@@ -73,7 +73,7 @@ All flags default to `false`. `POST /api/chat/stream` (live events) works only i
 
 ## Charlie's orchestration
 
-Each decision is a fresh, stateless planner call that can only propose `delegate <capability>` or `finish`. The application enforces dependencies (Research first; Security needs Research; Privacy Review and Synthesis need Research and Security), freshness of versioned results, budgets (8 decisions, 6 executions, 2 repeats, 120 seconds, 2 refused actions by default) and an absolute request deadline. A recommendation is never an authorization.
+Each decision is a fresh, stateless planner call that can only propose `delegate <capability>` or `finish`. The application enforces dependencies (Research first; Security needs Research; Privacy Review and Synthesis need Research and Security), freshness of versioned results, budgets (8 decisions, 6 executions, 2 repeats, 240 seconds, 2 refused actions by default) and an absolute request deadline. A recommendation is never an authorization.
 
 ## Live observability
 

@@ -28,18 +28,18 @@ ALL = [C.RESEARCH, C.FACT_CHECK, C.SOURCE_QUALITY, C.SECURITY_ASSESSMENT, C.PRIV
 def test_default_budgets_match_the_approved_values():
     budget = ExecutionBudget()
     assert (budget.max_decisions, budget.max_executions, budget.max_repeats_per_capability,
-            budget.max_seconds) == (8, 6, 2, 120.0)
+            budget.max_seconds) == (8, 6, 2, 240.0)
 
 
 @pytest.mark.parametrize("env,expected", [
-    ({}, (8, 6, 2, 120.0)),
+    ({}, (8, 6, 2, 240.0)),
     ({"VIHARBOT_ORCH_MAX_DECISIONS": "4", "VIHARBOT_ORCH_MAX_EXECUTIONS": "3",
       "VIHARBOT_ORCH_MAX_REPEATS": "0", "VIHARBOT_ORCH_MAX_SECONDS": "30"}, (4, 3, 0, 30.0)),
     ({"VIHARBOT_ORCH_MAX_DECISIONS": "9999", "VIHARBOT_ORCH_MAX_EXECUTIONS": "9999",
       "VIHARBOT_ORCH_MAX_REPEATS": "99", "VIHARBOT_ORCH_MAX_SECONDS": "99999"}, (16, 12, 3, 300.0)),
     ({"VIHARBOT_ORCH_MAX_DECISIONS": "0", "VIHARBOT_ORCH_MAX_EXECUTIONS": "-3",
       "VIHARBOT_ORCH_MAX_REPEATS": "-1", "VIHARBOT_ORCH_MAX_SECONDS": "0"}, (1, 1, 0, 1.0)),
-    ({"VIHARBOT_ORCH_MAX_DECISIONS": "abc", "VIHARBOT_ORCH_MAX_SECONDS": "nan"}, (8, 6, 2, 120.0)),
+    ({"VIHARBOT_ORCH_MAX_DECISIONS": "abc", "VIHARBOT_ORCH_MAX_SECONDS": "nan"}, (8, 6, 2, 240.0)),
 ])
 def test_budget_environment_overrides_are_bounded(monkeypatch, env, expected):
     for name in ("DECISIONS", "EXECUTIONS", "REPEATS", "SECONDS"):
@@ -112,7 +112,8 @@ def test_decision_history_and_gaps_are_bounded_and_content_free():
 
 def test_remaining_budget_reflects_usage_and_never_goes_negative():
     state = new_state()
-    assert state.remaining(lambda: 0.0) == {"decisions": 8, "executions": 6, "seconds": 120.0}
+    assert state.remaining(lambda: 0.0) == {
+        "decisions": 8, "executions": 6, "seconds": ExecutionBudget().max_seconds}
     state.decision_number = 20
     state.completed_steps.extend(make_step(C.RESEARCH, v) for v in range(1, 9))
     assert state.remaining(lambda: 500.0) == {"decisions": 0, "executions": 0, "seconds": 0.0}

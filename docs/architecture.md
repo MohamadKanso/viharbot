@@ -105,7 +105,7 @@ sequenceDiagram
     W-->>W: build ChatResponse (fresh results only)
 ```
 
-Budgets (defaults, with hard ceilings): 8 decisions, 6 executions, 2 repeats per capability, 120 s, 2 refused actions. The deadline is absolute and checked cooperatively.
+Budgets (defaults, with hard ceilings): 8 decisions, 6 executions, 2 repeats per capability, 240 s, 2 refused actions. The deadline is absolute and checked cooperatively.
 
 ## Model inference path
 

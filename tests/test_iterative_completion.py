@@ -5,7 +5,7 @@ import logging
 
 import pytest
 
-from orchestration_helpers import C, Clock, Forever, Script, delegate, finish
+from orchestration_helpers import C, FIXED_TIME_BUDGET, Clock, Forever, Script, delegate, finish
 from pipeline_fixtures import FakeSend, response
 from viharbot import web_app
 from viharbot.deadline import DeadlineExceeded
@@ -24,6 +24,7 @@ ALL_SIX = [R, FC, SQ, S, P, Y]
 
 def run(decide, send=None, **kwargs):
     send = send or FakeSend()
+    kwargs.setdefault("budget", FIXED_TIME_BUDGET)
     return run_iterative_pipeline(
         "q", RID, research_url="u-r", security_url="u-sec", specialist_urls=URLS, send=send,
         decide=decide, **kwargs), send
