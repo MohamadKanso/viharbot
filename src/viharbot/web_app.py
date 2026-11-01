@@ -138,6 +138,8 @@ def team_image(
     image_name: str,
     _: None = Depends(require_web_access),
 ) -> FileResponse:
+    if Path(image_name).name != image_name:
+        raise HTTPException(status_code=404, detail="Image not found")
     if image_name not in TEAM_IMAGES:
         raise HTTPException(status_code=404, detail="Image not found")
     images_dir = Path(os.getenv("WEB_IMAGES_DIR", "/app/images")).resolve()
