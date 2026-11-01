@@ -86,7 +86,7 @@ services:
       port: 8000
     envs:
       - key: RESEARCH_MODEL
-        value: openai/gpt-5.4-mini
+        value: gpt-5.4-mini
         scope: RUN_TIME
         type: GENERAL
       - key: MEMORY_DIR
@@ -202,7 +202,7 @@ services:
         scope: RUN_TIME
         type: GENERAL
       - key: PRIVACY_MODEL
-        value: openai/gpt-5.4-mini
+        value: gpt-5.4-mini
         scope: RUN_TIME
         type: GENERAL
       - key: MEMORY_DIR
@@ -232,7 +232,7 @@ services:
         scope: RUN_TIME
         type: GENERAL
       - key: SYNTHESIS_MODEL
-        value: openai/gpt-5.4-mini
+        value: gpt-5.4-mini
         scope: RUN_TIME
         type: GENERAL
       - key: MEMORY_DIR

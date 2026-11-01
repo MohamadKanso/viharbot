@@ -42,13 +42,13 @@ Eight agent identities are defined; four are connected to running services. Logi
 
 | Identity | Status | Capability | Service | Default model alias |
 |---|---|---|---|---|
-| Nova | live | research | `research` | `gpt-5.4-mini` |
+| Nova | live | research | `research` | `gpt-6.1-sol` |
 | Scout | live | fact check | `fact-check` | `gemini/gemini-3.5-flash` |
 | Scout | live | source quality | `source-quality` | `gemini/gemini-3.5-flash` |
 | Cipher | live | security assessment | `security` | `openai/gpt-5.4` |
 | Cipher | live | privacy review | `privacy-review` | `gpt-5.4-mini` |
 | Charlie | live | synthesis | `synthesis` | `gpt-5.4-mini` |
-| Charlie | live (opt-in) | planning | in the web container | `CHARLIE_PLANNER_MODEL`, no default |
+| Charlie | live (opt-in) | planning | in the web container | `gpt-6-luna` (`CHARLIE_PLANNER_MODEL`) |
 | Atlas, Sage | planned | none connected | none | none |
 | Pixel | live, on request (flag) | slide generation | `pixel` | `gpt-5.4-mini` |
 | Orbit | support role, not connected | none connected | none | none |

@@ -239,7 +239,7 @@ This section describes the Phase 6.2 rendering of the `/api/chat` response, whic
 
 ## Local Dev testing
 
-Nothing here deploys anything. With Docker Compose the web container gets the three flags (all `false` by default), `CHARLIE_PLANNER_MODEL` (empty by default), `LITELLM_BASE_URL` (the same default as the agents) and, **only if you opt in**, a LiteLLM key through `WEB_LITELLM_API_KEY`. By default the browser-facing container holds no key, even if `LITELLM_API_KEY` is set in your shell for the agents. The web image also installs the Cloudflare gateway CA, as the agent images do, so its HTTPS calls to LiteLLM verify.
+Nothing here deploys anything. With Docker Compose the web container gets the three flags (all `false` by default), `CHARLIE_PLANNER_MODEL` (`gpt-6-luna` by default), `LITELLM_BASE_URL` (the same default as the agents) and, **only if you opt in**, a LiteLLM key through `WEB_LITELLM_API_KEY`. By default the browser-facing container holds no key, even if `LITELLM_API_KEY` is set in your shell for the agents. The web image also installs the Cloudflare gateway CA, as the agent images do, so its HTTPS calls to LiteLLM verify.
 
 1. Pick a planner alias that exists in your LiteLLM (check `GET /v1/models`). It is never inferred from another alias.
 2. Start the stack with iterative mode on. The key is passed for this run only and is never written to a file:

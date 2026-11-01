@@ -75,7 +75,7 @@ Confidence and rationale are ignored. `research_security` omits Privacy Review b
 |---|---|---|
 | `VIHARBOT_DELEGATION_ENABLED` | Turns model-assisted selection on | false |
 | `VIHARBOT_IDENTITY_ROUTING_ENABLED` | Must also be true; otherwise delegation stays inactive and the existing path runs | false |
-| `CHARLIE_PLANNER_MODEL` | The planning model's LiteLLM alias | unset |
+| `CHARLIE_PLANNER_MODEL` | The planning model's LiteLLM alias | `gpt-6-luna` in local Compose; unset in the Stage spec |
 | `VIHARBOT_PLANNER_TIMEOUT_SECONDS` | Planning call timeout, clamped to 1-120 | 30 |
 
 `/api/chat` then uses one of three paths: delegation and routing on gives the delegated path, routing alone gives the fixed Phase 3 `full_review`, and neither gives the legacy pipeline. Users cannot choose a workflow, and nothing in the request is read for it. Personality-aware inference stays controlled by its own flags, and none of these variables is set in `compose.yaml`, `.env.example` or the DigitalOcean spec.

@@ -27,10 +27,10 @@ services:
       VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED: ${VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED:-false}
       # Dev only: planner rationale and model aliases in the live stream. Off by default.
       VIHARBOT_DEV_DIAGNOSTICS_ENABLED: ${VIHARBOT_DEV_DIAGNOSTICS_ENABLED:-false}
-      # Charlie's planner is the only inference the web service makes. It stays unavailable
-      # until an alias is set on purpose, and the key is passed only through the opt-in
-      # WEB_LITELLM_API_KEY so the browser-facing container holds no key by default.
-      CHARLIE_PLANNER_MODEL: ${CHARLIE_PLANNER_MODEL:-}
+      # Charlie's planner is the only inference the web service makes. Its alias defaults to
+      # gpt-6-luna, but it stays unavailable until the three flags are true and a key is passed
+      # through the opt-in WEB_LITELLM_API_KEY, so the browser-facing container holds no key by default.
+      CHARLIE_PLANNER_MODEL: ${CHARLIE_PLANNER_MODEL:-gpt-6-luna}
       LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}
       LITELLM_API_KEY: ${WEB_LITELLM_API_KEY:-}
     ports:
@@ -66,7 +66,7 @@ services:
     environment:
       LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}
       LITELLM_API_KEY: ${LITELLM_API_KEY:-}
-      RESEARCH_MODEL: ${RESEARCH_MODEL:-gpt-5.4-mini}
+      RESEARCH_MODEL: ${RESEARCH_MODEL:-gpt-6.1-sol}
       MEMORY_DIR: /data
     volumes:
       - ./data/research:/data/research

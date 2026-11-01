@@ -24,6 +24,7 @@ from .identity_execution import identity_routing_enabled, run_identity_pipeline
 from .iterative_execution import iterative_orchestration_enabled, run_iterative_pipeline
 from .orchestration_view import OrchestrationMeta, build_orchestration_meta  # noqa: F401
 from .chat_models import AgentActivity, ChatRequest, ChatResponse, ChatTurn, DeckInfo  # noqa: F401
+from .pixel.theme import tokens_css
 from .pixel_execution import fetch_deck, ppt_generation_enabled, run_pixel_stage, wants_deck
 from .live_hooks import CancelToken
 from .live_stream import StreamPermit, dev_diagnostics_enabled, event_stream
@@ -94,6 +95,14 @@ def health() -> dict[str, str]:
 def home(_: None = Depends(require_web_access)) -> FileResponse:
     static_dir = Path(os.getenv("WEB_STATIC_DIR", Path(__file__).with_name("static")))
     return FileResponse(static_dir / "index.html", media_type="text/html")
+
+
+@app.get("/pixel-tokens.css", include_in_schema=False)
+def pixel_tokens(_: None = Depends(require_web_access)) -> Response:
+    """Pixel's colours as CSS variables, so the chat output matches the PowerPoint and deck page."""
+    return Response(
+        content=tokens_css(), media_type="text/css; charset=utf-8", headers={"Cache-Control": "no-cache"}
+    )
 
 
 TEAM_IMAGES = {
