@@ -86,7 +86,7 @@ services:
       port: 8000
     envs:
       - key: RESEARCH_MODEL
-        value: gpt-5.4-mini
+        value: gpt-6.1-sol
         scope: RUN_TIME
         type: GENERAL
       - key: MEMORY_DIR
