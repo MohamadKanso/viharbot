@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from .schemas import (
+    DeckResult,
     FactCheckReview,
     FinalSynthesis,
     PrivacyAssessment,
@@ -42,6 +43,7 @@ SPECIALIST_RESULT_MODELS: dict[str, type[BaseModel]] = {
     "source-quality": SourceQualityReview,
     "privacy-review": PrivacyAssessment,
     "synthesis": FinalSynthesis,
+    "pixel": DeckResult,
 }
 
 AgentResponse = ResearchResponse | SecurityResponse | SpecialistResponse

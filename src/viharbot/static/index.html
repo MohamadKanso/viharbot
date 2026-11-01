@@ -119,6 +119,13 @@
       .welcome h2 { max-width: 620px; margin: 19px 0 9px; font-family: Iowan Old Style, "Palatino Linotype", Georgia, serif; font-size: clamp(35px, 4.6vw, 53px); font-weight: 400; line-height: 1.03; letter-spacing: -.055em; }
       .welcome h2 em { color: var(--coral); font-weight: 400; }
       .welcome-copy { max-width: 510px; margin: 0; color: #75766e; font-size: 14px; line-height: 1.7; }
+      .agent-downloads { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 8px 50px; }
+      .agent-downloads[hidden] { display: none; }
+      .deck-icon { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: rgba(255,255,255,.83); font-size: 11px; font-weight: 700; text-decoration: none; }
+      .deck-icon:hover { border-color: #e8c6b6; box-shadow: 0 4px 12px rgba(81, 64, 48, .08); }
+      .deck-note { margin: 14px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.7); font-size: 13px; }
+      .deck-note p { margin: 0 0 6px; }
+      .deck-link { font-weight: 700; color: var(--ink); text-decoration: underline; }
       .suggestion-heading { margin: 28px 0 10px; color: #8b8b82; font-size: 11px; font-weight: 720; letter-spacing: .1em; text-transform: uppercase; }
       .suggestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
       .suggestion { min-height: 72px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 15px; color: var(--ink); background: rgba(255,255,255,.83); text-align: left; cursor: pointer; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
@@ -282,7 +289,7 @@
         <div class="top-right">
           <span class="privacy-label">Thoughtful answers, with room for uncertainty</span>
           <a class="team-link" id="team-link" href="#team"><span aria-hidden="true">✳</span> Meet the team</a>
-          <span class="team-status"><i></i>4 live · 10 in the crew</span>
+          <span class="team-status"><i></i>5 live · 10 in the crew</span>
         </div>
       </header>
 
@@ -290,23 +297,24 @@
         <aside class="sidebar">
           <div class="eyebrow">A thinking companion</div>
           <h1>A little curiosity can go a long way.</h1>
-          <p class="intro">Ten distinct perspectives. Four already work together in every conversation.</p>
+          <p class="intro">Ten distinct perspectives. Five already work together; Pixel joins when you ask for a slide deck.</p>
           <div class="team-heading"><strong>Meet your crew</strong><span>10 teammates</span></div>
           <section class="team-group" aria-label="Agents active in the current chat pipeline">
-            <div class="team-group-title"><span>In the live chat</span><em>4 agents</em></div>
+            <div class="team-group-title"><span>In the live chat</span><em>5 agents</em></div>
             <div class="agent-list">
               <div class="agent"><img class="agent-photo" src="/images/Charlie_Chatwin_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Charlie Chatwin <small>Live · synthesis</small></span><span class="agent-desc">Strategic thinking &amp; orchestration</span></span></div>
               <div class="agent"><img class="agent-photo" src="/images/Nova_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Nova <small>Live · research</small></span><span class="agent-desc">Research &amp; knowledge</span></span></div>
               <div class="agent"><img class="agent-photo" src="/images/Scout_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Scout <small>Live · fact check &amp; sources</small></span><span class="agent-desc">Data exploration &amp; evidence analysis</span></span></div>
               <div class="agent"><img class="agent-photo" src="/images/Cipher_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Cipher <small>Live · security &amp; privacy</small></span><span class="agent-desc">Security &amp; risk analysis</span></span></div>
+              <div class="agent"><img class="agent-photo" src="/images/Pixel_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Pixel <small>Live · slide decks</small></span><span class="agent-desc">Executive slide decks on request</span></span></div>
+              <div class="agent-downloads" id="pixel-downloads" aria-label="Slide decks Pixel made" hidden></div>
             </div>
           </section>
           <section class="team-group" aria-label="Supporting team roles">
-            <div class="team-group-title"><span>Supporting the team</span><em>4 roles</em></div>
+            <div class="team-group-title"><span>Supporting the team</span><em>3 roles</em></div>
             <div class="agent-list">
               <div class="agent"><img class="agent-photo" src="/images/Atlas_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Atlas <small>Planned</small></span><span class="agent-desc">Exploration &amp; logistics</span></span></div>
               <div class="agent"><img class="agent-photo" src="/images/Sage_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Sage <small>Planned</small></span><span class="agent-desc">Perspective &amp; wisdom</span></span></div>
-              <div class="agent"><img class="agent-photo" src="/images/Pixel_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Pixel <small>Creative support</small></span><span class="agent-desc">Creative content &amp; visuals</span></span></div>
               <div class="agent"><img class="agent-photo" src="/images/Orbit_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Orbit <small>Platform support</small></span><span class="agent-desc">Automation &amp; operations</span></span></div>
             </div>
           </section>
@@ -317,7 +325,7 @@
               <div class="agent proposed"><span class="agent-initial" aria-hidden="true">E</span><span class="agent-copy"><span class="agent-name">Echo <small>Proposed</small></span><span class="agent-desc">Intent &amp; clarification</span></span></div>
             </div>
           </section>
-          <div class="sidebar-foot"><strong>Four live agents · one shared LiteLLM server</strong>Calls run in sequence. Atlas and Sage are planned and Pixel and Orbit are support roles; none of them run in the live chat. Beacon and Echo are proposed roles.</div>
+          <div class="sidebar-foot"><strong>Five live agents · one shared LiteLLM server</strong>Calls run in sequence. Pixel runs last, and only when you ask for a slide deck. Atlas and Sage are planned and Orbit is a support role; none of them run in the live chat. Beacon and Echo are proposed roles.</div>
         </aside>
 
         <main class="chat-panel">
@@ -330,10 +338,10 @@
               <p class="welcome-copy">ViharBot gathers research, checks the supplied evidence and sources, reviews security and privacy, then brings it together with care.</p>
               <p class="suggestion-heading">A few places to begin</p>
               <div class="suggestions">
-                <button class="suggestion" type="button"><b>Full team review</b><span>Our clinic wants to text appointment reminders through a third-party SMS vendor. Its brochure claims it is HIPAA-compliant, has 99.99% delivery, and has never had a breach, but cites no audit report. Please research the options, fact-check those claims, assess how reliable the brochure is as a source, review the security and privacy risks of sending patient names and appointment times, and finish with one synthesized recommendation.</span></button>
+                <button class="suggestion" type="button"><b>Full team review</b><span>Our clinic wants to text appointment reminders through a third-party SMS vendor. Its brochure claims it is HIPAA-compliant, has 99.99% delivery, and has never had a breach, but cites no audit report. Please research the options, fact-check those claims, assess how reliable the brochure is as a source, review the security and privacy risks of sending patient names and appointment times, and finish with one synthesized recommendation. Then turn that recommendation into a short slide deck for an executive audience.</span></button>
                 <button class="suggestion" type="button"><b>Check a claim and its source</b><span>A health blog claims vitamin D prevents every respiratory infection but links no study. Please research what is known, fact-check the claim against the evidence you have, assess the quality of the source, review any security or privacy concerns, and give me a synthesized answer on whether it is reliable.</span></button>
                 <button class="suggestion" type="button"><b>Review privacy</b><span>An AI meeting-notes app records voices, stores transcripts with attendee names, and uses them for model training by default. Please research how these tools work, review the security and privacy risks for a small team, and synthesize what the team should ask before enabling it.</span></button>
-                <button class="suggestion" type="button"><b>Plan a security change</b><span>Our 12-person nonprofit wants to replace passwords with passkeys on staff laptops and phones. Please research the options, assess the security risks and recovery gaps, check whether any privacy or accessibility issues apply, and synthesize a rollout recommendation.</span></button>
+                <button class="suggestion" type="button"><b>Plan a security change, with a deck</b><span>Our 12-person nonprofit wants to replace passwords with passkeys on staff laptops and phones. Please research the options, assess the security risks and recovery gaps, check whether any privacy or accessibility issues apply, and synthesize a rollout recommendation. Finish with a short slide deck I can present to the board.</span></button>
               </div>
             </section>
           </div>
@@ -379,7 +387,7 @@
           </article>
           <article class="profile-card">
             <img src="/images/Pixel_headshot.png" alt="Pixel portrait" />
-            <div class="profile-info"><div class="profile-name-line"><h3>Pixel</h3><span class="profile-status support">Creative support</span></div><p class="profile-title">Director of Creative Intelligence</p><p class="profile-bio">Pixel transforms complex ideas into compelling visual experiences. Through creative storytelling, illustrations, and interactive content, he helps make sophisticated topics easier to understand.</p><span class="profile-specialties">Visual storytelling · Creative design · Presentations · AI-generated media</span></div>
+            <div class="profile-info"><div class="profile-name-line"><h3>Pixel</h3><span class="profile-status">Live · Slide Decks</span></div><p class="profile-title">Director of Creative Intelligence</p><p class="profile-bio">Pixel transforms complex ideas into compelling visual experiences. Through creative storytelling, illustrations, and interactive content, he helps make sophisticated topics easier to understand.</p><span class="profile-specialties">Visual storytelling · Creative design · Presentations · AI-generated media</span></div>
           </article>
           <article class="profile-card">
             <img src="/images/Sage_headshot.png" alt="Sage portrait" />
@@ -512,13 +520,14 @@
 
       const agentNames = {
         research: "Research", "fact-check": "Fact Check", "source-quality": "Source Quality",
-        security: "Security", "privacy-review": "Privacy Review", synthesis: "Synthesis",
+        security: "Security", "privacy-review": "Privacy Review", synthesis: "Synthesis", pixel: "Pixel",
       };
 
-      const identityNames = { nova: "Nova", scout: "Scout", cipher: "Cipher", charlie: "Charlie" };
+      const identityNames = { nova: "Nova", scout: "Scout", cipher: "Cipher", charlie: "Charlie", pixel: "Pixel" };
       const capabilityLabels = {
         research: "Research", fact_check: "Fact Check", source_quality: "Source Quality",
         security_assessment: "Security", privacy_review: "Privacy Review", synthesis: "Synthesis",
+        slide_generation: "Slide Decks",
       };
       const completionNotes = {
         charlie_finished: "Charlie reviewed the evidence and decided it was sufficient.",
@@ -539,6 +548,40 @@
         if (className) node.className = className;
         if (text !== undefined) node.textContent = text;
         return node;
+      }
+      const DECK_STORE = "viharbot.pixelDecks";
+      function savedDecks() {
+        try { return JSON.parse(sessionStorage.getItem(DECK_STORE) || "[]"); } catch (e) { return []; }
+      }
+      function addDeckIcon(deck, remember) {
+        const strip = document.querySelector("#pixel-downloads");
+        if (!strip || !deck.download_url) return;
+        const link = el("a", "deck-icon", `\u2B07 ${deck.slide_count}`);
+        link.setAttribute("href", deck.download_url);
+        link.setAttribute("download", "");
+        link.setAttribute("title", `Download Pixel's ${deck.slide_count}-slide deck`);
+        link.setAttribute("aria-label", `Download Pixel's ${deck.slide_count}-slide deck`);
+        strip.append(link);
+        strip.hidden = false;
+        if (remember) {
+          try { sessionStorage.setItem(DECK_STORE, JSON.stringify([...savedDecks(), { download_url: deck.download_url, slide_count: deck.slide_count }].slice(-20))); } catch (e) { /* storage unavailable */ }
+        }
+      }
+      savedDecks().forEach((deck) => addDeckIcon(deck, false));
+      function buildDeck(deck) {
+        const box = el("section", "deck-note");
+        if (deck.status !== "complete") {
+          box.append(el("p", "", `Pixel could not build the slide deck${deck.error ? `: ${deck.error}` : "."}`));
+          return box;
+        }
+        box.append(el("p", "", `Pixel built a ${deck.slide_count}-slide deck.`));
+        const link = el("a", "deck-link", "Download the .pptx");
+        link.setAttribute("href", deck.download_url);
+        link.setAttribute("download", "");
+        box.append(link);
+        if (deck.rejected_slides?.length) box.append(el("p", "", `${deck.rejected_slides.length} planned slide(s) failed validation and were left out.`));
+        listSection(box, "Deck notes", deck.warnings);
+        return box;
       }
       function listSection(parent, title, items) {
         if (!items || !items.length) return;
@@ -664,6 +707,10 @@
           card.append(points);
         }
         if (synthesis?.caveats?.length) listSection(card, "A few caveats", synthesis.caveats);
+        if (result.deck) {
+          card.append(buildDeck(result.deck));
+          if (result.deck.status === "complete") addDeckIcon(result.deck, true);
+        }
         if (live) card.append(buildLiveTabs(live, result));
         else if (result.orchestration) card.append(buildOrchestration(result.orchestration));
         if (result.agent_activity?.length) card.append(buildActivity(result.agent_activity));

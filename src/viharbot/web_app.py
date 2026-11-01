@@ -23,7 +23,8 @@ from .delegated_execution import delegation_enabled, run_delegated_pipeline
 from .identity_execution import identity_routing_enabled, run_identity_pipeline
 from .iterative_execution import iterative_orchestration_enabled, run_iterative_pipeline
 from .orchestration_view import OrchestrationMeta, build_orchestration_meta  # noqa: F401
-from .chat_models import AgentActivity, ChatRequest, ChatResponse, ChatTurn  # noqa: F401
+from .chat_models import AgentActivity, ChatRequest, ChatResponse, ChatTurn, DeckInfo  # noqa: F401
+from .pixel_execution import fetch_deck, ppt_generation_enabled, run_pixel_stage, wants_deck
 from .live_hooks import CancelToken
 from .live_stream import StreamPermit, dev_diagnostics_enabled, event_stream
 from .observability import configure_logging, get_request_id
@@ -150,7 +151,9 @@ def agent_urls() -> dict:
     )
 
 
-def build_chat_response(pipeline_result: dict, request_id: str, orchestration=None) -> ChatResponse:
+def build_chat_response(
+    pipeline_result: dict, request_id: str, orchestration=None, deck: DeckInfo | None = None
+) -> ChatResponse:
     """Assemble the validated public response. Shared by /api/chat and the live stream."""
     fact_check_payload = pipeline_result.get("fact_check", {}).get("result")
     source_payload = pipeline_result.get("source_quality", {}).get("result")
@@ -172,6 +175,7 @@ def build_chat_response(pipeline_result: dict, request_id: str, orchestration=No
         synthesis=FinalSynthesis.model_validate(synthesis_payload) if synthesis_payload else None,
         agent_activity=pipeline_result["agent_activity"],
         **({"orchestration": orchestration} if orchestration is not None else {}),
+        **({"deck": deck} if deck is not None else {}),
     )
 
 
@@ -206,7 +210,13 @@ def chat(
             ).to_legacy_dict()
         else:
             pipeline_result = run_pipeline(*pipeline_args, **pipeline_urls)
-        result = build_chat_response(pipeline_result, request_id, orchestration)
+        deck = None
+        if ppt_generation_enabled() and wants_deck(body.message):
+            # Optional step after the pipeline; a failure is reported in `deck`, never a 502.
+            deck, deck_activity = run_pixel_stage(body.message.strip(), pipeline_result, request_id)
+            if deck_activity is not None:
+                pipeline_result["agent_activity"].append(deck_activity)
+        result = build_chat_response(pipeline_result, request_id, orchestration, deck)
         logger.info(
             "chat request completed",
             extra={
@@ -249,6 +259,19 @@ def chat(
             detail="The agent team could not complete this request",
             headers={"X-Request-ID": request_id},
         ) from None
+
+
+@app.get("/api/decks/{deck_id}", include_in_schema=False)
+def download_deck(deck_id: str, _: None = Depends(require_web_access)) -> Response:
+    """Serve a generated deck from the pixel service. Only deck ids the service issued match."""
+    data = fetch_deck(deck_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": f'attachment; filename="{deck_id}.pptx"'},
+    )
 
 
 STREAM_UNSUPPORTED_DETAIL = "Live streaming requires iterative orchestration"

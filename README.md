@@ -50,7 +50,8 @@ Eight agent identities are defined; four are connected to running services. Logi
 | Charlie | live | synthesis | `synthesis` | `openai/gpt-5.4-mini` |
 | Charlie | live (opt-in) | planning | in the web container | `CHARLIE_PLANNER_MODEL`, no default |
 | Atlas, Sage | planned | none connected | none | none |
-| Pixel, Orbit | support roles, not connected | none connected | none | none |
+| Pixel | live, on request (flag) | slide generation | `pixel` | `gemini/gemini-3.5-flash` |
+| Orbit | support role, not connected | none connected | none | none |
 
 Fact Check reviews only the evidence Research supplied; it does not browse. Each non-trivial verdict must quote that evidence, and the application checks the quote. Source Quality inspects reference strings without fetching them.
 
@@ -64,6 +65,7 @@ A declarative registry of 78 skills across the eight identities lives in `src/vi
 
 | Mode | Flags | Behavior |
 |---|---|---|
+| Slide decks (Pixel) | `VIHARBOT_PPT_GENERATION_ENABLED` (true in local Compose while testing; set it false when the feature is done) | After the pipeline, if the message asks for a deck, the pixel service plans and builds a `.pptx`; see [Pixel slide service](docs/pixel-slide-service.md) |
 | Iterative orchestration | `VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED`, `VIHARBOT_DELEGATION_ENABLED` and `VIHARBOT_IDENTITY_ROUTING_ENABLED` all `true`, plus `CHARLIE_PLANNER_MODEL` | Charlie recommends one step at a time; policy authorizes it; the loop runs it |
 | Controlled delegation | `VIHARBOT_DELEGATION_ENABLED` and identity routing | Charlie picks one of two predefined workflows |
 | Identity-attributed execution | `VIHARBOT_IDENTITY_ROUTING_ENABLED` | The fixed pipeline, attributed to identities |
@@ -138,7 +140,7 @@ Pushing to `main` updates source only; nothing deploys automatically.
 * Agent memory is append-only JSONL, written but never read back, and ephemeral on App Platform.
 * Agent-to-agent REST is unauthenticated; identities do not have separate cloud permissions.
 * Calls run one at a time, and cancelling a browser request does not stop work already in flight.
-* Planned, not built: per-user accounts, durable sessions and memory, authenticated inter-agent calls, distributed runtimes, Atlas, Sage, Pixel and Orbit.
+* Planned, not built: per-user accounts, durable sessions and memory, authenticated inter-agent calls, distributed runtimes, Atlas, Sage and Orbit. Pixel's slide decks are built only in local Compose and are unverified against a live model; see [Pixel slide service](docs/pixel-slide-service.md).
 
 ## Contributing and licensing
 

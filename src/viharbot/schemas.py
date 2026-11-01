@@ -73,3 +73,13 @@ class FinalSynthesis(BaseModel):
     key_points: list[str]
     confidence: Literal["low", "medium", "high"]
     caveats: list[str]
+
+
+class DeckResult(BaseModel):
+    """What the pixel service reports about a generated slide deck. No slide text."""
+
+    deck_id: str
+    slide_count: int
+    rejected_slides: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    model_calls: int

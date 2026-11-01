@@ -32,6 +32,7 @@ class Capability(StrEnum):
     LOGISTICS_PLANNING = "logistics_planning"
     AUTOMATION_ENGINEERING = "automation_engineering"
     EVIDENCE_DISCOVERY = "evidence_discovery"
+    SLIDE_GENERATION = "slide_generation"
 
 
 class CapabilityStatus(StrEnum):
@@ -53,6 +54,7 @@ CAPABILITY_STATUS: dict[Capability, CapabilityStatus] = {
             Capability.SECURITY_ASSESSMENT,
             Capability.PRIVACY_REVIEW,
             Capability.SYNTHESIS,
+            Capability.SLIDE_GENERATION,
         }
         else CapabilityStatus.PLANNED
     )

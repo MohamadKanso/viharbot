@@ -71,8 +71,9 @@ An identity's declared capabilities alone authorize nothing. Only a binding in t
 | Cipher | security_assessment | `security` |
 | Cipher | privacy_review | `privacy-review` |
 | Charlie | synthesis | `synthesis` |
+| Pixel | slide_generation | `pixel` (added after Phase 6; see [Pixel slide service](pixel-slide-service.md)) |
 
-Charlie also declares `research` but is deliberately not bound to it, because the design allows one identity per capability. Atlas, Pixel, Sage and Orbit have no bindings because their capabilities are planned. The bindings describe orchestration responsibility, not new services or personality-specific behavior.
+Charlie also declares `research` but is deliberately not bound to it, because the design allows one identity per capability. Atlas, Sage and Orbit have no bindings because their capabilities are planned. Pixel's `slide_generation` binding is not a pipeline stage: the web service calls it after the pipeline, only when the PPT flag is on. The bindings describe orchestration responsibility, not new services or personality-specific behavior.
 
 ## ExecutionPlan and workflows
 

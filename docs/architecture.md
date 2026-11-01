@@ -15,9 +15,11 @@ flowchart TB
     NO[Nova]
     SC[Scout]
     CI[Cipher]
-    PL["Atlas, Sage, Pixel, Orbit<br/>(not connected)"]
+    PX[Pixel]
+    PL["Atlas, Sage, Orbit<br/>(not connected)"]
   end
   CH -->|synthesis| SY[synthesis service]
+  PX -->|slide generation, on request| PXS[pixel service]
   CH -. planning .-> PW[planner in web container]
   NO -->|research| RS[research service]
   SC -->|fact check| FC[fact-check service]
@@ -172,4 +174,4 @@ A push to `main` deploys nothing. See [deployment strategy](deployment-strategy.
 | Memory | Write-only JSONL per agent | Durable, isolated, retrievable memory |
 | Communication | Plain JSON REST, validated contracts | Authenticated and observable inter-agent calls |
 | Runtimes | Docker Compose; DigitalOcean template | AWS EC2 and AgentCore deployment, distributed coordination |
-| Identities | Four live, four defined only | Atlas, Sage, Pixel, Orbit behavior |
+| Identities | Five live (Pixel only on request, behind a flag), three defined only | Atlas, Sage, Orbit behavior |
