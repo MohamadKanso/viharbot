@@ -19,11 +19,6 @@ from .identity import AgentId, Capability, NonEmpty
 from .identity_registry import AgentRegistry, default_registry
 from .pipeline_state import PipelineState
 
-IDENTITY_ROUTING_FLAG = "VIHARBOT_IDENTITY_ROUTING_ENABLED"
-
-
-def identity_routing_enabled() -> bool:
-    return os.getenv(IDENTITY_ROUTING_FLAG, "false").strip().lower() in {"1", "true", "yes"}
 
 
 class IdentityExecutionError(RuntimeError):

@@ -1,0 +1,180 @@
+{
+ "request_id": "lorem-sample",
+ "findings": {
+  "summary": "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et. Dolore magna aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea. Commodo consequat duis aute irure in reprehenderit voluptate velit esse cillum fugiat nulla pariatur excepteur sint.",
+  "findings": [
+   {
+    "claim": "Occaecat cupidatat non proident sunt culpa qui officia deserunt mollit.",
+    "evidence": "Anim id est laborum lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut.",
+    "confidence": "high"
+   },
+   {
+    "claim": "Labore et dolore magna aliqua enim ad minim veniam quis.",
+    "evidence": "Nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit voluptate velit esse.",
+    "confidence": "medium"
+   },
+   {
+    "claim": "Cillum fugiat nulla pariatur excepteur sint occaecat cupidatat non proident.",
+    "evidence": "Sunt culpa qui officia deserunt mollit anim id est laborum lorem ipsum dolor sit amet consectetur adipiscing elit.",
+    "confidence": "low"
+   },
+   {
+    "claim": "Sed do eiusmod tempor incididunt ut labore et dolore magna.",
+    "evidence": "Aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute.",
+    "confidence": "medium"
+   },
+   {
+    "claim": "Irure in reprehenderit voluptate velit esse cillum fugiat nulla pariatur.",
+    "evidence": "Excepteur sint occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum lorem ipsum.",
+    "confidence": "high"
+   }
+  ],
+  "sources": [
+   "dolor sit amet consectetur adipiscing elit",
+   "sed do eiusmod tempor incididunt ut",
+   "labore et dolore magna aliqua enim",
+   "ad minim veniam quis nostrud exercitation"
+  ],
+  "uncertainties": [
+   "Ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit voluptate.",
+   "Velit esse cillum fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa.",
+   "Qui officia deserunt mollit anim id est laborum lorem ipsum dolor sit amet consectetur."
+  ]
+ },
+ "assessment": {
+  "overall_risk": "medium",
+  "implications": [
+   "Adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua enim.",
+   "Ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat.",
+   "Duis aute irure in reprehenderit voluptate velit esse cillum fugiat nulla pariatur excepteur sint.",
+   "Occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum."
+  ],
+  "recommendations": [
+   "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut.",
+   "Labore et dolore magna aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris.",
+   "Nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit voluptate velit esse.",
+   "Cillum fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa qui officia."
+  ],
+  "uncertainties": [
+   "Deserunt mollit anim id est laborum lorem ipsum dolor sit amet consectetur adipiscing elit.",
+   "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua enim ad minim."
+  ]
+ },
+ "fact_check": {
+  "summary": "Veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure in. Reprehenderit voluptate velit esse cillum fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa.",
+  "claims": [
+   {
+    "claim": "Qui officia deserunt mollit anim id est laborum lorem ipsum.",
+    "status": "supported_by_supplied_evidence",
+    "rationale": "Dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna.",
+    "follow_up": "Aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris."
+   },
+   {
+    "claim": "Nisi aliquip ex ea commodo consequat duis aute irure in.",
+    "status": "insufficient_evidence",
+    "rationale": "Reprehenderit voluptate velit esse cillum fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa.",
+    "follow_up": "Qui officia deserunt mollit anim id est laborum lorem ipsum."
+   },
+   {
+    "claim": "Dolor sit amet consectetur adipiscing elit sed do eiusmod tempor.",
+    "status": "mixed_evidence",
+    "rationale": "Incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris.",
+    "follow_up": "Nisi aliquip ex ea commodo consequat duis aute irure in."
+   },
+   {
+    "claim": "Reprehenderit voluptate velit esse cillum fugiat nulla pariatur excepteur sint.",
+    "status": "contradicted_by_supplied_evidence",
+    "rationale": "Occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum lorem ipsum.",
+    "follow_up": "Dolor sit amet consectetur adipiscing elit sed do eiusmod tempor."
+   }
+  ],
+  "limitations": [
+   "Incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud exercitation.",
+   "Ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit voluptate."
+  ]
+ },
+ "source_quality": {
+  "summary": "Velit esse cillum fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa qui officia.",
+  "sources": [
+   {
+    "source": "deserunt mollit anim id est",
+    "apparent_quality": "weak",
+    "rationale": "Laborum lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt.",
+    "checks_to_perform": [
+     "Ut labore et dolore magna aliqua enim ad minim.",
+     "Veniam quis nostrud exercitation ullamco laboris nisi aliquip ex."
+    ]
+   },
+   {
+    "source": "ea commodo consequat duis aute",
+    "apparent_quality": "moderate",
+    "rationale": "Irure in reprehenderit voluptate velit esse cillum fugiat nulla pariatur excepteur sint occaecat cupidatat.",
+    "checks_to_perform": [
+     "Non proident sunt culpa qui officia deserunt mollit anim.",
+     "Id est laborum lorem ipsum dolor sit amet consectetur."
+    ]
+   },
+   {
+    "source": "adipiscing elit sed do eiusmod",
+    "apparent_quality": "strong",
+    "rationale": "Tempor incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud.",
+    "checks_to_perform": [
+     "Exercitation ullamco laboris nisi aliquip ex ea commodo consequat.",
+     "Duis aute irure in reprehenderit voluptate velit esse cillum."
+    ]
+   },
+   {
+    "source": "fugiat nulla pariatur excepteur sint",
+    "apparent_quality": "unknown",
+    "rationale": "Occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum.",
+    "checks_to_perform": [
+     "Lorem ipsum dolor sit amet consectetur adipiscing elit sed.",
+     "Do eiusmod tempor incididunt ut labore et dolore magna."
+    ]
+   }
+  ],
+  "limitations": [
+   "Aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea.",
+   "Commodo consequat duis aute irure in reprehenderit voluptate velit esse cillum fugiat nulla pariatur."
+  ]
+ },
+ "privacy_review": {
+  "overall_risk": "high",
+  "sensitive_data_categories": [
+   "excepteur sint",
+   "occaecat cupidatat",
+   "non proident",
+   "sunt culpa"
+  ],
+  "concerns": [
+   "Qui officia deserunt mollit anim id est laborum lorem ipsum dolor sit amet consectetur.",
+   "Adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua enim.",
+   "Ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat.",
+   "Duis aute irure in reprehenderit voluptate velit esse cillum fugiat nulla pariatur excepteur sint."
+  ],
+  "recommendations": [
+   "Occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum.",
+   "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut.",
+   "Labore et dolore magna aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris.",
+   "Nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit voluptate velit esse."
+  ],
+  "processing_note": "Cillum fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa qui officia."
+ },
+ "synthesis": {
+  "answer": "Deserunt mollit anim id est laborum lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor. Incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip. Ex ea commodo consequat duis aute irure in reprehenderit voluptate velit esse cillum fugiat nulla pariatur excepteur sint. Occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum lorem ipsum dolor sit.",
+  "key_points": [
+   "Amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna.",
+   "Aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea.",
+   "Commodo consequat duis aute irure in reprehenderit voluptate velit esse cillum fugiat nulla pariatur.",
+   "Excepteur sint occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id.",
+   "Est laborum lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor."
+  ],
+  "confidence": "medium",
+  "caveats": [
+   "Incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud exercitation.",
+   "Ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit voluptate.",
+   "Velit esse cillum fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa."
+  ]
+ },
+ "agent_activity": []
+}

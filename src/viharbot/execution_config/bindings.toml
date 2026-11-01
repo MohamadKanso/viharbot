@@ -32,3 +32,10 @@ service_name = "privacy-review"
 identity_id = "charlie"
 capability = "synthesis"
 service_name = "synthesis"
+
+# Pixel's slide generation. Unlike the six services above, the pixel service is not a stage of
+# the typed pipeline: the web service calls it after the pipeline, only when the PPT flag is on.
+[[binding]]
+identity_id = "pixel"
+capability = "slide_generation"
+service_name = "pixel"

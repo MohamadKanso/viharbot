@@ -34,7 +34,7 @@ def test_unbound_teammates_are_never_marked_live():
 
 def test_counts_match_the_bindings():
     live = len(live_identities())
-    words = {4: "Four"}
+    words = {4: "Four", 5: "Five"}
     assert f"{live} live · 10 in the crew" in HTML
     assert f"<em>{live} agents</em>" in HTML
     assert f"{words[live]} live agents" in HTML and f"{words[live]} already work together" in HTML

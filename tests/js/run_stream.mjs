@@ -44,6 +44,8 @@ const context = vm.createContext({
   document, window, console, Date, Promise, JSON, Math, Object, Array, String, Number,
   TextDecoder, ReadableStream: function ReadableStream() {},
   fetch: async (url, options) => {
+    // The page's load-time GET for the agents' models is not a chat request; see run_page.mjs.
+    if (String(url).startsWith("/api/team-models")) return { ok: false, json: async () => null };
     fetchCalls.push({ url, body: JSON.parse(options.body), accept: (options.headers ?? {}).Accept ?? null });
     if (url === "/api/chat/stream") return streamResponse;
     return ordinary;

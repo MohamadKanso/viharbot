@@ -42,6 +42,11 @@ services:
         value: /app/static
         scope: RUN_TIME
         type: GENERAL
+      # Slide-deck generation is off on Stage, and this spec has no pixel component.
+      - key: VIHARBOT_PPT_GENERATION_ENABLED
+        value: "false"
+        scope: RUN_TIME
+        type: GENERAL
       - key: RESEARCH_URL
         value: http://research:8000/research
         scope: RUN_TIME
@@ -81,7 +86,7 @@ services:
       port: 8000
     envs:
       - key: RESEARCH_MODEL
-        value: openai/gpt-5.4-mini
+        value: gpt-6.1-sol
         scope: RUN_TIME
         type: GENERAL
       - key: MEMORY_DIR
@@ -197,7 +202,7 @@ services:
         scope: RUN_TIME
         type: GENERAL
       - key: PRIVACY_MODEL
-        value: openai/gpt-5.4-mini
+        value: gpt-5.4-mini
         scope: RUN_TIME
         type: GENERAL
       - key: MEMORY_DIR
@@ -227,7 +232,7 @@ services:
         scope: RUN_TIME
         type: GENERAL
       - key: SYNTHESIS_MODEL
-        value: openai/gpt-5.4-mini
+        value: gpt-5.4-mini
         scope: RUN_TIME
         type: GENERAL
       - key: MEMORY_DIR

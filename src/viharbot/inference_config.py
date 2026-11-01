@@ -1,7 +1,7 @@
 """Resolve the effective inference configuration for an operational service.
 
 Legacy behavior is the default. Personality-aware inference activates only inside a service
-whose own environment enables both flags, and only for that service's approved binding. No
+whose own environment enables its flag, and only for that service's approved binding. No
 identity ever arrives from a request, and resolution makes no network or model calls.
 """
 
@@ -21,9 +21,6 @@ from .identity import AgentId, Capability, CapabilityStatus, ModelAlias, NonEmpt
 from .identity_registry import AgentRegistry, default_registry
 
 PERSONALITY_FLAG = "VIHARBOT_PERSONALITY_INFERENCE_ENABLED"
-# Same variable as identity_execution.IDENTITY_ROUTING_FLAG; duplicated so services do not
-# import the orchestrator. A test keeps the two equal.
-IDENTITY_ROUTING_FLAG = "VIHARBOT_IDENTITY_ROUTING_ENABLED"
 
 SERVICE_CAPABILITY: dict[str, Capability] = {
     service: capability for capability, service in OPERATIONAL_SERVICES.items()
@@ -80,8 +77,8 @@ def _flag(name: str) -> bool:
 
 
 def personality_inference_active() -> bool:
-    """Both flags must be set in this service's own environment."""
-    return _flag(PERSONALITY_FLAG) and _flag(IDENTITY_ROUTING_FLAG)
+    """The flag must be set in this service's own environment."""
+    return _flag(PERSONALITY_FLAG)
 
 
 def compose_system_prompt(identity_prompt: str, capability_instructions: str) -> str:
@@ -152,7 +149,7 @@ def effective_inference(
     registry: AgentRegistry | None = None,
     bindings: ExecutionBindingSet | None = None,
 ) -> EffectiveInference:
-    """The service's existing behavior, unless both flags are on in its environment."""
+    """The service's existing behavior, unless the flag is on in its environment."""
     if not personality_inference_active():
         return legacy_inference(legacy_alias, legacy_prompt)
     resolved = resolve_inference_config(

@@ -27,6 +27,7 @@ EXPECTED = {
     ("cipher", "security_assessment", "security"),
     ("cipher", "privacy_review", "privacy-review"),
     ("charlie", "synthesis", "synthesis"),
+    ("pixel", "slide_generation", "pixel"),
 }
 
 
@@ -57,8 +58,8 @@ def test_every_implemented_capability_has_exactly_one_binding():
 
 def test_only_approved_identities_have_bindings():
     bound = {b.identity_id for b in default_bindings().bindings}
-    assert bound == {"nova", "scout", "cipher", "charlie"}
-    assert not bound & {"atlas", "pixel", "sage", "orbit"}
+    assert bound == {"nova", "scout", "cipher", "charlie", "pixel"}
+    assert not bound & {"atlas", "sage", "orbit"}
     # Charlie also declares research but is deliberately not bound to it.
     assert default_bindings().lookup(Capability.RESEARCH).identity_id == "nova"
 
@@ -152,7 +153,7 @@ def test_loading_bindings_makes_no_network_calls(monkeypatch):
 
     monkeypatch.setattr(socket, "socket", blocked)
     monkeypatch.setattr(socket, "getaddrinfo", blocked)
-    assert len(load_bindings()) == 6
+    assert len(load_bindings()) == 7
 
 
 def test_binding_and_planner_modules_do_not_import_inference_clients():

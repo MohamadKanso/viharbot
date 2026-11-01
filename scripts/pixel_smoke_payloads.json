@@ -1,0 +1,72 @@
+[
+  {
+    "slide_id": "S01-01", "layout_id": "LAYOUT_23_SEC_DISCLOSURE_READINESS", "claim_status": "proposed",
+    "tokens": {
+      "SLIDE_TAG": "Governance // SEC disclosure",
+      "SLIDE_TITLE": "Incident materiality and 8-K readiness",
+      "RULE": "Form 8-K Item 1.05: disclose a material incident within four business days after the materiality determination [verify against source]",
+      "ESCALATION_STEP_1": "Detect and log incident",
+      "ESCALATION_STEP_2": "Security review (Cipher)",
+      "ESCALATION_STEP_3": "Human materiality decision",
+      "AUTOMATION_STATUS": "No disclosure automation exists"
+    },
+    "status_overrides": {"READINESS_BADGE": "CRITICAL"},
+    "evidence_refs": [],
+    "warnings": ["Verify rule text against the SEC source before use; materiality is a legal determination for people, not the agent"]
+  },
+  {
+    "slide_id": "S02-01", "layout_id": "LAYOUT_17_ZERO_TRUST_PILLARS", "claim_status": "proposed",
+    "tokens": {
+      "SLIDE_TAG": "Zero Trust // CISA ZTMM v2.0",
+      "SLIDE_TITLE": "Workload and identity posture",
+      "PILLAR_1_NAME": "Identity", "PILLAR_1_ZT_TIER": "Traditional",
+      "PILLAR_1_NOTE": "Agent REST calls unauthenticated; authenticated calls planned",
+      "PILLAR_2_NAME": "Devices", "PILLAR_2_ZT_TIER": "[to be supplied]",
+      "PILLAR_2_NOTE": "[to be supplied]",
+      "PILLAR_3_NAME": "Networks", "PILLAR_3_ZT_TIER": "[to be supplied]",
+      "PILLAR_3_NOTE": "Private REST between agents; segmentation not assessed",
+      "PILLAR_4_NAME": "Applications and Workloads", "PILLAR_4_ZT_TIER": "Initial",
+      "PILLAR_4_NOTE": "Agents deploy as independent services; hardening not yet assessed",
+      "PILLAR_5_NAME": "Data", "PILLAR_5_ZT_TIER": "[to be supplied]",
+      "PILLAR_5_NOTE": "JSONL audit files per agent; encryption at rest not assessed"
+    },
+    "status_overrides": {
+      "PILLAR_1_BADGE": "HIGH", "PILLAR_2_BADGE": "NOT_ASSESSED", "PILLAR_3_BADGE": "NOT_ASSESSED",
+      "PILLAR_4_BADGE": "MEDIUM", "PILLAR_5_BADGE": "NOT_ASSESSED"
+    },
+    "evidence_refs": ["README.md", "docs/memory-architecture.md"],
+    "warnings": ["Stage ratings are author judgment, not assessed"]
+  },
+  {
+    "slide_id": "S03-01", "layout_id": "LAYOUT_14_OWASP_LLM_TOP10", "claim_status": "implemented",
+    "tokens": {
+      "SLIDE_TAG": "AI security // OWASP LLM Top 10 (2025)",
+      "SLIDE_TITLE": "LLM risk coverage",
+      "LLM01_NOTE": "Agents treat supplied text as untrusted data per identity prompts",
+      "LLM02_NOTE": "Logs exclude full prompts and secrets by policy",
+      "LLM04_NOTE": "[to be supplied]",
+      "LLM06_NOTE": "Agents hold no tools; identities grant no permissions",
+      "LLM07_NOTE": "[to be supplied]",
+      "LLM08_NOTE": "[to be supplied]"
+    },
+    "status_overrides": {
+      "LLM01_BADGE": "MEDIUM", "LLM02_BADGE": "MEDIUM", "LLM04_BADGE": "NOT_ASSESSED",
+      "LLM06_BADGE": "LOW", "LLM07_BADGE": "NOT_ASSESSED", "LLM08_BADGE": "NOT_ASSESSED"
+    },
+    "evidence_refs": ["src/viharbot/agent_identities/prompts/pixel.md", "AGENTS.md"],
+    "warnings": ["Prompt-level controls are not a tested defense; no ATLAS mapping evidence supplied"]
+  },
+  {
+    "slide_id": "S04-01", "layout_id": "LAYOUT_08_SUPPLY_CHAIN_RISK", "claim_status": "implemented",
+    "tokens": {
+      "SLIDE_TAG": "Resilience // third-party risk",
+      "SLIDE_TITLE": "Third-party and dependency exposure",
+      "VENDOR_CONCENTRATION": "All inference routes through one external LiteLLM project",
+      "DEPENDENCY_NOTE": "Runtime dependencies use minimum-version ranges, not pins",
+      "BLAST_RADIUS_NOTE": "[to be supplied]"
+    },
+    "status_overrides": {"VENDOR_BADGE": "MEDIUM", "DEPENDENCY_BADGE": "MEDIUM", "BLAST_RADIUS_BADGE": "NOT_ASSESSED"},
+    "evidence_refs": ["docs/litellm-integration.md", "pyproject.toml"],
+    "warnings": ["Badge ratings are author judgment, not assessed", "No DORA or NIS2 mapping has been assessed"]
+  }
+]

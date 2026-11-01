@@ -17,16 +17,19 @@ services:
       SOURCE_QUALITY_URL: http://source-quality:8000/process
       PRIVACY_REVIEW_URL: http://privacy-review:8000/process
       SYNTHESIS_URL: http://synthesis:8000/process
-      # Optional coordination modes. All off by default; iterative mode needs all three.
-      VIHARBOT_IDENTITY_ROUTING_ENABLED: ${VIHARBOT_IDENTITY_ROUTING_ENABLED:-false}
-      VIHARBOT_DELEGATION_ENABLED: ${VIHARBOT_DELEGATION_ENABLED:-false}
-      VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED: ${VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED:-false}
+      PIXEL_URL: http://pixel:8000/process
+      # Slide-deck generation (Pixel). True while the feature is being tested; set it to false in
+      # compose and .env when the feature is done so no request spends model calls on decks.
+      VIHARBOT_PPT_GENERATION_ENABLED: ${VIHARBOT_PPT_GENERATION_ENABLED:-true}
+      # The live team conversation has no flag: it runs when the planner is configured, that is
+      # when WEB_LITELLM_API_KEY is passed (below) with a planner alias. Without the key the web
+      # service runs the fixed pipeline.
       # Dev only: planner rationale and model aliases in the live stream. Off by default.
       VIHARBOT_DEV_DIAGNOSTICS_ENABLED: ${VIHARBOT_DEV_DIAGNOSTICS_ENABLED:-false}
-      # Charlie's planner is the only inference the web service makes. It stays unavailable
-      # until an alias is set on purpose, and the key is passed only through the opt-in
-      # WEB_LITELLM_API_KEY so the browser-facing container holds no key by default.
-      CHARLIE_PLANNER_MODEL: ${CHARLIE_PLANNER_MODEL:-}
+      # Charlie's planner is the only inference the web service makes. Its alias defaults to
+      # gpt-6-luna, but it stays unavailable until the three flags are true and a key is passed
+      # through the opt-in WEB_LITELLM_API_KEY, so the browser-facing container holds no key by default.
+      CHARLIE_PLANNER_MODEL: ${CHARLIE_PLANNER_MODEL:-gpt-6-luna}
       LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}
       LITELLM_API_KEY: ${WEB_LITELLM_API_KEY:-}
     ports:
@@ -44,6 +47,8 @@ services:
         condition: service_healthy
       synthesis:
         condition: service_healthy
+      pixel:
+        condition: service_healthy
     networks:
       - agent-network
     healthcheck:
@@ -60,7 +65,7 @@ services:
     environment:
       LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}
       LITELLM_API_KEY: ${LITELLM_API_KEY:-}
-      RESEARCH_MODEL: ${RESEARCH_MODEL:-openai/gpt-5.4-mini}
+      RESEARCH_MODEL: ${RESEARCH_MODEL:-gpt-6.1-sol}
       MEMORY_DIR: /data
     volumes:
       - ./data/research:/data/research
@@ -151,7 +156,7 @@ services:
       AGENT_KIND: privacy-review
       LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}
       LITELLM_API_KEY: ${LITELLM_API_KEY:-}
-      PRIVACY_MODEL: ${PRIVACY_MODEL:-openai/gpt-5.4-mini}
+      PRIVACY_MODEL: ${PRIVACY_MODEL:-gpt-5.4-mini}
       MEMORY_DIR: /data
     volumes:
       - privacy_review_data:/data
@@ -174,10 +179,37 @@ services:
       AGENT_KIND: synthesis
       LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}
       LITELLM_API_KEY: ${LITELLM_API_KEY:-}
-      SYNTHESIS_MODEL: ${SYNTHESIS_MODEL:-openai/gpt-5.4-mini}
+      SYNTHESIS_MODEL: ${SYNTHESIS_MODEL:-gpt-5.4-mini}
       MEMORY_DIR: /data
     volumes:
       - synthesis_data:/data
+    expose:
+      - "8000"
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  pixel:
+    build:
+      context: .
+      dockerfile: Dockerfile.pixel
+    environment:
+      LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}
+      LITELLM_API_KEY: ${LITELLM_API_KEY:-}
+      PIXEL_MODEL: ${PIXEL_MODEL:-gpt-5.4-mini}
+      # The service refuses to run unless this is true. Same switch as the web service.
+      VIHARBOT_PPT_GENERATION_ENABLED: ${VIHARBOT_PPT_GENERATION_ENABLED:-true}
+      # Budgets for one deck: slides planned and the hard cap on model calls.
+      PIXEL_TARGET_SLIDES: ${PIXEL_TARGET_SLIDES:-6}
+      PIXEL_MAX_MODEL_CALLS: ${PIXEL_MAX_MODEL_CALLS:-8}
+      MEMORY_DIR: /data
+    volumes:
+      - pixel_data:/data
     expose:
       - "8000"
     networks:
@@ -244,3 +276,4 @@ volumes:
   source_quality_data:
   privacy_review_data:
   synthesis_data:
+  pixel_data:

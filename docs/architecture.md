@@ -15,9 +15,11 @@ flowchart TB
     NO[Nova]
     SC[Scout]
     CI[Cipher]
-    PL["Atlas, Sage, Pixel, Orbit<br/>(not connected)"]
+    PX[Pixel]
+    PL["Atlas, Sage, Orbit<br/>(not connected)"]
   end
   CH -->|synthesis| SY[synthesis service]
+  PX -->|slide generation, on request| PXS[pixel service]
   CH -. planning .-> PW[planner in web container]
   NO -->|research| RS[research service]
   SC -->|fact check| FC[fact-check service]
@@ -111,10 +113,11 @@ Every model call is `build_agent()` in `model_agent.py`: a Strands `Agent` over 
 
 | Service | Default alias (Compose and Stage template) |
 |---|---|
-| research, privacy-review, synthesis | `openai/gpt-5.4-mini` |
+| research | `gpt-6.1-sol` (local Compose and the Stage spec) |
+| privacy-review, synthesis, pixel | `gpt-5.4-mini` (the gateway lists it without the `openai/` prefix) |
 | security | `openai/gpt-5.4` |
 | fact-check, source-quality | `gemini/gemini-3.5-flash` |
-| Charlie's planner | none; set `CHARLIE_PLANNER_MODEL` deliberately |
+| Charlie's planner | `gpt-6-luna` in local Compose; unavailable until a key is passed to the web container (there is no flag) |
 
 ## Streaming event flow
 
@@ -172,4 +175,4 @@ A push to `main` deploys nothing. See [deployment strategy](deployment-strategy.
 | Memory | Write-only JSONL per agent | Durable, isolated, retrievable memory |
 | Communication | Plain JSON REST, validated contracts | Authenticated and observable inter-agent calls |
 | Runtimes | Docker Compose; DigitalOcean template | AWS EC2 and AgentCore deployment, distributed coordination |
-| Identities | Four live, four defined only | Atlas, Sage, Pixel, Orbit behavior |
+| Identities | Five live (Pixel only on request, behind a flag), three defined only | Atlas, Sage, Orbit behavior |

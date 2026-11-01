@@ -13,7 +13,6 @@ from pipeline_fixtures import FINDINGS, RESPONSES
 from viharbot import research_agent, security_agent
 from viharbot.identity_registry import default_registry
 from viharbot.inference_config import (
-    IDENTITY_ROUTING_FLAG,
     PERSONALITY_FLAG,
     PRECEDENCE_CLAUSE,
 )
@@ -62,7 +61,6 @@ def harness(monkeypatch, tmp_path):
     """Run one service request with a mocked Strands agent. Returns (client, calls)."""
     monkeypatch.setenv("MEMORY_DIR", str(tmp_path))
     monkeypatch.delenv(PERSONALITY_FLAG, raising=False)
-    monkeypatch.delenv(IDENTITY_ROUTING_FLAG, raising=False)
     for _, env, _, _ in SERVICES.values():
         monkeypatch.setenv(env, ALIAS)
 
@@ -95,11 +93,9 @@ def harness(monkeypatch, tmp_path):
     return client_for, monkeypatch
 
 
-def enable(monkeypatch, personality="true", routing="true"):
+def enable(monkeypatch, personality="true"):
     if personality is not None:
         monkeypatch.setenv(PERSONALITY_FLAG, personality)
-    if routing is not None:
-        monkeypatch.setenv(IDENTITY_ROUTING_FLAG, routing)
 
 
 def post(client, path, body, **kwargs):
@@ -120,12 +116,11 @@ def test_legacy_prompt_alias_and_response_are_unchanged_by_default(harness, serv
     assert reply.json()["requested_model_alias"] == ALIAS
 
 
-# 15. personality mode needs both flags
-@pytest.mark.parametrize("personality,routing", [("true", None), ("true", "false"),
-                                                 (None, "true"), ("false", "true")])
-def test_personality_mode_cannot_activate_without_routing_and_its_own_flag(harness, personality, routing):
+# 15. personality mode needs only its own flag
+@pytest.mark.parametrize("personality", [None, "false", ""])
+def test_personality_mode_cannot_activate_without_its_own_flag(harness, personality):
     client_for, patch = harness
-    enable(patch, personality, routing)
+    enable(patch, personality)
     client, calls, path, body = client_for("research")
     assert post(client, path, body).status_code == 200
     assert hashlib.sha256(calls.built[0]["prompt"].encode()).hexdigest() == LEGACY_PROMPT_HASHES["research"]
@@ -162,10 +157,10 @@ def test_user_input_stays_in_the_user_message_only(harness):
 
 
 # 16. identity never comes from the request
-@pytest.mark.parametrize("flags", [(None, None), ("true", "true")])
-def test_identity_headers_and_fields_cannot_select_or_activate_an_identity(harness, flags):
+@pytest.mark.parametrize("flag", [None, "true"])
+def test_identity_headers_and_fields_cannot_select_or_activate_an_identity(harness, flag):
     client_for, patch = harness
-    enable(patch, *flags)
+    enable(patch, flag)
     client, calls, path, body = client_for("research")
     forged_headers = {"X-Identity-ID": "orbit", "X-Agent-Identity": "orbit",
                       "X-Viharbot-Identity": "orbit"}
@@ -175,7 +170,7 @@ def test_identity_headers_and_fields_cannot_select_or_activate_an_identity(harne
     assert reply.status_code == 200
     prompt = calls.built[0]["prompt"]
     assert calls.built[0]["alias"] == ALIAS
-    expected = default_registry().get("nova").system_prompt if flags[0] else None
+    expected = default_registry().get("nova").system_prompt if flag else None
     if expected:
         assert prompt.startswith(expected)
     else:
@@ -290,9 +285,10 @@ def test_service_openapi_contracts_do_not_change_with_the_flags(harness):
 def test_chat_response_schema_is_unchanged():
     from viharbot import web_app
 
-    # Phase 6.2 added one optional field; the original eight fields and their order are unchanged.
+    # Optional fields were added later (`orchestration`, then `deck`); the original eight fields and
+    # their order are unchanged.
     assert list(web_app.ChatResponse.model_fields) == [
         "request_id", "findings", "assessment", "fact_check", "source_quality",
         "privacy_review", "synthesis", "agent_activity",
-        "orchestration",
+        "orchestration", "deck",
     ]

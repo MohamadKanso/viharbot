@@ -42,15 +42,16 @@ Eight agent identities are defined; four are connected to running services. Logi
 
 | Identity | Status | Capability | Service | Default model alias |
 |---|---|---|---|---|
-| Nova | live | research | `research` | `openai/gpt-5.4-mini` |
+| Nova | live | research | `research` | `gpt-6.1-sol` |
 | Scout | live | fact check | `fact-check` | `gemini/gemini-3.5-flash` |
 | Scout | live | source quality | `source-quality` | `gemini/gemini-3.5-flash` |
 | Cipher | live | security assessment | `security` | `openai/gpt-5.4` |
-| Cipher | live | privacy review | `privacy-review` | `openai/gpt-5.4-mini` |
-| Charlie | live | synthesis | `synthesis` | `openai/gpt-5.4-mini` |
-| Charlie | live (opt-in) | planning | in the web container | `CHARLIE_PLANNER_MODEL`, no default |
+| Cipher | live | privacy review | `privacy-review` | `gpt-5.4-mini` |
+| Charlie | live | synthesis | `synthesis` | `gpt-5.4-mini` |
+| Charlie | live (opt-in) | planning | in the web container | `gpt-6-luna` (`CHARLIE_PLANNER_MODEL`) |
 | Atlas, Sage | planned | none connected | none | none |
-| Pixel, Orbit | support roles, not connected | none connected | none | none |
+| Pixel | live, on request (flag) | slide generation | `pixel` | `gpt-5.4-mini` |
+| Orbit | support role, not connected | none connected | none | none |
 
 Fact Check reviews only the evidence Research supplied; it does not browse. Each non-trivial verdict must quote that evidence, and the application checks the quote. Source Quality inspects reference strings without fetching them.
 
@@ -64,9 +65,8 @@ A declarative registry of 78 skills across the eight identities lives in `src/vi
 
 | Mode | Flags | Behavior |
 |---|---|---|
-| Iterative orchestration | `VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED`, `VIHARBOT_DELEGATION_ENABLED` and `VIHARBOT_IDENTITY_ROUTING_ENABLED` all `true`, plus `CHARLIE_PLANNER_MODEL` | Charlie recommends one step at a time; policy authorizes it; the loop runs it |
-| Controlled delegation | `VIHARBOT_DELEGATION_ENABLED` and identity routing | Charlie picks one of two predefined workflows |
-| Identity-attributed execution | `VIHARBOT_IDENTITY_ROUTING_ENABLED` | The fixed pipeline, attributed to identities |
+| Slide decks (Pixel) | `VIHARBOT_PPT_GENERATION_ENABLED` (true in local Compose while testing; set it false when the feature is done) | After the pipeline, if the message asks for a deck, the pixel service plans and builds a `.pptx`; see [Pixel slide service](docs/pixel-slide-service.md) |
+| Live team conversation (iterative orchestration) | **No flag.** It runs when Charlie's planner is configured: a planner alias (`gpt-6-luna` by default) and `WEB_LITELLM_API_KEY` passed to the web container. Without the key the web service runs the fixed pipeline | Charlie recommends one step at a time; policy authorizes it; the loop runs it, and Pixel joins when you ask for a deck |
 | Fixed pipeline | none (the default) | Research, then the specialists in a fixed order |
 
 All flags default to `false`. `POST /api/chat/stream` (live events) works only in iterative mode and returns `409` otherwise. Details: [iterative orchestration](docs/iterative-orchestration.md), [controlled delegation](docs/controlled-delegation.md), [identity execution](docs/identity-execution-integration.md).
@@ -138,7 +138,7 @@ Pushing to `main` updates source only; nothing deploys automatically.
 * Agent memory is append-only JSONL, written but never read back, and ephemeral on App Platform.
 * Agent-to-agent REST is unauthenticated; identities do not have separate cloud permissions.
 * Calls run one at a time, and cancelling a browser request does not stop work already in flight.
-* Planned, not built: per-user accounts, durable sessions and memory, authenticated inter-agent calls, distributed runtimes, Atlas, Sage, Pixel and Orbit.
+* Planned, not built: per-user accounts, durable sessions and memory, authenticated inter-agent calls, distributed runtimes, Atlas, Sage and Orbit. Pixel's slide decks are built only in local Compose and are unverified against a live model; see [Pixel slide service](docs/pixel-slide-service.md).
 
 ## Contributing and licensing
 

@@ -30,7 +30,7 @@ EXPECTED_CAPABILITIES = {
     "charlie": {"synthesis", "research"},
     "nova": {"research", "evidence_discovery"},
     "atlas": {"logistics_planning"},
-    "pixel": {"creative_design"},
+    "pixel": {"creative_design", "slide_generation"},
     "sage": {"philosophical_analysis"},
     "cipher": {"security_assessment", "privacy_review"},
     "scout": {"evidence_discovery", "source_quality", "fact_check"},
@@ -40,7 +40,7 @@ EXPECTED_FAMILIES = {
     "charlie": "GPT-6 family",
     "nova": "Gemini Pro family",
     "atlas": "Claude Sonnet family",
-    "pixel": "Gemini multimodal family",
+    "pixel": "GPT mini family",
     "sage": "Claude Opus family",
     "cipher": "GPT-6 family",
     "scout": "Gemini Pro family",
@@ -297,12 +297,12 @@ def test_capability_vocabulary_and_status():
     assert {c.value for c in Capability} == {
         "research", "fact_check", "source_quality", "security_assessment", "privacy_review",
         "synthesis", "creative_design", "philosophical_analysis", "logistics_planning",
-        "automation_engineering", "evidence_discovery",
+        "automation_engineering", "evidence_discovery", "slide_generation",
     }
     implemented = {c for c in Capability if capability_status(c) is CapabilityStatus.IMPLEMENTED}
     assert {c.value for c in implemented} == {
         "research", "fact_check", "source_quality", "security_assessment", "privacy_review",
-        "synthesis",
+        "synthesis", "slide_generation",
     }
     assert capability_status(Capability.AUTOMATION_ENGINEERING) is CapabilityStatus.PLANNED
 
@@ -311,10 +311,11 @@ def test_capability_vocabulary_and_status():
 def test_chat_response_contract_is_unchanged():
     from viharbot import web_app
 
-    # Phase 6.2 added one optional field; the original eight fields and their order are unchanged.
+    # Optional fields were added later (`orchestration` in Phase 6.2, `deck` for Pixel's slides);
+    # the original eight fields and their order are unchanged.
     assert list(web_app.ChatResponse.model_fields) == [
         "request_id", "findings", "assessment", "fact_check", "source_quality",
         "privacy_review", "synthesis", "agent_activity",
-        "orchestration",
+        "orchestration", "deck",
     ]
     assert list(web_app.ChatRequest.model_fields) == ["message", "history"]

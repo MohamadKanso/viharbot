@@ -38,6 +38,12 @@ def health() -> dict[str, str]:
     return {"status": "ok", "agent": "security"}
 
 
+@app.get("/model")
+def model() -> dict[str, str | None]:
+    """The configured model alias, so the web UI can show who uses what. Not a secret."""
+    return {"agent": "security", "model_alias": os.getenv("SECURITY_MODEL", "").strip() or None}
+
+
 @app.post("/assess", response_model=SecurityResponse)
 def assess(
     body: SecurityRequest,

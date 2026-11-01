@@ -62,6 +62,12 @@ class JsonFormatter(logging.Formatter):
             "elapsed_ms",
             "remaining_ms",
             "stale_excluded",
+            "deck_id",
+            "batch",
+            "slides",
+            "model_calls",
+            "input_tokens",
+            "output_tokens",
         ):
             if hasattr(record, key):
                 fields[key] = getattr(record, key)

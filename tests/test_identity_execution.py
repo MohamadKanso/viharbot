@@ -8,10 +8,8 @@ from viharbot import demo, web_app
 from viharbot.demo import AgentPipelineError, run_pipeline
 from viharbot.execution_planner import PlanningError
 from viharbot.identity_execution import (
-    IDENTITY_ROUTING_FLAG,
     ExecutionRecord,
     IdentityPipelineError,
-    identity_routing_enabled,
     run_identity_pipeline,
 )
 
@@ -190,42 +188,20 @@ def test_default_transport_is_demo_post_json(monkeypatch):
     assert send.order == ORDER
 
 
-# 16. feature flag
-@pytest.mark.parametrize("value,expected", [
-    (None, False), ("", False), ("false", False), ("0", False), ("no", False), ("off", False),
-    ("true", True), ("TRUE", True), ("1", True), ("yes", True),
-])
-def test_feature_flag_parsing_defaults_to_disabled(monkeypatch, value, expected):
-    monkeypatch.delenv(IDENTITY_ROUTING_FLAG, raising=False)
-    if value is not None:
-        monkeypatch.setenv(IDENTITY_ROUTING_FLAG, value)
-    assert identity_routing_enabled() is expected
-
-
-def test_flag_is_not_enabled_in_shipped_configuration():
-    from shipped_config_helpers import assert_flag_shipped_off
-
-    assert_flag_shipped_off(IDENTITY_ROUTING_FLAG)
-
-
-# 17, 24. web API with the flag off and on
+# 17, 24. the web API without the live team uses the fixed pipeline, not the identity one
 @pytest.fixture
 def web(monkeypatch):
     monkeypatch.setenv("WEB_AUTH_ENABLED", "false")
-    monkeypatch.delenv(IDENTITY_ROUTING_FLAG, raising=False)
-    calls = {"legacy": 0, "identity": [], "send": FakeSend()}
-    real_legacy, real_identity = run_pipeline, run_identity_pipeline
+    monkeypatch.delenv("CHARLIE_PLANNER_MODEL", raising=False)
+    monkeypatch.delenv("LITELLM_API_KEY", raising=False)
+    calls = {"legacy": 0, "send": FakeSend()}
+    real_legacy = run_pipeline
 
     def spy_legacy(question, request_id, **kwargs):
         calls["legacy"] += 1
         return real_legacy(question, request_id, **{**kwargs, "send": calls["send"]})
 
-    def spy_identity(question, request_id, **kwargs):
-        calls["identity"].append(kwargs["workflow"])
-        return real_identity(question, request_id, **{**kwargs, "send": calls["send"]})
-
     monkeypatch.setattr(web_app, "run_pipeline", spy_legacy)
-    monkeypatch.setattr(web_app, "run_identity_pipeline", spy_identity)
     return TestClient(web_app.app), calls, monkeypatch
 
 
@@ -233,45 +209,27 @@ def chat(client, **kwargs):
     return client.post("/api/chat", json={"message": "hi"}, headers={"X-Request-ID": RID}, **kwargs)
 
 
-def test_flag_off_uses_the_legacy_pipeline(web):
+def test_without_the_live_team_the_fixed_pipeline_answers(web):
     client, calls, _ = web
-    assert chat(client).status_code == 200
-    assert calls["legacy"] == 1 and calls["identity"] == []
-
-
-def test_flag_on_uses_only_full_review_and_keeps_the_response_identical(web):
-    client, calls, patch = web
-    off = chat(client).json()
-    patch.setenv(IDENTITY_ROUTING_FLAG, "true")
-    on_response = chat(client)
-    assert on_response.status_code == 200
-    assert calls["identity"] == ["full_review"] and calls["legacy"] == 1
-    on = on_response.json()
-    def strip(body):
-        return {**body, "agent_activity": [{**a, "duration_ms": 0} for a in body["agent_activity"]]}
-
-    assert strip(on) == strip(off)
-    assert list(on) == [
+    reply = chat(client)
+    assert reply.status_code == 200 and calls["legacy"] == 1
+    assert reply.headers["X-Request-ID"] == RID
+    assert list(reply.json()) == [
         "request_id", "findings", "assessment", "fact_check", "source_quality",
         "privacy_review", "synthesis", "agent_activity",
     ]
-    assert on_response.headers["X-Request-ID"] == RID
-    assert all("identity_id" not in str(a) for a in on["agent_activity"])
+    assert all("identity_id" not in str(a) for a in reply.json()["agent_activity"])
 
 
 def test_workflow_cannot_be_selected_through_the_api(web):
     client, calls, patch = web
-    patch.setenv(IDENTITY_ROUTING_FLAG, "true")
     reply = client.post("/api/chat", json={"message": "hi", "workflow": "research_security"})
     assert reply.status_code == 200
-    assert calls["identity"] == ["full_review"]
     assert len(calls["send"].calls) == 6
 
 
-@pytest.mark.parametrize("flag", ["false", "true"])
-def test_validation_and_auth_are_unchanged_by_the_flag(web, flag):
+def test_validation_and_auth_are_unchanged(web):
     client, _, patch = web
-    patch.setenv(IDENTITY_ROUTING_FLAG, flag)
     assert client.post("/api/chat", json={}).status_code == 422
     assert client.post("/api/chat", json={"message": "x" * 3001}).status_code == 422
     patch.setenv("WEB_AUTH_ENABLED", "true")
@@ -281,9 +239,8 @@ def test_validation_and_auth_are_unchanged_by_the_flag(web, flag):
     assert client.post("/api/chat", json={"message": "hi"}, auth=("u", "p")).status_code == 200
 
 
-def test_flag_on_failures_keep_the_existing_502_shape(web):
+def test_failures_keep_the_existing_502_shape(web):
     client, calls, patch = web
-    patch.setenv(IDENTITY_ROUTING_FLAG, "true")
     calls["send"].overrides = {"security": lambda r: {**r, "request_id": "other"}}
     reply = chat(client)
     assert reply.status_code == 502 and reply.headers["X-Request-ID"] == RID
@@ -292,9 +249,8 @@ def test_flag_on_failures_keep_the_existing_502_shape(web):
     assert detail["agent_activity"][-1]["agent"] == "security"
 
 
-def test_flag_on_agentcore_arns_resolve_through_the_same_url_configuration(web):
+def test_agentcore_arns_resolve_through_the_same_url_configuration(web):
     client, calls, patch = web
-    patch.setenv(IDENTITY_ROUTING_FLAG, "true")
     patch.setenv("FACT_CHECK_AGENTCORE_ARN", "arn:aws:test:fc")
     assert chat(client).status_code == 200
     assert calls["send"].calls[1]["url"] == "agentcore://arn:aws:test:fc"

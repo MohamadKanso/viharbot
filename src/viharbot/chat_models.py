@@ -39,6 +39,19 @@ class AgentActivity(BaseModel):
     status: Literal["complete", "failed"]
 
 
+class DeckInfo(BaseModel):
+    """Public result of the optional slide-deck step. Never contains slide text."""
+
+    status: Literal["complete", "failed"]
+    deck_id: str | None = None
+    slide_count: int | None = None
+    download_url: str | None = None
+    view_url: str | None = None
+    rejected_slides: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    error: str | None = None
+
+
 class ChatResponse(BaseModel):
     request_id: str
     findings: ResearchFindings
@@ -50,3 +63,5 @@ class ChatResponse(BaseModel):
     agent_activity: list[AgentActivity]
     # Present only for iterative orchestration; omitted from every other response.
     orchestration: OrchestrationMeta | None = None
+    # Present only when the PPT flag is on and the request asked for a deck.
+    deck: DeckInfo | None = None

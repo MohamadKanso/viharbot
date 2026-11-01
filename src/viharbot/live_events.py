@@ -24,7 +24,10 @@ SCHEMA_VERSION = "1.0"
 APPLICATION_IDENTITY = "application"  # the documented system identity for policy and terminal events
 APPLICATION_NAME = "ViharBot"
 
-Service = Literal["research", "fact-check", "source-quality", "security", "privacy-review", "synthesis"]
+Service = Literal[
+    "research", "fact-check", "source-quality", "security", "privacy-review", "synthesis", "pixel"]
+# Pixel's slide generation runs after the loop, so the loop's own CapabilityName does not include it.
+EventCapability = CapabilityName | Literal["slide_generation"]
 
 # Sanitized, documented codes. No free text, no exception names, no URLs.
 PlannerErrorCode = Literal[
@@ -90,7 +93,7 @@ class Correlation(Strict):
 
 class ResultRef(Strict):
     identity_id: str
-    capability: CapabilityName
+    capability: EventCapability
     result_version: int = Field(ge=1)
 
     _check = field_validator("identity_id")(lambda v: _registered(v))
@@ -140,7 +143,7 @@ class PlannerCompletedData(Strict):
     status: Literal["completed"]
     duration_ms: float = Field(ge=0)
     action: Literal["delegate", "finish"]
-    capability: CapabilityName | None
+    capability: EventCapability | None
     # Developer diagnostics only (bounded, validated, never hidden reasoning):
     rationale: str | None = Field(default=None, max_length=300)
     model_alias: str | None = Field(default=None, max_length=200)
@@ -160,7 +163,7 @@ class PlannerFailedData(Strict):
 
 class DelegationRequestedData(Strict):
     status: Literal["requested"]
-    capability: CapabilityName
+    capability: EventCapability
     target_identity: str
 
     _check = field_validator("target_identity")(lambda v: _registered(v))
@@ -168,7 +171,7 @@ class DelegationRequestedData(Strict):
 
 class DelegationAuthorizedData(Strict):
     status: Literal["authorized"]
-    capability: CapabilityName
+    capability: EventCapability
     target_identity: str
     service: Service
     result_version: int = Field(ge=1)
@@ -178,20 +181,20 @@ class DelegationAuthorizedData(Strict):
 
 class DelegationRejectedData(Strict):
     status: Literal["rejected"]
-    capability: CapabilityName | None  # null only when a finish request was refused
+    capability: EventCapability | None  # null only when a finish request was refused
     rejection_code: RejectionCode
 
 
 class AgentStartedData(Strict):
     status: Literal["running"]
-    capability: CapabilityName
+    capability: EventCapability
     service: Service
     result_version: int = Field(ge=1)
 
 
 class AgentCompletedData(Strict):
     status: Literal["completed"]
-    capability: CapabilityName
+    capability: EventCapability
     result_version: int = Field(ge=1)
     duration_ms: float = Field(ge=0)
     validated: Literal[True]
@@ -201,7 +204,7 @@ class AgentCompletedData(Strict):
 
 class AgentFailedData(Strict):
     status: Literal["failed"]
-    capability: CapabilityName
+    capability: EventCapability
     error_code: AgentErrorCode
     duration_ms: float = Field(ge=0)
 
@@ -212,7 +215,7 @@ class DependencyRecordedData(Strict):
 
 
 class EvidenceSupersededData(Strict):
-    capability: CapabilityName
+    capability: EventCapability
     superseded_version: int = Field(ge=1)
     replacement_version: int = Field(ge=2)
     affected_results: list[ResultRef] = Field(min_length=1)

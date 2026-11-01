@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#fbfaf7" />
     <title>ViharBot — A brighter way to think</title>
+    <style id="pixel-tokens">/*__PIXEL_TOKENS__*/</style>
     <style>
       :root {
         color-scheme: light;
@@ -119,6 +120,9 @@
       .welcome h2 { max-width: 620px; margin: 19px 0 9px; font-family: Iowan Old Style, "Palatino Linotype", Georgia, serif; font-size: clamp(35px, 4.6vw, 53px); font-weight: 400; line-height: 1.03; letter-spacing: -.055em; }
       .welcome h2 em { color: var(--coral); font-weight: 400; }
       .welcome-copy { max-width: 510px; margin: 0; color: #75766e; font-size: 14px; line-height: 1.7; }
+      .deck-note { margin: 14px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.7); font-size: 13px; }
+      .deck-note p { margin: 0 0 6px; }
+      .deck-link { font-weight: 700; color: var(--ink); text-decoration: underline; }
       .suggestion-heading { margin: 28px 0 10px; color: #8b8b82; font-size: 11px; font-weight: 720; letter-spacing: .1em; text-transform: uppercase; }
       .suggestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
       .suggestion { min-height: 72px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 15px; color: var(--ink); background: rgba(255,255,255,.83); text-align: left; cursor: pointer; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
@@ -282,7 +286,7 @@
         <div class="top-right">
           <span class="privacy-label">Thoughtful answers, with room for uncertainty</span>
           <a class="team-link" id="team-link" href="#team"><span aria-hidden="true">✳</span> Meet the team</a>
-          <span class="team-status"><i></i>4 live · 10 in the crew</span>
+          <span class="team-status"><i></i>5 live · 10 in the crew</span>
         </div>
       </header>
 
@@ -290,23 +294,23 @@
         <aside class="sidebar">
           <div class="eyebrow">A thinking companion</div>
           <h1>A little curiosity can go a long way.</h1>
-          <p class="intro">Ten distinct perspectives. Four already work together in every conversation.</p>
+          <p class="intro">Ten distinct perspectives. Five already work together; Pixel joins when you ask for a slide deck.</p>
           <div class="team-heading"><strong>Meet your crew</strong><span>10 teammates</span></div>
           <section class="team-group" aria-label="Agents active in the current chat pipeline">
-            <div class="team-group-title"><span>In the live chat</span><em>4 agents</em></div>
+            <div class="team-group-title"><span>In the live chat</span><em>5 agents</em></div>
             <div class="agent-list">
               <div class="agent"><img class="agent-photo" src="/images/Charlie_Chatwin_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Charlie Chatwin <small>Live · synthesis</small></span><span class="agent-desc">Strategic thinking &amp; orchestration</span></span></div>
               <div class="agent"><img class="agent-photo" src="/images/Nova_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Nova <small>Live · research</small></span><span class="agent-desc">Research &amp; knowledge</span></span></div>
               <div class="agent"><img class="agent-photo" src="/images/Scout_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Scout <small>Live · fact check &amp; sources</small></span><span class="agent-desc">Data exploration &amp; evidence analysis</span></span></div>
               <div class="agent"><img class="agent-photo" src="/images/Cipher_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Cipher <small>Live · security &amp; privacy</small></span><span class="agent-desc">Security &amp; risk analysis</span></span></div>
+              <div class="agent"><img class="agent-photo" src="/images/Pixel_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Pixel <small>Live · slide decks</small></span><span class="agent-desc">Executive slide decks on request</span></span></div>
             </div>
           </section>
           <section class="team-group" aria-label="Supporting team roles">
-            <div class="team-group-title"><span>Supporting the team</span><em>4 roles</em></div>
+            <div class="team-group-title"><span>Supporting the team</span><em>3 roles</em></div>
             <div class="agent-list">
               <div class="agent"><img class="agent-photo" src="/images/Atlas_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Atlas <small>Planned</small></span><span class="agent-desc">Exploration &amp; logistics</span></span></div>
               <div class="agent"><img class="agent-photo" src="/images/Sage_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Sage <small>Planned</small></span><span class="agent-desc">Perspective &amp; wisdom</span></span></div>
-              <div class="agent"><img class="agent-photo" src="/images/Pixel_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Pixel <small>Creative support</small></span><span class="agent-desc">Creative content &amp; visuals</span></span></div>
               <div class="agent"><img class="agent-photo" src="/images/Orbit_headshot.png" alt="" /><span class="agent-copy"><span class="agent-name">Orbit <small>Platform support</small></span><span class="agent-desc">Automation &amp; operations</span></span></div>
             </div>
           </section>
@@ -317,7 +321,7 @@
               <div class="agent proposed"><span class="agent-initial" aria-hidden="true">E</span><span class="agent-copy"><span class="agent-name">Echo <small>Proposed</small></span><span class="agent-desc">Intent &amp; clarification</span></span></div>
             </div>
           </section>
-          <div class="sidebar-foot"><strong>Four live agents · one shared LiteLLM server</strong>Calls run in sequence. Atlas and Sage are planned and Pixel and Orbit are support roles; none of them run in the live chat. Beacon and Echo are proposed roles.</div>
+          <div class="sidebar-foot"><strong>Five live agents · one shared LiteLLM server</strong>Calls run in sequence. Pixel runs last, and only when you ask for a slide deck. Atlas and Sage are planned and Orbit is a support role; none of them run in the live chat. Beacon and Echo are proposed roles.</div>
         </aside>
 
         <main class="chat-panel">
@@ -330,10 +334,10 @@
               <p class="welcome-copy">ViharBot gathers research, checks the supplied evidence and sources, reviews security and privacy, then brings it together with care.</p>
               <p class="suggestion-heading">A few places to begin</p>
               <div class="suggestions">
-                <button class="suggestion" type="button"><b>Full team review</b><span>Our clinic wants to text appointment reminders through a third-party SMS vendor. Its brochure claims it is HIPAA-compliant, has 99.99% delivery, and has never had a breach, but cites no audit report. Please research the options, fact-check those claims, assess how reliable the brochure is as a source, review the security and privacy risks of sending patient names and appointment times, and finish with one synthesized recommendation.</span></button>
+                <button class="suggestion" type="button"><b>Full team review</b><span>Our clinic wants to text appointment reminders through a third-party SMS vendor. Its brochure claims it is HIPAA-compliant, has 99.99% delivery, and has never had a breach, but cites no audit report. Please research the options, fact-check those claims, assess how reliable the brochure is as a source, review the security and privacy risks of sending patient names and appointment times, and finish with one synthesized recommendation. Then turn that recommendation into a short slide deck for an executive audience.</span></button>
                 <button class="suggestion" type="button"><b>Check a claim and its source</b><span>A health blog claims vitamin D prevents every respiratory infection but links no study. Please research what is known, fact-check the claim against the evidence you have, assess the quality of the source, review any security or privacy concerns, and give me a synthesized answer on whether it is reliable.</span></button>
                 <button class="suggestion" type="button"><b>Review privacy</b><span>An AI meeting-notes app records voices, stores transcripts with attendee names, and uses them for model training by default. Please research how these tools work, review the security and privacy risks for a small team, and synthesize what the team should ask before enabling it.</span></button>
-                <button class="suggestion" type="button"><b>Plan a security change</b><span>Our 12-person nonprofit wants to replace passwords with passkeys on staff laptops and phones. Please research the options, assess the security risks and recovery gaps, check whether any privacy or accessibility issues apply, and synthesize a rollout recommendation.</span></button>
+                <button class="suggestion" type="button"><b>Plan a security change, with a deck</b><span>Our 12-person nonprofit wants to replace passwords with passkeys on staff laptops and phones. Please research the options, assess the security risks and recovery gaps, check whether any privacy or accessibility issues apply, and synthesize a rollout recommendation. Finish with a short slide deck I can present to the board.</span></button>
               </div>
             </section>
           </div>
@@ -379,7 +383,7 @@
           </article>
           <article class="profile-card">
             <img src="/images/Pixel_headshot.png" alt="Pixel portrait" />
-            <div class="profile-info"><div class="profile-name-line"><h3>Pixel</h3><span class="profile-status support">Creative support</span></div><p class="profile-title">Director of Creative Intelligence</p><p class="profile-bio">Pixel transforms complex ideas into compelling visual experiences. Through creative storytelling, illustrations, and interactive content, he helps make sophisticated topics easier to understand.</p><span class="profile-specialties">Visual storytelling · Creative design · Presentations · AI-generated media</span></div>
+            <div class="profile-info"><div class="profile-name-line"><h3>Pixel</h3><span class="profile-status">Live · Slide Decks</span></div><p class="profile-title">Director of Creative Intelligence</p><p class="profile-bio">Pixel transforms complex ideas into compelling visual experiences. Through creative storytelling, illustrations, and interactive content, he helps make sophisticated topics easier to understand.</p><span class="profile-specialties">Visual storytelling · Creative design · Presentations · AI-generated media</span></div>
           </article>
           <article class="profile-card">
             <img src="/images/Sage_headshot.png" alt="Sage portrait" />
@@ -502,6 +506,32 @@
         .step-num { grid-row: 1 / 3; }
       }
     </style>
+    <style id="pixel-output">
+      .model-chip { display: inline-flex; align-items: center; gap: 4px; margin: 0 6px 0 0; font-size: 10px; font-weight: 650; color: var(--px-light-muted, #64748b); white-space: nowrap; }
+      .model-logo { width: 13px; height: 13px; flex: 0 0 auto; }
+      .agent-model { display: flex; flex-wrap: wrap; margin-top: 3px; }
+      .profile-models { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 9px; }
+      .profile-models .model-chip { font-size: 12px; } .profile-models .model-logo { width: 16px; height: 16px; }
+      .activity-model .model-chip { margin: 0; font-size: 11px; }
+      .deck-frame { display: block; width: 100%; height: 600px; margin: 16px 0 0; border: 1px solid var(--px-light-border, #e2e8f0); border-radius: 12px; background: var(--px-light-background, #f8fafc); resize: vertical; }
+      /* The chat output uses Pixel's tokens (served from /pixel-tokens.css, the same file that
+         draws the PowerPoint and the deck page). Fallbacks keep the page readable without it. */
+      .response-card { background: var(--px-light-card, #fff); border-color: var(--px-light-border, #e2e8f0); color: var(--px-light-text, #0f172a); }
+      .answer-label { color: var(--px-accent-ai, #8b5cf6); }
+      .answer-label i { background: var(--px-accent-ai, #8b5cf6); }
+      .answer-points, .result-section p, .result-section ul, .answer-source, .request-meta, .analysis summary, .analysis summary::after { color: var(--px-light-muted, #64748b); }
+      .result-section h4 { color: var(--px-accent-ai, #8b5cf6); }
+      .analysis, .activity-row { background: var(--px-light-card, #fff); border-color: var(--px-light-border, #e2e8f0); }
+      .activity-row.failed .activity-state { color: var(--px-critical, #dc2626); }
+      .activity-row.failed .activity-state::before { background: var(--px-critical, #dc2626); }
+      .answer.markdown blockquote { border-left-color: var(--px-accent-ai, #8b5cf6); color: var(--px-light-muted, #64748b); }
+      .risk { border-color: transparent; color: var(--px-not-assessed-text, #0b0f19); background: var(--px-not-assessed, #94a3b8); }
+      .risk.low { color: var(--px-low-text, #0b0f19); background: var(--px-low, #10b981); }
+      .risk.medium { color: var(--px-medium-text, #0b0f19); background: var(--px-medium, #f59e0b); }
+      .risk.high { color: var(--px-high-text, #fff); background: var(--px-high, #ea580c); }
+      .deck-note { background: var(--px-light-background, #f8fafc); border-color: var(--px-light-border, #e2e8f0); color: var(--px-light-text, #0f172a); }
+      .deck-link { color: var(--px-accent-ai, #8b5cf6); }
+    </style>
     <script>
       const form = document.querySelector("#chat-form");
       const input = document.querySelector("#message");
@@ -512,13 +542,14 @@
 
       const agentNames = {
         research: "Research", "fact-check": "Fact Check", "source-quality": "Source Quality",
-        security: "Security", "privacy-review": "Privacy Review", synthesis: "Synthesis",
+        security: "Security", "privacy-review": "Privacy Review", synthesis: "Synthesis", pixel: "Pixel",
       };
 
-      const identityNames = { nova: "Nova", scout: "Scout", cipher: "Cipher", charlie: "Charlie" };
+      const identityNames = { nova: "Nova", scout: "Scout", cipher: "Cipher", charlie: "Charlie", pixel: "Pixel" };
       const capabilityLabels = {
         research: "Research", fact_check: "Fact Check", source_quality: "Source Quality",
         security_assessment: "Security", privacy_review: "Privacy Review", synthesis: "Synthesis",
+        slide_generation: "Slide Decks",
       };
       const completionNotes = {
         charlie_finished: "Charlie reviewed the evidence and decided it was sufficient.",
@@ -539,6 +570,93 @@
         if (className) node.className = className;
         if (text !== undefined) node.textContent = text;
         return node;
+      }
+      // Which model each agent uses. The aliases come from the agents themselves (/api/team-models),
+      // never from this page. The logos are simple stand-in marks in /images; replace the two SVG
+      // files there with official artwork if you prefer.
+      const modelLogos = { openai: "/images/model-openai.svg", gemini: "/images/model-gemini.svg" };
+      let teamModels = {};
+      function modelFamily(alias) {
+        const a = String(alias || "").toLowerCase();
+        return a.includes("gemini") ? "gemini" : /gpt|openai|(^|\/)o\d/.test(a) ? "openai" : "";
+      }
+      function shortModel(alias) { return String(alias).replace(/^[a-z]+\//, ""); }
+      function modelChip(alias) {
+        const chip = el("span", "model-chip");
+        chip.setAttribute("title", "Model: " + alias);
+        const family = modelFamily(alias);
+        if (family) {
+          const logo = document.createElement("img");
+          logo.className = "model-logo";
+          logo.setAttribute("src", modelLogos[family]);
+          logo.setAttribute("alt", "");
+          chip.append(logo);
+        }
+        chip.append(document.createTextNode(shortModel(alias)));
+        return chip;
+      }
+      function configuredModel(identity, capability) {
+        const list = teamModels[identity] || [];
+        const hit = list.find((entry) => entry.capability === capability) || (list.length === 1 ? list[0] : null);
+        return hit && hit.model ? hit.model : null;
+      }
+      function modelLine(identity) {
+        const seen = new Set();
+        const line = el("span", "agent-model");
+        (teamModels[identity] || []).forEach((entry) => {
+          if (entry.model && !seen.has(entry.model)) { seen.add(entry.model); line.append(modelChip(entry.model)); }
+        });
+        return seen.size ? line : null;
+      }
+      function decorateTeam() {
+        document.querySelectorAll(".agent-model, .profile-models").forEach((node) => node.remove());
+        document.querySelectorAll(".agent").forEach((node) => {
+          const name = node.querySelector(".agent-name");
+          const copy = node.querySelector(".agent-copy");
+          const line = name && copy ? modelLine(name.textContent.trim().split(" ")[0].toLowerCase()) : null;
+          if (line) copy.append(line);
+        });
+        document.querySelectorAll(".profile-info").forEach((info) => {
+          const heading = info.querySelector("h3");
+          const line = heading ? modelLine(heading.textContent.trim().split(" ")[0].toLowerCase()) : null;
+          if (line) { line.className = "profile-models"; info.append(line); }
+        });
+      }
+      function loadTeamModels() {
+        if (typeof fetch !== "function") return;
+        fetch("/api/team-models").then((response) => response.ok ? response.json() : null).then((data) => {
+          if (data && data.identities) { teamModels = data.identities; decorateTeam(); }
+        }).catch(() => {});
+      }
+      loadTeamModels();
+      function buildDeckFrame(deck) {
+        // Pixel's own HTML page, shown in the output. It has no scripts and is served with a strict
+        // policy; the sandbox allows nothing but the page's download link.
+        if (deck.status !== "complete" || !deck.view_url) return null;
+        const frame = document.createElement("iframe");
+        frame.className = "deck-frame";
+        frame.setAttribute("src", deck.view_url);
+        frame.setAttribute("sandbox", "allow-downloads");
+        frame.setAttribute("title", `Pixel's ${deck.slide_count}-slide deck`);
+        frame.setAttribute("loading", "lazy");
+        return frame;
+      }
+      function buildDeck(deck) {
+        const box = el("section", "deck-note");
+        if (deck.status !== "complete") {
+          box.append(el("p", "", `Pixel could not build the slide deck${deck.error ? `: ${deck.error}` : "."}`));
+          return box;
+        }
+        const line = el("p", "deck-line");
+        line.append(el("span", "", `Slide deck \u00B7 ${deck.slide_count} slides \u00B7 `));
+        const link = el("a", "deck-link", "Download the .pptx");
+        link.setAttribute("href", deck.download_url);
+        link.setAttribute("download", "");
+        line.append(link);
+        box.append(line);
+        if (deck.rejected_slides?.length) box.append(el("p", "", `${deck.rejected_slides.length} planned slide(s) failed validation and were left out.`));
+        listSection(box, "Deck notes", deck.warnings);
+        return box;
       }
       function listSection(parent, title, items) {
         if (!items || !items.length) return;
@@ -570,7 +688,7 @@
           row.append(el("span", "activity-agent", item.display_name || agentNames[item.agent] || item.agent));
           const model = el("span", "activity-model");
           model.append(document.createTextNode("Model "));
-          model.append(el("code", "", item.model_alias || "not reported"));
+          model.append(item.model_alias ? modelChip(item.model_alias) : el("code", "", "not reported"));
           row.append(model);
           row.append(el("time", "activity-time", formatDuration(item.duration_ms || 0)));
           row.append(el("span", "activity-state", item.status === "failed" ? "Failed" : "Done"));
@@ -664,6 +782,8 @@
           card.append(points);
         }
         if (synthesis?.caveats?.length) listSection(card, "A few caveats", synthesis.caveats);
+        const deckFrame = result.deck ? buildDeckFrame(result.deck) : null;
+        if (deckFrame) card.append(deckFrame);
         if (live) card.append(buildLiveTabs(live, result));
         else if (result.orchestration) card.append(buildOrchestration(result.orchestration));
         if (result.agent_activity?.length) card.append(buildActivity(result.agent_activity));
@@ -694,7 +814,7 @@
         }
         const security = el("section", "result-section");
         security.append(el("h4", "", "Security review"));
-        security.append(el("span", "risk", `${result.assessment.overall_risk} risk`));
+        security.append(el("span", `risk ${result.assessment.overall_risk}`, `${result.assessment.overall_risk} risk`));
         listSection(security, "Implications", result.assessment.implications);
         listSection(security, "Recommendations", result.assessment.recommendations);
         listSection(security, "Uncertainties", result.assessment.uncertainties);
@@ -702,7 +822,7 @@
         if (result.privacy_review) {
           const privacy = el("section", "result-section");
           privacy.append(el("h4", "", "Privacy review"));
-          privacy.append(el("span", "risk", `${result.privacy_review.overall_risk} privacy risk`));
+          privacy.append(el("span", `risk ${result.privacy_review.overall_risk}`, `${result.privacy_review.overall_risk} privacy risk`));
           listSection(privacy, "Concerns", result.privacy_review.concerns);
           listSection(privacy, "Recommendations", result.privacy_review.recommendations);
           listSection(privacy, "Sensitive data categories", result.privacy_review.sensitive_data_categories);
@@ -711,6 +831,7 @@
         }
         details.append(body);
         card.append(details);
+        if (result.deck) card.append(buildDeck(result.deck));
         card.append(el("p", "request-meta", `Request ${result.request_id}`));
         row.append(card);
         conversation.append(row);
@@ -851,7 +972,7 @@
         switch (ev.event_type) {
           case "planner_started":
             model.planner.push({ decision, remainingMs: data.remaining_budget_ms, durationMs: null, action: null, capability: null });
-            setRow(model, { key: "planner-" + decision, kind: "planner", state: "active", identity: "charlie",
+            setRow(model, { key: "planner-" + decision, kind: "planner", state: "active", identity: "charlie", capability: "planning",
               text: model.executions.length === 0 ? "Let me think about what this needs first…" : "Let me look at what we have so far…",
               detail: ["Decision " + decision, "Time remaining " + seconds(data.remaining_budget_ms)], durationMs: null, sequence: ev.sequence });
             break;
@@ -859,14 +980,14 @@
             const entry = model.planner.find((item) => item.decision === decision);
             if (entry) Object.assign(entry, { durationMs: data.duration_ms, action: data.action, capability: data.capability, modelAlias: data.model_alias || null });
             const row = model.rows.find((candidate) => candidate.key === "planner-" + decision);
-            setRow(model, { key: "planner-" + decision, kind: "planner", state: "done", identity: "charlie",
+            setRow(model, { key: "planner-" + decision, kind: "planner", state: "done", identity: "charlie", capability: "planning",
               text: data.action === "delegate" ? "Next up: " + lower(cap) + "." : "I think we have enough to finish.",
               detail: [].concat(row ? row.detail : [], data.rationale ? ["Planner rationale: " + data.rationale] : [],
                 data.model_alias ? ["Planner model: " + data.model_alias] : []), durationMs: data.duration_ms, sequence: ev.sequence,
               model: data.model_alias || null });
             break; }
           case "planner_failed":
-            setRow(model, { key: "planner-" + decision, kind: "planner", state: "failed", identity: "charlie",
+            setRow(model, { key: "planner-" + decision, kind: "planner", state: "failed", identity: "charlie", capability: "planning",
               text: "Sorry, I couldn't decide on the next step.", detail: ["Reason: " + String(data.error_code).replace(/_/g, " ")],
               durationMs: data.duration_ms, sequence: ev.sequence });
             break;
@@ -891,14 +1012,14 @@
               detail: ["Why: " + why], durationMs: null, sequence: ev.sequence });
             break; }
           case "agent_started":
-            setRow(model, { key: "exec-" + execution, kind: "agent", state: "active", identity: ev.source.identity_id,
+            setRow(model, { key: "exec-" + execution, kind: "agent", state: "active", identity: ev.source.identity_id, capability: data.capability,
               text: "Yes, I'm on it. Working on " + lower(cap) + " now.", detail: [cap + " result version " + data.result_version, "Service " + data.service],
               durationMs: null, sequence: ev.sequence });
             break;
           case "agent_completed": {
             settle(model, "exec-" + execution, "done");
             if (data.model_alias) { const started = model.rows.find((candidate) => candidate.key === "exec-" + execution); if (started) started.model = data.model_alias; }
-            setRow(model, { key: "done-" + execution, kind: "agent", state: "done", identity: ev.source.identity_id, model: data.model_alias || null,
+            setRow(model, { key: "done-" + execution, kind: "agent", state: "done", identity: ev.source.identity_id, capability: data.capability, model: data.model_alias || null,
               text: "Done: " + lower(cap) + " is finished (v" + data.result_version + ").",
               detail: [cap + " result version " + data.result_version].concat(data.model_alias ? ["Model reported by the service: " + data.model_alias] : []),
               durationMs: data.duration_ms, sequence: ev.sequence });
@@ -907,7 +1028,7 @@
             break; }
           case "agent_failed":
             settle(model, "exec-" + execution, "done");
-            setRow(model, { key: "fail-" + execution, kind: "agent", state: "failed", identity: ev.source.identity_id,
+            setRow(model, { key: "fail-" + execution, kind: "agent", state: "failed", identity: ev.source.identity_id, capability: data.capability,
               text: "I couldn't complete " + lower(cap) + ".", detail: ["Reason: " + String(data.error_code).replace(/_/g, " ")],
               durationMs: data.duration_ms, sequence: ev.sequence });
             model.executions.push({ execution, decision, identity: ev.source.identity_id, capability: data.capability,
@@ -985,8 +1106,10 @@
         item.className = "live-row state-" + row.state + " kind-" + row.kind;
         const body = item.children[1];
         item.className += " side-" + sideOf(row.identity);
-        // The model is shown only when a service really reported it (Dev diagnostics on).
-        body.children[0].textContent = speakerName(row.identity) + (row.model ? " · " + row.model : "");
+        // The model next to the speaker: the one the service reported (Dev diagnostics on), else the
+        // one the agent is configured with (from /api/team-models).
+        const shown = row.model || configuredModel(row.identity, row.capability);
+        body.children[0].textContent = speakerName(row.identity) + (shown ? " · " + shortModel(shown) : "");
         body.children[1].textContent = stateGlyph(row.state);
         body.children[1].setAttribute("aria-hidden", "true");
         body.children[2].textContent = row.text;

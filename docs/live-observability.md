@@ -109,7 +109,7 @@ Notes:
 
 ## JSON examples
 
-Every example below is a real event taken from the run fixtures in `tests/fixtures/live_events/` and validates against the schema (`parse_event`). `final_response.data.response` is the same `ChatResponse` as `/api/chat`, with optional fields omitted when unset.
+Every example below is a real event taken from the run fixtures in `tests/fixtures/live_events/` and validates against the schema (`parse_event`). `final_response.data.response` is the same `ChatResponse` as `/api/chat`, with optional fields omitted when unset. When the PPT flag is on and the request asks for a deck, it also carries `deck` (status, slide count, download and view links, warnings; never slide text); the deck is built before `final_response`. The step also appears in the team conversation with the existing event types: `delegation_authorized` (source ViharBot, because the user asked for a deck, not Charlie's planner), `agent_started`, `agent_completed` or `agent_failed`, and `dependency_recorded`, all with service `pixel` and capability `slide_generation`. Those two values are additive to the event schema; the planner's own capability set is unchanged.
 
 ### `planner_started`
 

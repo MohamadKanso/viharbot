@@ -26,6 +26,7 @@ OPERATIONAL_SERVICES: dict[Capability, str] = {
     Capability.SECURITY_ASSESSMENT: "security",
     Capability.PRIVACY_REVIEW: "privacy-review",
     Capability.SYNTHESIS: "synthesis",
+    Capability.SLIDE_GENERATION: "pixel",
 }
 
 

@@ -1,0 +1,147 @@
+"""The web service's optional slide-deck step, run after the agent pipeline.
+
+Pixel is bound to the `slide_generation` capability (execution_config/bindings.toml) but is not a
+stage of the typed pipeline: the pipeline runs unchanged, then, only if the PPT flag is on and
+the request asks for a deck, the pixel service is called with the team's results as evidence.
+A failure here never fails the chat; it is reported in `deck` and in the agent activity.
+"""
+
+from __future__ import annotations
+
+import functools
+import re
+from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
+from urllib.request import Request
+
+import os
+
+from .chat_models import DeckInfo
+from .demo import AgentPipelineError, invoke_agent, post_json
+from .execution_bindings import default_bindings
+from .identity import Capability
+from .identity_registry import default_registry
+from .litellm_client import urlopen as no_redirect_urlopen
+from .pipeline_state import AgentActivity
+from .pixel.flag import ppt_generation_enabled  # noqa: F401  (re-exported for web_app)
+from .schemas import DeckResult
+
+PIXEL_TIMEOUT_SECONDS = 300
+MAX_DECK_BYTES = 25 * 1024 * 1024
+DECK_ID = re.compile(r"^deck-[0-9a-f]{12}$")
+# Deliberately narrow and deterministic: a request names a deck, slides or a presentation file.
+DECK_INTENT = re.compile(r"\b(slide\s*deck|slides|power\s?point|pptx?|presentation)\b", re.IGNORECASE)
+
+
+def wants_deck(message: str) -> bool:
+    return bool(DECK_INTENT.search(message))
+
+
+def pixel_url() -> str:
+    return os.getenv("PIXEL_URL", "http://pixel:8000/process")
+
+
+def pixel_authorized() -> bool:
+    """Only an enabled repository binding for a registered identity authorizes the step."""
+    binding = default_bindings().lookup(Capability.SLIDE_GENERATION)
+    return bool(binding and binding.enabled and binding.identity_id in default_registry())
+
+
+def _evidence(pipeline_result: dict[str, Any]) -> dict[str, Any]:
+    def result(key: str) -> Any:
+        return (pipeline_result.get(key) or {}).get("result")
+
+    return {
+        "research": (pipeline_result.get("research") or {}).get("findings"),
+        "fact_check": result("fact_check"),
+        "source_quality": result("source_quality"),
+        "security": (pipeline_result.get("security") or {}).get("assessment"),
+        "privacy_review": result("privacy_review"),
+        "synthesis": result("synthesis"),
+    }
+
+
+def run_pixel_stage(
+    question: str,
+    pipeline_result: dict[str, Any],
+    request_id: str,
+    *,
+    send=None,
+    reporter=None,
+    decision_number: int | None = None,
+    execution_id: str | None = None,
+    dependencies: list[dict[str, Any]] | None = None,
+) -> tuple[DeckInfo, dict[str, Any] | None]:
+    """Call the pixel service. Returns the public deck info and an activity row, if one ran.
+
+    With a live `reporter` (the stream's event emitter) the team conversation shows it: the
+    application authorizes Pixel because the user asked for a deck, Pixel starts, reads the team's
+    results, and finishes or fails. Pixel's step is not a decision of Charlie's, so no event claims
+    he requested it.
+    """
+    if not pixel_authorized():
+        return DeckInfo(status="failed", error="Slide generation is not authorized"), None
+    send = send or functools.partial(post_json, timeout_cap=PIXEL_TIMEOUT_SECONDS)
+    activity: list[AgentActivity] = []
+    live = reporter is not None and decision_number is not None and execution_id is not None
+    common = dict(decision_number=decision_number, execution_id=execution_id)
+    if live:
+        reporter.delegation_authorized(
+            capability="slide_generation", target_identity="pixel", service="pixel",
+            result_version=1, **common)
+        reporter.agent_started(
+            identity_id="pixel", capability="slide_generation", service="pixel", result_version=1, **common)
+    try:
+        envelope, domain = invoke_agent(
+            send,
+            pixel_url(),
+            {"question": question, "context": _evidence(pipeline_result)},
+            request_id,
+            "pixel",
+            activity,
+        )
+    except AgentPipelineError:
+        if live:
+            reporter.agent_failed(
+                identity_id="pixel", capability="slide_generation", error_code="agent_execution_failed",
+                duration_ms=activity[-1].duration_ms if activity else 0, **common)
+        return (
+            DeckInfo(status="failed", error="The slide deck could not be generated"),
+            activity[-1].to_legacy() if activity else None,
+        )
+    deck = DeckResult.model_validate(domain)
+    if live:
+        reporter.agent_completed(
+            identity_id="pixel", capability="slide_generation", result_version=1,
+            duration_ms=activity[-1].duration_ms, model_alias=envelope.requested_model_alias or None, **common)
+        if dependencies:
+            reporter.dependency_recorded(
+                consumer={"identity_id": "pixel", "capability": "slide_generation", "result_version": 1},
+                dependencies=dependencies, **common)
+    return (
+        DeckInfo(
+            status="complete",
+            deck_id=deck.deck_id,
+            slide_count=deck.slide_count,
+            download_url=f"/api/decks/{deck.deck_id}",
+            view_url=f"/api/decks/{deck.deck_id}/view",
+            rejected_slides=deck.rejected_slides,
+            warnings=deck.warnings,
+        ),
+        activity[-1].to_legacy(),
+    )
+
+
+def fetch_deck(deck_id: str, kind: str = "pptx") -> bytes | None:
+    """A finished deck file ("pptx" or "html") from the pixel service, or None if it is missing."""
+    if not DECK_ID.fullmatch(deck_id) or kind not in {"pptx", "html"}:
+        return None
+    parts = urlsplit(pixel_url())
+    request = Request(f"{parts.scheme}://{parts.netloc}/decks/{deck_id}.{kind}")
+    try:
+        with no_redirect_urlopen(request, 30) as response:
+            data = response.read(MAX_DECK_BYTES + 1)
+    except (HTTPError, URLError, TimeoutError, OSError):
+        return None
+    return data if 0 < len(data) <= MAX_DECK_BYTES else None

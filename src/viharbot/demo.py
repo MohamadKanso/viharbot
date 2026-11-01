@@ -36,6 +36,7 @@ AGENT_LABELS = {
     "security": "Security",
     "privacy-review": "Privacy Review",
     "synthesis": "Synthesis",
+    "pixel": "Pixel",
 }
 
 
@@ -74,6 +75,7 @@ def post_json(
     destination: str,
     *,
     deadline: RequestDeadline | None = None,
+    timeout_cap: float = REST_TIMEOUT_CAP_SECONDS,
 ) -> dict:
     started = time.perf_counter()
 
@@ -123,7 +125,7 @@ def post_json(
         headers={"Content-Type": "application/json", "X-Request-ID": request_id},
     )
     try:
-        timeout = bounded_timeout(REST_TIMEOUT_CAP_SECONDS, deadline)
+        timeout = bounded_timeout(timeout_cap, deadline)
         with urlopen(request, timeout=timeout) as response:
             if deadline is not None:
                 deadline.require_remaining()  # the response arrived after the deadline

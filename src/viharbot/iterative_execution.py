@@ -17,7 +17,6 @@ from pydantic import BaseModel, ConfigDict
 
 from . import demo, orchestration_planner
 from .deadline import DeadlineExceeded, RequestDeadline
-from .delegated_execution import delegation_enabled
 from .delegation import (
     DelegationError,
     PlannerInferenceError,
@@ -58,14 +57,14 @@ from .orchestration_state import (
 )
 from .pipeline_state import AgentActivity, PipelineContext, PipelineState
 
-ITERATIVE_FLAG = "VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED"
+from .live_team import live_team_enabled
+
 logger = logging.getLogger("orchestrator")
 
 
 def iterative_orchestration_enabled() -> bool:
-    """Needs its own flag plus delegation (which itself needs identity routing)."""
-    own = os.getenv(ITERATIVE_FLAG, "false").strip().lower() in {"1", "true", "yes"}
-    return own and delegation_enabled()
+    """True when Charlie's planner is configured (an alias and a key); there is no flag."""
+    return live_team_enabled()
 
 
 class OrchestrationFailed(DelegationError):
