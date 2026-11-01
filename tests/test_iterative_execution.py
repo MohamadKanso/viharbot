@@ -12,19 +12,17 @@ from orchestration_helpers import (
 from pipeline_fixtures import FINDINGS, ORDER, RID, URLS, FakeSend, response
 from viharbot import delegation_planner, demo, model_agent, orchestration_planner, web_app
 from viharbot.deadline import DeadlineExceeded
-from viharbot.delegated_execution import DELEGATION_FLAG
 from viharbot.delegation import (
     DelegationDecision, PlannerInferenceError, PlannerOutputError, PlannerUnavailableError)
 from viharbot.demo import AgentPipelineError, invoke_agent, run_pipeline
 from viharbot.execution_bindings import ExecutionBinding, ExecutionBindingSet, default_bindings
-from viharbot.identity_execution import IDENTITY_ROUTING_FLAG
 from viharbot.identity_registry import default_registry
 from viharbot.iterative_execution import (
-    ITERATIVE_FLAG,
     OrchestrationFailed,
     iterative_orchestration_enabled,
     run_iterative_pipeline,
 )
+from viharbot.live_team import live_team_enabled
 from viharbot.observability import JsonFormatter
 from viharbot.orchestration_planner import (
     ORCHESTRATION_INSTRUCTIONS,
@@ -419,59 +417,52 @@ def test_planner_digest_stays_bounded_with_huge_agent_output():
     assert len(message) < len(QUESTION) + 14000 and huge not in message
 
 
-# 19, 20, 21, 22, 28. flags and public API
-@pytest.mark.parametrize("iterative,delegation,routing,expected", [
-    (None, None, None, False), ("true", None, None, False), ("true", "true", None, False),
-    ("true", None, "true", False), ("true", "true", "true", True), ("1", "yes", "1", True),
-    ("false", "true", "true", False), ("", "true", "true", False),
+# 19, 20, 21, 22, 28. live-team configuration and public API
+LIVE_ENV = ("CHARLIE_PLANNER_MODEL", "LITELLM_API_KEY")
+
+
+@pytest.mark.parametrize("model,key,expected", [
+    ("planner/alias", "test-key", True),
+    (None, "test-key", False), ("planner/alias", None, False), (None, None, False),
+    ("", "test-key", False), ("planner/alias", "", False),
+    ("   ", "test-key", False), ("planner/alias", "  \t", False),
 ])
-def test_iterative_mode_defaults_off_and_requires_delegation_and_routing(
-        monkeypatch, iterative, delegation, routing, expected):
-    for name, value in ((ITERATIVE_FLAG, iterative), (DELEGATION_FLAG, delegation),
-                        (IDENTITY_ROUTING_FLAG, routing)):
+def test_live_team_needs_both_a_planner_alias_and_a_key(monkeypatch, model, key, expected):
+    for name, value in zip(LIVE_ENV, (model, key)):
         monkeypatch.delenv(name, raising=False)
         if value is not None:
             monkeypatch.setenv(name, value)
+    assert live_team_enabled() is expected
     assert iterative_orchestration_enabled() is expected
 
 
-def test_flags_are_not_enabled_in_shipped_configuration():
-    from shipped_config_helpers import ROOT, assert_flag_shipped_off
+def test_no_orchestration_flag_is_shipped_in_configuration():
+    from shipped_config_helpers import ROOT
 
-    assert_flag_shipped_off(ITERATIVE_FLAG)
     for name in (".env.example", "compose.yaml", "deploy/digitalocean/app.yaml"):
         path = ROOT / name
         if path.exists():
             assert "VIHARBOT_ORCH_" not in path.read_text(), name
 
 
-def full_review_recommendation(question, request_id):
-    return DelegationDecision(workflow_name="full_review", rationale="r", confidence="high")
-
-
 @pytest.fixture
 def web(monkeypatch):
     monkeypatch.setenv("WEB_AUTH_ENABLED", "false")
-    for name in (ITERATIVE_FLAG, DELEGATION_FLAG, IDENTITY_ROUTING_FLAG):
+    for name in LIVE_ENV:
         monkeypatch.delenv(name, raising=False)
     state = {"send": FakeSend(), "paths": [],
              "script": lambda: sequence(C.RESEARCH, C.SECURITY_ASSESSMENT)}
-    originals = {n: getattr(web_app, n) for n in
-                 ("run_pipeline", "run_identity_pipeline", "run_delegated_pipeline",
-                  "run_iterative_pipeline")}
+    originals = {n: getattr(web_app, n) for n in ("run_pipeline", "run_iterative_pipeline")}
 
     def spy(name, **extra):
         def call(q, rid, **kw):
             state["paths"].append(name)
             extra_args = {k: v() if callable(v) else v for k, v in extra.items()}
-            return originals[f"run_{name}_pipeline" if name != "legacy" else "run_pipeline"](
+            return originals["run_pipeline" if name == "legacy" else f"run_{name}_pipeline"](
                 q, rid, **{**kw, "send": state["send"], **extra_args})
         return call
 
     monkeypatch.setattr(web_app, "run_pipeline", spy("legacy"))
-    monkeypatch.setattr(web_app, "run_identity_pipeline", spy("identity"))
-    monkeypatch.setattr(web_app, "run_delegated_pipeline",
-                        spy("delegated", recommend=lambda: full_review_recommendation))
     monkeypatch.setattr(web_app, "run_iterative_pipeline", spy("iterative", decide=lambda: state["script"]()))
     return TestClient(web_app.app), state, monkeypatch
 
@@ -482,29 +473,34 @@ def chat(client, **kwargs):
 
 
 def enable_all(patch):
-    for name in (ITERATIVE_FLAG, DELEGATION_FLAG, IDENTITY_ROUTING_FLAG):
-        patch.setenv(name, "true")
+    patch.setenv("CHARLIE_PLANNER_MODEL", "planner/alias")
+    patch.setenv("LITELLM_API_KEY", "test-key")
 
 
-def test_each_earlier_mode_is_unchanged_when_iterative_is_off(web):
+def test_without_the_planner_alias_and_key_the_fixed_pipeline_answers(web):
     client, state, patch = web
     assert chat(client).status_code == 200
-    patch.setenv(IDENTITY_ROUTING_FLAG, "true")
+    patch.setenv("CHARLIE_PLANNER_MODEL", "planner/alias")  # a key is still missing
     assert chat(client).status_code == 200
-    patch.setenv(DELEGATION_FLAG, "true")
+    patch.delenv("CHARLIE_PLANNER_MODEL")
+    patch.setenv("LITELLM_API_KEY", "test-key")  # an alias is still missing
     assert chat(client).status_code == 200
-    patch.setenv(ITERATIVE_FLAG, "false")
-    assert chat(client).status_code == 200
-    assert state["paths"] == ["legacy", "identity", "delegated", "delegated"]
+    assert state["paths"] == ["legacy"] * 3
 
 
-def test_iterative_mode_needs_its_prerequisites(web):
+def test_the_stream_endpoint_is_refused_without_the_planner_alias_and_key(web):
     client, state, patch = web
-    patch.setenv(ITERATIVE_FLAG, "true")
+    reply = client.post("/api/chat/stream", json={"message": "hi"})
+    assert reply.status_code == 409 and state["paths"] == []
+
+
+def test_with_the_planner_alias_and_key_chat_goes_through_the_iterative_pipeline(web):
+    client, state, patch = web
+    enable_all(patch)
     assert chat(client).status_code == 200
-    patch.setenv(IDENTITY_ROUTING_FLAG, "true")
-    assert chat(client).status_code == 200
-    assert state["paths"] == ["legacy", "identity"]
+    assert state["paths"] == ["iterative"]
+    stream = client.post("/api/chat/stream", json={"message": "hi"})
+    assert stream.status_code == 200 and "text/event-stream" in stream.headers["content-type"]
 
 
 def test_iterative_mode_keeps_the_public_response_contract(web):

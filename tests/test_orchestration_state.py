@@ -132,7 +132,7 @@ def test_orchestration_state_is_not_part_of_any_public_schema():
     assert list(web_app.ChatResponse.model_fields) == [
         "request_id", "findings", "assessment", "fact_check", "source_quality",
         "privacy_review", "synthesis", "agent_activity",
-        "orchestration"]
+        "orchestration", "deck"]
 
 
 # 8, 17. observations

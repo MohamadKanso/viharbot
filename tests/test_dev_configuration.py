@@ -3,11 +3,11 @@ from __future__ import annotations
 import re
 import subprocess
 
-from shipped_config_helpers import DEPLOY_SPEC, ROOT, assert_flag_shipped_off
+from shipped_config_helpers import DEPLOY_SPEC, ROOT
 
 COMPOSE = (ROOT / "compose.yaml").read_text()
-FLAGS = ("VIHARBOT_IDENTITY_ROUTING_ENABLED", "VIHARBOT_DELEGATION_ENABLED",
-         "VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED")
+REMOVED_FLAGS = ("VIHARBOT_IDENTITY_ROUTING_ENABLED", "VIHARBOT_DELEGATION_ENABLED",
+                 "VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED", "VIHARBOT_LIVE_TEAM_ENABLED")
 AGENTS = ("research", "security", "fact-check", "source-quality", "privacy-review", "synthesis", "pixel")
 
 
@@ -17,17 +17,20 @@ def service_block(name: str) -> str:
     return match.group(1)
 
 
-def test_every_optional_mode_is_off_by_default_in_shipped_config():
-    for flag in FLAGS:
-        assert_flag_shipped_off(flag)
-    web = service_block("web")
-    for flag in FLAGS:
-        assert f"{flag}: ${{{flag}:-false}}" in web
+def test_the_removed_feature_flags_are_not_shipped_anywhere():
+    example = (ROOT / ".env.example").read_text()
+    for flag in REMOVED_FLAGS:
+        assert flag not in COMPOSE and flag not in example, flag
+    spec = ROOT / DEPLOY_SPEC
+    if spec.exists():
+        text = spec.read_text()
+        for name in (*REMOVED_FLAGS, "CHARLIE_PLANNER_MODEL", "WEB_LITELLM_API_KEY"):
+            assert name not in text, name  # the cloud spec never carries the live team's inputs
 
 
 def test_the_web_service_receives_the_planner_settings_with_safe_defaults():
     web = service_block("web")
-    assert "CHARLIE_PLANNER_MODEL: ${CHARLIE_PLANNER_MODEL:-gpt-6-luna}" in web  # still off until the flags and a key are set
+    assert "CHARLIE_PLANNER_MODEL: ${CHARLIE_PLANNER_MODEL:-gpt-6-luna}" in web  # the live team stays off until the web container also gets a key
     assert "LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}" in web
     for name in AGENTS:
         assert "CHARLIE_PLANNER_MODEL" not in service_block(name)

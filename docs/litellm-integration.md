@@ -9,7 +9,7 @@ LiteLLM is an external project already running at https://litellm.viharchokshi.c
 - RESEARCH_MODEL: gpt-6.1-sol. PRIVACY_MODEL, SYNTHESIS_MODEL, PIXEL_MODEL: gpt-5.4-mini (the gateway lists it without the `openai/` prefix; aliases must match its `/v1/models` list).
 - SECURITY_MODEL: openai/gpt-5.4.
 - FACT_CHECK_MODEL, SOURCE_QUALITY_MODEL: gemini/gemini-3.5-flash (since PR #13). Other Gemini aliases were tested on 2026-10-27 and are not usable on this account today: gemini-2.5-flash and gemini-2.5-flash-lite return 404 (retired for new users), gemini-3.7-flash and gemini-3.8-flash returned 503 for high demand, and the Pro models returned 429 quota errors.
-- CHARLIE_PLANNER_MODEL: gpt-6-luna in local Compose (never inferred from another alias). Used by the planner in the web container, which stays off until `VIHARBOT_LIVE_TEAM_ENABLED` (or the three flags) is true and WEB_LITELLM_API_KEY is passed. The Stage spec does not set it.
+- CHARLIE_PLANNER_MODEL: gpt-6-luna in local Compose (never inferred from another alias). Used by the planner in the web container, which runs the live team only when WEB_LITELLM_API_KEY is passed (there is no flag). The Stage spec does not set it.
 
 These are configured defaults. A configured alias does not prove a live request succeeds, and the alias list reflects one account at one time; confirm availability with GET /v1/models and a small real call before relying on an alias.
 

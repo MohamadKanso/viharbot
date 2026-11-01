@@ -81,6 +81,12 @@ def health() -> dict[str, str]:
     return {"status": "ok", "agent": "pixel"}
 
 
+@app.get("/model")
+def model() -> dict[str, str | None]:
+    """The configured model alias, so the web UI can show who uses what. Not a secret."""
+    return {"agent": "pixel", "model_alias": os.getenv("PIXEL_MODEL", "").strip() or None}
+
+
 @app.post("/process", response_model=SpecialistResponse)
 def process(
     body: PixelRequest,

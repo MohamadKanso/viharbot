@@ -12,21 +12,21 @@ from uuid import uuid4
 
 import uvicorn
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field
 
 from .demo import AgentPipelineError, run_pipeline
 from .agentcore_runtime import add_agentcore_routes
-from .delegated_execution import delegation_enabled, run_delegated_pipeline
-from .identity_execution import identity_routing_enabled, run_identity_pipeline
 from .iterative_execution import iterative_orchestration_enabled, run_iterative_pipeline
 from .orchestration_view import OrchestrationMeta, build_orchestration_meta  # noqa: F401
 from .chat_models import AgentActivity, ChatRequest, ChatResponse, ChatTurn, DeckInfo  # noqa: F401
 from .pixel.theme import tokens_css
-from .pixel_execution import fetch_deck, ppt_generation_enabled, run_pixel_stage, wants_deck
+from .pixel_execution import fetch_deck, pixel_url, ppt_generation_enabled, run_pixel_stage, wants_deck
+from .team_models import team_models
 from .live_hooks import CancelToken
+from .orchestration_state import CANONICAL_ORDER
 from .live_stream import StreamPermit, dev_diagnostics_enabled, event_stream
 from .observability import configure_logging, get_request_id
 from .schemas import (
@@ -91,18 +91,30 @@ def health() -> dict[str, str]:
     return {"status": "ok", "agent": "web"}
 
 
+TOKENS_MARKER = "/*__PIXEL_TOKENS__*/"
+
+
 @app.get("/", include_in_schema=False)
-def home(_: None = Depends(require_web_access)) -> FileResponse:
+def home(_: None = Depends(require_web_access)) -> HTMLResponse:
+    """The chat page with Pixel's design tokens inlined, so it stays one self-contained file."""
     static_dir = Path(os.getenv("WEB_STATIC_DIR", Path(__file__).with_name("static")))
-    return FileResponse(static_dir / "index.html", media_type="text/html")
+    page = (static_dir / "index.html").read_text(encoding="utf-8")
+    return HTMLResponse(page.replace(TOKENS_MARKER, tokens_css()))
 
 
-@app.get("/pixel-tokens.css", include_in_schema=False)
-def pixel_tokens(_: None = Depends(require_web_access)) -> Response:
-    """Pixel's colours as CSS variables, so the chat output matches the PowerPoint and deck page."""
-    return Response(
-        content=tokens_css(), media_type="text/css; charset=utf-8", headers={"Cache-Control": "no-cache"}
-    )
+@app.get("/api/team-models", include_in_schema=False)
+def team_models_route(_: None = Depends(require_web_access)) -> dict:
+    """Which model each identity uses, as the agents themselves report it (no inference)."""
+    urls = agent_urls()
+    services = {
+        "research": urls["research_url"], "security": urls["security_url"],
+        "fact-check": urls["specialist_urls"]["fact_check"],
+        "source-quality": urls["specialist_urls"]["source_quality"],
+        "privacy-review": urls["specialist_urls"]["privacy_review"],
+        "synthesis": urls["specialist_urls"]["synthesis"],
+        "pixel": pixel_url(),
+    }
+    return {"identities": team_models(services)}
 
 
 TEAM_IMAGES = {
@@ -116,6 +128,8 @@ TEAM_IMAGES = {
     "Scout_headshot.png",
     "Orbit_headshot.png",
     "AI Robot Team Portrait Grid.png",
+    "model-openai.svg",
+    "model-gemini.svg",
 }
 
 
@@ -127,7 +141,8 @@ def team_image(
     if image_name not in TEAM_IMAGES:
         raise HTTPException(status_code=404, detail="Image not found")
     images_dir = Path(os.getenv("WEB_IMAGES_DIR", "/app/images"))
-    return FileResponse(images_dir / image_name, media_type="image/png")
+    media_type = "image/svg+xml" if image_name.endswith(".svg") else "image/png"
+    return FileResponse(images_dir / image_name, media_type=media_type)
 
 
 def make_contextual_question(body: ChatRequest) -> str:
@@ -188,7 +203,7 @@ def build_chat_response(
     )
 
 
-def add_deck_step(message: str, pipeline_result: dict, request_id: str) -> DeckInfo | None:
+def add_deck_step(message: str, pipeline_result: dict, request_id: str, **live) -> DeckInfo | None:
     """The optional slide-deck step, shared by /api/chat and the live stream.
 
     Runs only when the PPT flag is on and the message asks for a deck. A failure is reported in
@@ -196,7 +211,7 @@ def add_deck_step(message: str, pipeline_result: dict, request_id: str) -> DeckI
     """
     if not (ppt_generation_enabled() and wants_deck(message)):
         return None
-    deck, activity = run_pixel_stage(message.strip(), pipeline_result, request_id)
+    deck, activity = run_pixel_stage(message.strip(), pipeline_result, request_id, **live)
     if activity is not None:
         pipeline_result["agent_activity"].append(activity)
     return deck
@@ -217,20 +232,11 @@ def chat(
         pipeline_urls = agent_urls()
         orchestration = None
         if iterative_orchestration_enabled():
-            # Charlie recommends one step at a time; application policy authorizes each one.
+            # The live team: Charlie recommends one step at a time; application policy authorizes
+            # each one. On whenever his planner is configured (an alias and a key), never by flag.
             iterative = run_iterative_pipeline(*pipeline_args, **pipeline_urls)
             pipeline_result = iterative.to_legacy_dict()
             orchestration = build_orchestration_meta(iterative)
-        elif delegation_enabled():
-            # Charlie recommends one of two predefined workflows; application policy authorizes it.
-            pipeline_result = run_delegated_pipeline(
-                *pipeline_args, **pipeline_urls
-            ).to_legacy_dict()
-        elif identity_routing_enabled():
-            # The workflow is fixed server-side; it is never chosen by the request.
-            pipeline_result = run_identity_pipeline(
-                *pipeline_args, workflow="full_review", **pipeline_urls
-            ).to_legacy_dict()
         else:
             pipeline_result = run_pipeline(*pipeline_args, **pipeline_urls)
         # Optional step after the pipeline; a failure is reported in `deck`, never a 502.
@@ -349,7 +355,18 @@ async def chat_stream(
         token.raise_if_set()  # nobody is listening: do not spend model calls on a deck
         # The deck is built before final_response, so that event carries it; the stream sends
         # keep-alive comments meanwhile and no new event type is needed.
-        deck = add_deck_step(message, pipeline_result, request_id)
+        state = iterative.orchestration
+        # Pixel joins the team conversation: the application authorizes it, it reads the results the
+        # team produced (with their real versions), then finishes or fails, as live events.
+        used = [
+            {"identity_id": step.identity_id, "capability": step.capability.value,
+             "result_version": step.version, "dependency_type": "optional"}
+            for step in (state.latest(capability) for capability in CANONICAL_ORDER) if step is not None
+        ]
+        deck = add_deck_step(
+            message, pipeline_result, request_id, reporter=emitter,
+            decision_number=max(state.decision_number, 1), execution_id=f"exec-{state.iteration + 1}",
+            dependencies=used)
         response = build_chat_response(
             pipeline_result, request_id, build_orchestration_meta(iterative), deck)
         state = iterative.orchestration

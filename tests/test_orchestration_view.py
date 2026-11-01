@@ -7,10 +7,7 @@ from fastapi.testclient import TestClient
 from orchestration_helpers import C, Script, delegate, finish
 from pipeline_fixtures import FINDINGS, RID, URLS, FakeSend, response
 from viharbot import web_app
-from viharbot.delegated_execution import DELEGATION_FLAG
 from viharbot.delegation import DelegationDecision
-from viharbot.identity_execution import IDENTITY_ROUTING_FLAG
-from viharbot.iterative_execution import ITERATIVE_FLAG
 from viharbot.orchestration_state import ExecutionBudget
 from viharbot.orchestration_view import OrchestrationMeta, OrchestrationStep, build_orchestration_meta
 
@@ -32,6 +29,9 @@ class VersionedSend(FakeSend):
         return {**raw, "findings": {**FINDINGS, "summary": f"research-v{self.research_calls}"}}
 
 
+LIVE_ENV = ("CHARLIE_PLANNER_MODEL", "LITELLM_API_KEY")
+
+
 def decision(workflow="full_review"):
     return DelegationDecision(workflow_name=workflow, rationale="r", confidence="high")
 
@@ -39,14 +39,13 @@ def decision(workflow="full_review"):
 @pytest.fixture
 def web(monkeypatch):
     monkeypatch.setenv("WEB_AUTH_ENABLED", "false")
-    for name in (ITERATIVE_FLAG, DELEGATION_FLAG, IDENTITY_ROUTING_FLAG):
+    for name in LIVE_ENV:
         monkeypatch.delenv(name, raising=False)
     state = {"send": VersionedSend(), "budget": None, "paths": [],
              "script": lambda: Script(delegate(R, RATIONALE, GAP), delegate(S), finish(RATIONALE)),
              "recommend": lambda q, r: decision()}
     originals = {name: getattr(web_app, name) for name in
-                 ("run_pipeline", "run_identity_pipeline", "run_delegated_pipeline",
-                  "run_iterative_pipeline")}
+                 ("run_pipeline", "run_iterative_pipeline")}
 
     def wrap(name, key, **extra):
         def call(question, request_id, **kwargs):
@@ -56,17 +55,14 @@ def web(monkeypatch):
         return call
 
     monkeypatch.setattr(web_app, "run_pipeline", wrap("run_pipeline", "legacy"))
-    monkeypatch.setattr(web_app, "run_identity_pipeline", wrap("run_identity_pipeline", "identity"))
-    monkeypatch.setattr(web_app, "run_delegated_pipeline",
-                        wrap("run_delegated_pipeline", "delegated", recommend=lambda: state["recommend"]))
     monkeypatch.setattr(web_app, "run_iterative_pipeline",
                         wrap("run_iterative_pipeline", "iterative", decide=lambda: state["script"]()))
     return TestClient(web_app.app), state, monkeypatch
 
 
-def enable(patch, *names):
-    for name in names or (ITERATIVE_FLAG, DELEGATION_FLAG, IDENTITY_ROUTING_FLAG):
-        patch.setenv(name, "true")
+def enable(patch):
+    patch.setenv("CHARLIE_PLANNER_MODEL", "planner/alias")
+    patch.setenv("LITELLM_API_KEY", "test-key")
 
 
 def chat(client, message="hello", **kwargs):
@@ -179,18 +175,6 @@ def test_legacy_responses_are_unchanged_and_omit_the_key(web):
     assert body["findings"]["summary"] == "research-v1"
 
 
-def test_identity_routing_and_phase_5_responses_are_unchanged_and_omit_the_key(web):
-    client, state, patch = web
-    enable(patch, IDENTITY_ROUTING_FLAG)
-    routed = chat(client)
-    assert state["paths"] == ["identity"] and list(routed.json()) == LEGACY_KEYS
-    state["send"] = VersionedSend()
-    enable(patch, IDENTITY_ROUTING_FLAG, DELEGATION_FLAG)
-    delegated = chat(client)
-    assert state["paths"][-1] == "delegated" and list(delegated.json()) == LEGACY_KEYS
-    assert b"orchestration" not in routed.content + delegated.content
-
-
 def test_legacy_bodies_match_a_run_without_the_feature_exactly(web):
     client, state, patch = web
     legacy = chat(client).json()
@@ -283,7 +267,7 @@ def test_agentcore_invocations_carry_the_metadata_for_iterative_runs(web):
     enable(patch)
     iterative = client.post("/invocations", json={"request_id": RID, "input": {"message": "hi"}})
     assert iterative.status_code == 200 and iterative.json()["orchestration"]["mode"] == "iterative"
-    for name in (ITERATIVE_FLAG, DELEGATION_FLAG, IDENTITY_ROUTING_FLAG):
+    for name in LIVE_ENV:
         patch.delenv(name)
     legacy = client.post("/invocations", json={"request_id": RID, "input": {"message": "hi"}})
     assert legacy.json()["orchestration"] is None  # the wrapper serializes the null

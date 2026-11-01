@@ -26,7 +26,13 @@ const window = {
 };
 const context = vm.createContext({
   document, window, console, Date, Promise, JSON, Math, Object, Array, String, Number,
-  fetch: (url, options) => { fetchCalls.push({ url, options }); return fetchPromise; },
+  // The page asks once, at load, which model each agent uses. That GET is not a chat request, so
+  // it is answered "not available" and kept out of the recorded calls.
+  fetch: (url, options) => {
+    if (String(url).startsWith("/api/team-models")) return Promise.resolve({ ok: false, json: async () => null });
+    fetchCalls.push({ url, options });
+    return fetchPromise;
+  },
 });
 vm.runInContext(scripts[0], context);
 

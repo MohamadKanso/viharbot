@@ -117,7 +117,7 @@ Every model call is `build_agent()` in `model_agent.py`: a Strands `Agent` over 
 | privacy-review, synthesis, pixel | `gpt-5.4-mini` (the gateway lists it without the `openai/` prefix) |
 | security | `openai/gpt-5.4` |
 | fact-check, source-quality | `gemini/gemini-3.5-flash` |
-| Charlie's planner | `gpt-6-luna` in local Compose; unavailable until `VIHARBOT_LIVE_TEAM_ENABLED` (or the three flags) is true and a key is passed |
+| Charlie's planner | `gpt-6-luna` in local Compose; unavailable until a key is passed to the web container (there is no flag) |
 
 ## Streaming event flow
 

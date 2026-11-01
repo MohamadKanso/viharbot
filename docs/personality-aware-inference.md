@@ -20,15 +20,13 @@ Personality mode is not delegation. No agent chooses another agent, plans, or ca
 flowchart TD
     subgraph SvcEnv["Inside one service's own environment"]
         F1{{"VIHARBOT_PERSONALITY_INFERENCE_ENABLED"}}
-        F2{{"VIHARBOT_IDENTITY_ROUTING_ENABLED"}}
         NAME["Service name from the service's own code<br/>(research, security, AGENT_KIND)"]
         ALIAS["Service alias env var<br/>(RESEARCH_MODEL, ...)"]
     end
     BND["Approved bindings<br/>execution_config/bindings.toml"] --> RES
     REG["Identity registry<br/>agent_identities/"] --> RES
     NAME --> RES["resolve_inference_config()<br/>no network, no model calls"]
-    F1 --> GATE{{"both on?"}}
-    F2 --> GATE
+    F1 --> GATE{{"on?"}}
     GATE -- "no: legacy prompt + alias" --> BA
     GATE -- "yes" --> RES
     ALIAS --> RES
@@ -48,15 +46,9 @@ Nothing about identity is sent to a service. A service decides for itself, using
 
 A request cannot choose, add or change an identity. Headers such as `X-Identity-ID` and body fields such as `identity_id` are never read. Because the decision is local, the same code runs for REST and for AgentCore `/invocations`, and no new protocol or authentication is needed. The orchestrator's flag does not reach the services, so each service's flags are set independently in that service's environment.
 
-## Feature flags
+## Feature flag
 
-| `VIHARBOT_PERSONALITY_INFERENCE_ENABLED` | `VIHARBOT_IDENTITY_ROUTING_ENABLED` | Result in a service |
-|---|---|---|
-| false / unset | any | Legacy prompt and alias |
-| true | false / unset | Legacy prompt and alias (personality cannot activate without routing) |
-| true | true | Personality-aware inference |
-
-Both accept `1`, `true` or `yes`, are read on every request and default to false. Neither is set in `compose.yaml`, the DigitalOcean spec or `.env.example`, so deployed containers stay on legacy behavior until you change their configuration.
+`VIHARBOT_PERSONALITY_INFERENCE_ENABLED` alone controls it, set in each service's own environment. It accepts `1`, `true` or `yes`, is read on every request and defaults to false. When false or unset a service uses its legacy prompt and alias; when true it uses personality-aware inference for its approved binding. It is not set in `compose.yaml`, the DigitalOcean spec or `.env.example`, so deployed containers stay on legacy behavior until you change their configuration. (It used to need `VIHARBOT_IDENTITY_ROUTING_ENABLED` as well; that flag was removed.)
 
 ## Effective configuration
 

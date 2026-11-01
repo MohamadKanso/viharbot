@@ -33,7 +33,6 @@ flowchart LR
     RTP --> ST["PipelineState"]
     EP --> REC["ExecutionRecords<br/>(internal attribution)"]
     ST --> LEG["Legacy result dict<br/>(same as run_pipeline)"]
-    FLAG{{"VIHARBOT_IDENTITY_ROUTING_ENABLED"}} -. "false: run_pipeline()" .-> RTP
     FLAG -. "true: full_review only" .-> RIP
 ```
 
@@ -103,14 +102,9 @@ The result is an `IdentityPipelineResult` holding the typed state, the plan and 
 
 Each `ExecutionRecord` has `identity_id`, `capability`, `service_name`, `request_id`, `duration_ms`, `status` and the service-reported `model_alias`. Records are internal. They are not in the public `AgentActivity` or `ChatResponse`, and Phase 3 adds no logging of prompts or user data.
 
-## Feature flag
+## Feature flag (removed)
 
-`VIHARBOT_IDENTITY_ROUTING_ENABLED` is read on every request and defaults to **false**. It accepts `1`, `true` or `yes`.
-
-- **False:** `/api/chat` calls `run_pipeline()` exactly as before. Identity configuration has no effect.
-- **True:** `/api/chat` runs `full_review` through the identity path. The workflow is fixed in server code, so a request cannot choose it, and `research_security` is reachable only through the internal function. The result converts to the unchanged `ChatResponse`. Failures use the existing 502 responses, with no silent fallback to the legacy pipeline.
-
-`compose.yaml` and the DigitalOcean spec do not pass this variable, so deployed containers keep it off. Enabling it there needs a separately approved configuration change.
+The `VIHARBOT_IDENTITY_ROUTING_ENABLED` flag that originally gated this path was removed. The web app no longer has a separate identity-routed mode: it runs the fixed pipeline, or the live team conversation when Charlie's planner is configured, and identity routing is one of the layers that conversation uses. `run_identity_pipeline()` and everything described above remain as library code.
 
 ## Security boundaries
 

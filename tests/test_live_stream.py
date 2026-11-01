@@ -19,10 +19,7 @@ from fastapi.testclient import TestClient
 from live_helpers import C, R, S, Script, VersionedSend, delegate, finish
 from pipeline_fixtures import RID
 from viharbot import live_stream, web_app
-from viharbot.delegated_execution import DELEGATION_FLAG
 from viharbot.delegation import PlannerUnavailableError
-from viharbot.identity_execution import IDENTITY_ROUTING_FLAG
-from viharbot.iterative_execution import ITERATIVE_FLAG
 from viharbot.live_events import TERMINAL_EVENT_TYPES, check_stream, parse_event
 from viharbot.live_hooks import CancelToken, OrchestrationCancelled
 from viharbot.live_stream import (
@@ -56,8 +53,8 @@ def events_of(body: bytes):
 @pytest.fixture
 def live(monkeypatch):
     monkeypatch.setenv("WEB_AUTH_ENABLED", "false")
-    for name in (ITERATIVE_FLAG, DELEGATION_FLAG, IDENTITY_ROUTING_FLAG):
-        monkeypatch.setenv(name, "true")
+    monkeypatch.setenv("CHARLIE_PLANNER_MODEL", "planner/alias")
+    monkeypatch.setenv("LITELLM_API_KEY", "test-key")
     monkeypatch.delenv(DIAGNOSTICS_FLAG, raising=False)
     state = SimpleNamespace(decide=lambda question: standard_script(), sends=[], decisions=0)
     real = web_app.run_iterative_pipeline
@@ -184,10 +181,10 @@ def test_the_request_contract_is_the_existing_one_with_nothing_new_required(live
 
 
 # ---- modes and limits --------------------------------------------------------------------------
-@pytest.mark.parametrize("off", [ITERATIVE_FLAG, DELEGATION_FLAG, IDENTITY_ROUTING_FLAG])
-def test_streaming_needs_iterative_orchestration_and_says_so_before_streaming(live, off):
+@pytest.mark.parametrize("missing", ["CHARLIE_PLANNER_MODEL", "LITELLM_API_KEY"])
+def test_streaming_needs_iterative_orchestration_and_says_so_before_streaming(live, missing):
     client, state, patch = live
-    patch.setenv(off, "false")
+    patch.delenv(missing)
     reply = post(client)
     assert reply.status_code == 409
     assert reply.json() == {"detail": "Live streaming requires iterative orchestration"}
@@ -196,8 +193,7 @@ def test_streaming_needs_iterative_orchestration_and_says_so_before_streaming(li
 
 def test_the_ordinary_endpoint_is_unaffected_when_streaming_is_unavailable(live):
     client, state, patch = live
-    for name in (ITERATIVE_FLAG, DELEGATION_FLAG, IDENTITY_ROUTING_FLAG):
-        patch.setenv(name, "false")
+    patch.delenv("LITELLM_API_KEY")
     patch.setattr(web_app, "run_pipeline", lambda q, rid, **kw: __import__("viharbot.demo", fromlist=["x"]).run_pipeline(
         q, rid, **{**kw, "send": VersionedSend()}))
     assert post(client).status_code == 409

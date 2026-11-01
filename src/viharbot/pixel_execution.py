@@ -63,15 +63,37 @@ def _evidence(pipeline_result: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_pixel_stage(
-    question: str, pipeline_result: dict[str, Any], request_id: str, *, send=None
+    question: str,
+    pipeline_result: dict[str, Any],
+    request_id: str,
+    *,
+    send=None,
+    reporter=None,
+    decision_number: int | None = None,
+    execution_id: str | None = None,
+    dependencies: list[dict[str, Any]] | None = None,
 ) -> tuple[DeckInfo, dict[str, Any] | None]:
-    """Call the pixel service. Returns the public deck info and an activity row, if one ran."""
+    """Call the pixel service. Returns the public deck info and an activity row, if one ran.
+
+    With a live `reporter` (the stream's event emitter) the team conversation shows it: the
+    application authorizes Pixel because the user asked for a deck, Pixel starts, reads the team's
+    results, and finishes or fails. Pixel's step is not a decision of Charlie's, so no event claims
+    he requested it.
+    """
     if not pixel_authorized():
         return DeckInfo(status="failed", error="Slide generation is not authorized"), None
     send = send or functools.partial(post_json, timeout_cap=PIXEL_TIMEOUT_SECONDS)
     activity: list[AgentActivity] = []
+    live = reporter is not None and decision_number is not None and execution_id is not None
+    common = dict(decision_number=decision_number, execution_id=execution_id)
+    if live:
+        reporter.delegation_authorized(
+            capability="slide_generation", target_identity="pixel", service="pixel",
+            result_version=1, **common)
+        reporter.agent_started(
+            identity_id="pixel", capability="slide_generation", service="pixel", result_version=1, **common)
     try:
-        _, domain = invoke_agent(
+        envelope, domain = invoke_agent(
             send,
             pixel_url(),
             {"question": question, "context": _evidence(pipeline_result)},
@@ -80,11 +102,23 @@ def run_pixel_stage(
             activity,
         )
     except AgentPipelineError:
+        if live:
+            reporter.agent_failed(
+                identity_id="pixel", capability="slide_generation", error_code="agent_execution_failed",
+                duration_ms=activity[-1].duration_ms if activity else 0, **common)
         return (
             DeckInfo(status="failed", error="The slide deck could not be generated"),
             activity[-1].to_legacy() if activity else None,
         )
     deck = DeckResult.model_validate(domain)
+    if live:
+        reporter.agent_completed(
+            identity_id="pixel", capability="slide_generation", result_version=1,
+            duration_ms=activity[-1].duration_ms, model_alias=envelope.requested_model_alias or None, **common)
+        if dependencies:
+            reporter.dependency_recorded(
+                consumer={"identity_id": "pixel", "capability": "slide_generation", "result_version": 1},
+                dependencies=dependencies, **common)
     return (
         DeckInfo(
             status="complete",

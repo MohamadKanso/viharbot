@@ -293,7 +293,7 @@ Note on the 8-K rule: the four-day clock runs from the company's materiality det
 
 ## Known limitations
 
-- The template deck is generated from the registry with one generic grid, so every layout is structurally correct but not visually tuned. Nobody has looked at the rendered slides yet (no renderer was available), and long text can overflow a cell; word limits mitigate but do not guarantee fit.
+- The template deck is generated from the registry with one generic grid, so every layout is structurally correct but not visually tuned. Nobody has looked at the rendered slides yet (no renderer was available). Overflow is handled by an estimated fit step that lowers font sizes and by a header band on four layouts (`header_cells` in `layouts.json`); see [Pixel slide service](pixel-slide-service.md).
 - The runner's Tier 1 and Tier 2 model calls are untested against a real model. `PIXEL_MODEL` must name a LiteLLM alias; none is configured.
 - Totals are checked only for the roadmap layout. Other layouts have no arithmetic validation.
 - The pixel service is not in the DigitalOcean spec, so Stage does not run it.

@@ -17,7 +17,6 @@ from viharbot.execution_bindings import (
 from viharbot.identity import AgentIdentity, Capability, CapabilityStatus
 from viharbot.identity_registry import AgentRegistry, default_registry, load_registry
 from viharbot.inference_config import (
-    IDENTITY_ROUTING_FLAG,
     PERSONALITY_FLAG,
     PRECEDENCE_CLAUSE,
     InferenceConfigError,
@@ -174,35 +173,27 @@ def test_preferred_model_families_are_never_used_as_aliases():
 
 
 # 13, 15. flags
-def test_flags_default_to_disabled(monkeypatch):
+def test_flag_defaults_to_disabled(monkeypatch):
     monkeypatch.delenv(PERSONALITY_FLAG, raising=False)
-    monkeypatch.delenv(IDENTITY_ROUTING_FLAG, raising=False)
     assert personality_inference_active() is False
 
 
-@pytest.mark.parametrize("personality,routing,expected", [
-    ("true", "true", True), ("1", "yes", True), ("true", "false", False),
-    ("false", "true", False), ("true", None, False), (None, "true", False), ("", "", False),
+@pytest.mark.parametrize("personality,expected", [
+    ("true", True), ("1", True), ("yes", True), ("false", False), ("", False), (None, False),
 ])
-def test_personality_requires_both_flags(monkeypatch, personality, routing, expected):
-    for name, value in ((PERSONALITY_FLAG, personality), (IDENTITY_ROUTING_FLAG, routing)):
-        monkeypatch.delenv(name, raising=False)
-        if value is not None:
-            monkeypatch.setenv(name, value)
+def test_personality_needs_only_its_own_flag(monkeypatch, personality, expected):
+    monkeypatch.delenv(PERSONALITY_FLAG, raising=False)
+    if personality is not None:
+        monkeypatch.setenv(PERSONALITY_FLAG, personality)
     assert personality_inference_active() is expected
 
 
-def test_routing_flag_name_matches_the_orchestrator():
-    assert IDENTITY_ROUTING_FLAG == identity_execution.IDENTITY_ROUTING_FLAG
-
-
-def test_effective_inference_is_legacy_unless_both_flags_are_on(monkeypatch):
-    monkeypatch.setenv(PERSONALITY_FLAG, "true")
-    monkeypatch.delenv(IDENTITY_ROUTING_FLAG, raising=False)
+def test_effective_inference_is_legacy_unless_the_flag_is_on(monkeypatch):
+    monkeypatch.delenv(PERSONALITY_FLAG, raising=False)
     legacy = effective_inference("research", legacy_alias="a/b", legacy_prompt="LEGACY")
     assert (legacy.model_alias, legacy.system_prompt, legacy.personality_mode) == ("a/b", "LEGACY", False)
     assert legacy.identity_id is None
-    monkeypatch.setenv(IDENTITY_ROUTING_FLAG, "true")
+    monkeypatch.setenv(PERSONALITY_FLAG, "true")
     active = effective_inference("research", legacy_alias="a/b", legacy_prompt="LEGACY")
     assert active.personality_mode and active.identity_id == "nova" and active.capability == "research"
     assert active.system_prompt.endswith("LEGACY") and active.system_prompt != "LEGACY"

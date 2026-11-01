@@ -21,14 +21,9 @@ services:
       # Slide-deck generation (Pixel). True while the feature is being tested; set it to false in
       # compose and .env when the feature is done so no request spends model calls on decks.
       VIHARBOT_PPT_GENERATION_ENABLED: ${VIHARBOT_PPT_GENERATION_ENABLED:-true}
-      # One switch for the live team conversation: it turns on all three modes below. Off by
-      # default. It grants no credentials; the planner also needs WEB_LITELLM_API_KEY.
-      VIHARBOT_LIVE_TEAM_ENABLED: ${VIHARBOT_LIVE_TEAM_ENABLED:-false}
-      # Optional coordination modes. All off by default; iterative mode needs all three, or the
-      # single flag above.
-      VIHARBOT_IDENTITY_ROUTING_ENABLED: ${VIHARBOT_IDENTITY_ROUTING_ENABLED:-false}
-      VIHARBOT_DELEGATION_ENABLED: ${VIHARBOT_DELEGATION_ENABLED:-false}
-      VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED: ${VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED:-false}
+      # The live team conversation has no flag: it runs when the planner is configured, that is
+      # when WEB_LITELLM_API_KEY is passed (below) with a planner alias. Without the key the web
+      # service runs the fixed pipeline.
       # Dev only: planner rationale and model aliases in the live stream. Off by default.
       VIHARBOT_DEV_DIAGNOSTICS_ENABLED: ${VIHARBOT_DEV_DIAGNOSTICS_ENABLED:-false}
       # Charlie's planner is the only inference the web service makes. Its alias defaults to

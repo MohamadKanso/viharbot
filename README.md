@@ -66,9 +66,7 @@ A declarative registry of 78 skills across the eight identities lives in `src/vi
 | Mode | Flags | Behavior |
 |---|---|---|
 | Slide decks (Pixel) | `VIHARBOT_PPT_GENERATION_ENABLED` (true in local Compose while testing; set it false when the feature is done) | After the pipeline, if the message asks for a deck, the pixel service plans and builds a `.pptx`; see [Pixel slide service](docs/pixel-slide-service.md) |
-| Iterative orchestration (the live team conversation) | **`VIHARBOT_LIVE_TEAM_ENABLED=true`**, which turns on all three layers (or set `VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED`, `VIHARBOT_DELEGATION_ENABLED` and `VIHARBOT_IDENTITY_ROUTING_ENABLED` individually), plus a planner alias (`gpt-6-luna` by default) and `WEB_LITELLM_API_KEY` for the web container | Charlie recommends one step at a time; policy authorizes it; the loop runs it |
-| Controlled delegation | `VIHARBOT_DELEGATION_ENABLED` and identity routing | Charlie picks one of two predefined workflows |
-| Identity-attributed execution | `VIHARBOT_IDENTITY_ROUTING_ENABLED` | The fixed pipeline, attributed to identities |
+| Live team conversation (iterative orchestration) | **No flag.** It runs when Charlie's planner is configured: a planner alias (`gpt-6-luna` by default) and `WEB_LITELLM_API_KEY` passed to the web container. Without the key the web service runs the fixed pipeline | Charlie recommends one step at a time; policy authorizes it; the loop runs it, and Pixel joins when you ask for a deck |
 | Fixed pipeline | none (the default) | Research, then the specialists in a fixed order |
 
 All flags default to `false`. `POST /api/chat/stream` (live events) works only in iterative mode and returns `409` otherwise. Details: [iterative orchestration](docs/iterative-orchestration.md), [controlled delegation](docs/controlled-delegation.md), [identity execution](docs/identity-execution-integration.md).

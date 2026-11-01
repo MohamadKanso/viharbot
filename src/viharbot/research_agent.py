@@ -46,6 +46,12 @@ def health() -> dict[str, str]:
     return {"status": "ok", "agent": "research"}
 
 
+@app.get("/model")
+def model() -> dict[str, str | None]:
+    """The configured model alias, so the web UI can show who uses what. Not a secret."""
+    return {"agent": "research", "model_alias": os.getenv("RESEARCH_MODEL", "").strip() or None}
+
+
 @app.post("/research", response_model=ResearchResponse)
 def research(
     body: ResearchRequest,

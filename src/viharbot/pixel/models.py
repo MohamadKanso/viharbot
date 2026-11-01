@@ -31,6 +31,8 @@ class LayoutSpec(BaseModel):
     theme: Literal["dark", "light"]
     purpose: str
     grid_cols: int = 3
+    # The first N cells are laid out as one compact band across the top; the rest fill the grid.
+    header_cells: int = 0
     word_limits: dict[str, int] = Field(default_factory=dict)
     cells: tuple[Cell, ...]
 

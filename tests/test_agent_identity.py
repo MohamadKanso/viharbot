@@ -311,10 +311,11 @@ def test_capability_vocabulary_and_status():
 def test_chat_response_contract_is_unchanged():
     from viharbot import web_app
 
-    # Phase 6.2 added one optional field; the original eight fields and their order are unchanged.
+    # Optional fields were added later (`orchestration` in Phase 6.2, `deck` for Pixel's slides);
+    # the original eight fields and their order are unchanged.
     assert list(web_app.ChatResponse.model_fields) == [
         "request_id", "findings", "assessment", "fact_check", "source_quality",
         "privacy_review", "synthesis", "agent_activity",
-        "orchestration",
+        "orchestration", "deck",
     ]
     assert list(web_app.ChatRequest.model_fields) == ["message", "history"]

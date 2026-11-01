@@ -69,12 +69,12 @@ Confidence and rationale are ignored. `research_security` omits Privacy Review b
 
 `run_delegated_pipeline()` calls the planner once, validates, then passes the approved plan to `execute_plan()`. That is the same execution half `run_identity_pipeline()` uses, so transport (HTTP and `agentcore://`), response validation, request ID checks and outbound payloads are unchanged. Services keep their own prompts and aliases. Unexecuted stages stay absent internally and serialize as `null` in `ChatResponse`. Nothing is fabricated and no step is added.
 
-## Configuration and feature flags
+## Configuration
+
+> **Update:** the `VIHARBOT_DELEGATION_ENABLED` and `VIHARBOT_IDENTITY_ROUTING_ENABLED` flags were removed. Delegation and identity routing are no longer separate web modes; they are layers the live team conversation uses, and that mode has no flag either: it runs when the planner is configured. `run_delegated_pipeline()` and the rest of this design are unchanged as library code.
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `VIHARBOT_DELEGATION_ENABLED` | Turns model-assisted selection on | false |
-| `VIHARBOT_IDENTITY_ROUTING_ENABLED` | Must also be true; otherwise delegation stays inactive and the existing path runs | false |
 | `CHARLIE_PLANNER_MODEL` | The planning model's LiteLLM alias | `gpt-6-luna` in local Compose; unset in the Stage spec |
 | `VIHARBOT_PLANNER_TIMEOUT_SECONDS` | Planning call timeout, clamped to 1-120 | 30 |
 

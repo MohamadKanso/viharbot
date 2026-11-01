@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import copy
 import html as _html
+import logging
 import math
 import re
 from pathlib import Path
@@ -23,8 +24,15 @@ from typing import Any, Iterable
 from .models import LayoutSpec, SlidePayload
 from .registry import design_tokens, get_layout_spec, list_layouts
 
+logger = logging.getLogger("pixel")
+
 TOKEN_RE = re.compile(r"\{\{([A-Z0-9_]+)\}\}")
 SLIDE_W_IN, SLIDE_H_IN = 13.333, 7.5
+BADGE_W_IN = 1.25
+SHORT_CELL_IN = 1.6  # cells shorter than this put their badges beside the text, not above it
+MIN_FONT_PT = 8.0
+AVG_CHAR_EM = 0.55  # average glyph width in ems; deliberately a little wide so the estimate errs safe
+LINE_HEIGHT = 1.2
 
 
 def _pptx() -> dict[str, Any]:
@@ -54,6 +62,30 @@ def _add_run(P, paragraph, text: str, size: float, bold: bool, color: str) -> No
     run.font.color.rgb = _rgb(P, color)
 
 
+BAND_H_IN = 0.9
+
+
+def _placements(spec: LayoutSpec) -> list[tuple]:
+    """(cell, left, top, width, height) in inches: an optional header band, then the grid."""
+    x0, y0, width, height, gap = 0.6, 1.7, 12.13, 5.3, 0.2
+    out: list[tuple] = []
+    band = spec.cells[: spec.header_cells]
+    if band:
+        w = (width - gap * (len(band) - 1)) / len(band)
+        out += [(c, x0 + i * (w + gap), y0, w, BAND_H_IN) for i, c in enumerate(band)]
+        y0, height = y0 + BAND_H_IN + gap, height - BAND_H_IN - gap
+    rest = spec.cells[spec.header_cells :]
+    cols = max(1, spec.grid_cols)
+    rows = math.ceil(len(rest) / cols) or 1
+    cell_w = (width - gap * (cols - 1)) / cols
+    cell_h = (height - gap * (rows - 1)) / rows
+    out += [
+        (c, x0 + (i % cols) * (cell_w + gap), y0 + (i // cols) * (cell_h + gap), cell_w, cell_h)
+        for i, c in enumerate(rest)
+    ]
+    return out
+
+
 def _draw_layout(P: dict[str, Any], prs, spec: LayoutSpec) -> None:
     tokens = design_tokens()
     theme = tokens["themes"][spec.theme]
@@ -78,14 +110,7 @@ def _draw_layout(P: dict[str, Any], prs, spec: LayoutSpec) -> None:
     _add_run(P, frame.paragraphs[0], "{{SLIDE_TAG}}", 10, True, accent)
     _add_run(P, frame.add_paragraph(), "{{SLIDE_TITLE}}", 22, True, theme["text"])
 
-    n, cols = len(spec.cells), max(1, spec.grid_cols)
-    rows = math.ceil(n / cols)
-    x0, y0, width, height, gap = 0.6, 1.7, 12.13, 5.3, 0.2
-    cell_w = (width - gap * (cols - 1)) / cols
-    cell_h = (height - gap * (rows - 1)) / rows
-    for index, cell in enumerate(spec.cells):
-        left = x0 + (index % cols) * (cell_w + gap)
-        top = y0 + (index // cols) * (cell_h + gap)
+    for cell, left, top, cell_w, cell_h in _placements(spec):
         box = slide.shapes.add_shape(
             P["MSO_SHAPE"].ROUNDED_RECTANGLE, Inches(left), Inches(top), Inches(cell_w), Inches(cell_h)
         )
@@ -97,14 +122,19 @@ def _draw_layout(P: dict[str, Any], prs, spec: LayoutSpec) -> None:
         frame = box.text_frame
         frame.word_wrap = True
         frame.vertical_anchor = P["MSO_ANCHOR"].TOP
-        frame.margin_left = frame.margin_right = Inches(0.14)
-        frame.margin_top = Inches(0.42 if cell.badges else 0.14)
+        short = cell_h < SHORT_CELL_IN
+        badge_room = len(cell.badges) * (BADGE_W_IN + 0.05) if cell.badges else 0
+        frame.margin_left = Inches(0.14)
+        frame.margin_right = Inches(0.14 + (badge_room if short else 0))
+        frame.margin_top = Inches(0.42 if cell.badges and not short else 0.12)
+        frame.margin_bottom = Inches(0.06)
+        sizes = (11.0, 9.5) if short else (12.0, 10.5)
         for i, token in enumerate(cell.tokens):
             paragraph = frame.paragraphs[0] if i == 0 else frame.add_paragraph()
             paragraph.alignment = P["PP_ALIGN"].LEFT
-            _add_run(P, paragraph, "{{%s}}" % token, 12 if i == 0 else 10.5, i == 0, theme["text"])
+            _add_run(P, paragraph, "{{%s}}" % token, sizes[0] if i == 0 else sizes[1], i == 0, theme["text"])
         for b, badge_token in enumerate(cell.badges):
-            badge_w = 1.25
+            badge_w = BADGE_W_IN
             badge_left = left + cell_w - 0.12 - (len(cell.badges) - b) * (badge_w + 0.05) + 0.05
             badge = slide.shapes.add_shape(
                 P["MSO_SHAPE"].ROUNDED_RECTANGLE,
@@ -200,6 +230,41 @@ def _clone(prs, template):
     return new
 
 
+def _text_height_in(shape) -> float:
+    """Estimated height of a shape's text in inches, from its width, margins and font sizes."""
+    frame = shape.text_frame
+    width = (shape.width - frame.margin_left - frame.margin_right) / 914400
+    total = 0.0
+    for paragraph in frame.paragraphs:
+        size = max((run.font.size.pt for run in paragraph.runs if run.font.size), default=10.5)
+        per_line = max(1, int(width * 72 / (size * AVG_CHAR_EM)))
+        lines = sum(max(1, math.ceil(len(part) / per_line)) for part in paragraph.text.split("\n"))
+        total += lines * size * LINE_HEIGHT / 72
+    return total
+
+
+def _fit_cells(P, slide) -> int:
+    """Lower each overfull cell's font size, to MIN_FONT_PT, until its text should fit.
+
+    Deterministic and independent of the model. It works from an estimate, not a real layout, so
+    a cell may still overflow at the minimum size; returns how many cells could not be made to fit.
+    """
+    unfit = 0
+    for shape in slide.shapes:
+        if not (shape.name.startswith("CELL_") and shape.has_text_frame):
+            continue
+        frame = shape.text_frame
+        available = (shape.height - frame.margin_top - frame.margin_bottom) / 914400
+        while _text_height_in(shape) > available:
+            runs = [r for p in frame.paragraphs for r in p.runs if r.font.size]
+            if not runs or max(r.font.size.pt for r in runs) <= MIN_FONT_PT:
+                unfit += 1
+                break
+            for run in runs:
+                run.font.size = P["Pt"](max(MIN_FONT_PT, run.font.size.pt - 0.5))
+    return unfit
+
+
 def populate(
     template_path: str | Path,
     payloads: Iterable[SlidePayload | dict[str, Any]],
@@ -225,6 +290,9 @@ def populate(
             _recolor(P, slide, dict(payload.status_overrides))
         except ValueError as exc:
             problems.append(f"{payload.slide_id}: {exc}")
+        unfit = _fit_cells(P, slide)
+        if unfit:
+            logger.warning("pixel text may overflow", extra={"agent": "pixel", "error": f"{unfit} cells at minimum font size"})
         for shape in list(slide.shapes):
             if shape.name == "LAYOUT_ID":
                 shape._element.getparent().remove(shape._element)
@@ -258,7 +326,7 @@ def _css() -> str:
         ".slide{border-radius:14px;padding:28px 28px 24px;margin:0 0 22px;border:1px solid transparent}",
         ".slide h2{margin:2px 0 18px;font-size:1.45rem;line-height:1.25}",
         ".tag{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}",
-        ".grid{display:grid;gap:14px}",
+        ".grid{display:grid;gap:14px}.grid.band{margin-bottom:14px}",
         ".cell{position:relative;border-radius:12px;padding:14px 16px;border:1px solid transparent}",
         ".cell p{margin:0 0 6px;font-size:.92rem}.cell p:first-of-type{font-weight:700;font-size:.98rem}",
         ".badges{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin:0 0 8px}",
@@ -297,19 +365,28 @@ def render_html(
     for payload in items:
         spec = get_layout_spec(payload.layout_id)
         cells: list[str] = []
-        for cell in spec.cells:
+        band_cells: list[str] = []
+        for position, cell in enumerate(spec.cells):
             badges = "".join(
                 f'<span class="badge {esc(status)}">{esc(statuses[status]["label"])}</span>'
                 for status in (payload.status_overrides.get(b) for b in cell.badges)
                 if status in statuses
             )
             texts = "".join(f"<p>{esc(payload.tokens.get(t, ''))}</p>" for t in cell.tokens)
-            cells.append(f'<div class="cell">{f"<div class=badges>{badges}</div>" if badges else ""}{texts}</div>')
+            html_cell = f'<div class="cell">{f"<div class=badges>{badges}</div>" if badges else ""}{texts}</div>'
+            (band_cells if position < spec.header_cells else cells).append(html_cell)
         cols = max(1, spec.grid_cols)
+        band = (
+            f'<div class="grid band" style="grid-template-columns:repeat({len(band_cells)},minmax(0,1fr))">'
+            f'{"".join(band_cells)}</div>'
+            if band_cells
+            else ""
+        )
         sections.append(
             f'<section class="slide {esc(spec.theme)}" data-layout="{esc(spec.layout_id)}">'
             f'<div class="tag">{esc(payload.tokens.get("SLIDE_TAG", ""))}</div>'
             f'<h2>{esc(payload.tokens.get("SLIDE_TITLE", ""))}</h2>'
+            f'{band}'
             f'<div class="grid" style="grid-template-columns:repeat({cols},minmax(0,1fr))">{"".join(cells)}</div>'
             "</section>"
         )

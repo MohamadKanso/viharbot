@@ -159,6 +159,12 @@ def health() -> dict[str, str]:
     return {"status": "ok", "agent": AGENT_KIND}
 
 
+@app.get("/model")
+def model() -> dict[str, str | None]:
+    """The configured model alias, so the web UI can show who uses what. Not a secret."""
+    return {"agent": AGENT_KIND, "model_alias": os.getenv(definition.model_env, "").strip() or None}
+
+
 @app.post("/process", response_model=SpecialistResponse)
 def process(
     body: SpecialistRequest,
