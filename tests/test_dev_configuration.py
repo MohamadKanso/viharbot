@@ -8,7 +8,7 @@ from shipped_config_helpers import DEPLOY_SPEC, ROOT
 COMPOSE = (ROOT / "compose.yaml").read_text()
 REMOVED_FLAGS = ("VIHARBOT_IDENTITY_ROUTING_ENABLED", "VIHARBOT_DELEGATION_ENABLED",
                  "VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED", "VIHARBOT_LIVE_TEAM_ENABLED")
-AGENTS = ("research", "security", "fact-check", "source-quality", "privacy-review", "synthesis", "pixel")
+AGENTS = ("research", "security", "fact-check", "source-quality", "privacy-review", "synthesis", "pixel", "sage")
 
 
 def service_block(name: str) -> str:

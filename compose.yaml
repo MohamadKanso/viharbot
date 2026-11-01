@@ -221,6 +221,31 @@ services:
       retries: 5
     restart: unless-stopped
 
+  sage:
+    build:
+      context: .
+      dockerfile: Dockerfile.sage
+    environment:
+      LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}
+      LITELLM_API_KEY: ${LITELLM_API_KEY:-}
+      # Sage prefers a Claude Opus model, but the gateway routes no Claude alias, so this is a
+      # verified existing alias (see docs/sage-service.md). Override it with SAGE_MODEL.
+      SAGE_MODEL: ${SAGE_MODEL:-gpt-6.1-sol}
+      SAGE_MODEL_TIMEOUT_SECONDS: ${SAGE_MODEL_TIMEOUT_SECONDS:-80}
+      MEMORY_DIR: /data
+    volumes:
+      - sage_data:/data
+    expose:
+      - "8000"
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   orchestrator:
     profiles: ["demo"]
     build:
@@ -277,3 +302,4 @@ volumes:
   privacy_review_data:
   synthesis_data:
   pixel_data:
+  sage_data:

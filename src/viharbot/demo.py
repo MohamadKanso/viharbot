@@ -37,6 +37,7 @@ AGENT_LABELS = {
     "privacy-review": "Privacy Review",
     "synthesis": "Synthesis",
     "pixel": "Pixel",
+    "sage": "Sage",
 }
 
 

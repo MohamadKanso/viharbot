@@ -12,6 +12,7 @@ from .schemas import (
     FinalSynthesis,
     PrivacyAssessment,
     ResearchFindings,
+    SageAnalysis,
     SecurityAssessment,
     SourceQualityReview,
 )
@@ -44,6 +45,7 @@ SPECIALIST_RESULT_MODELS: dict[str, type[BaseModel]] = {
     "privacy-review": PrivacyAssessment,
     "synthesis": FinalSynthesis,
     "pixel": DeckResult,
+    "sage": SageAnalysis,
 }
 
 AgentResponse = ResearchResponse | SecurityResponse | SpecialistResponse

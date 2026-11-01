@@ -83,3 +83,60 @@ class DeckResult(BaseModel):
     rejected_slides: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     model_calls: int
+
+
+# ---- Sage: philosophical analysis ---------------------------------------------------------------
+# Every claim says what kind of claim it is, so the reader can tell a finding from a judgment.
+SageClaimType = Literal[
+    "evidence_supported",  # a supplied context section states it (named in evidence_refs)
+    "reasoned_interpretation",  # an inference from the evidence or the question
+    "normative_judgment",  # a value judgment, resting on a stated framework or assumption
+    "recommendation",  # a proposed action
+]
+
+
+class SageStakeholder(BaseModel):
+    name: str = Field(max_length=120)
+    interest: str = Field(max_length=400)
+    potential_impact: str = Field(max_length=400)
+    impact_direction: Literal["benefit", "harm", "mixed", "unclear"]
+
+
+class SageClaim(BaseModel):
+    """Shared shape of a typed claim. `evidence_refs` name supplied context sections only."""
+
+    statement: str = Field(max_length=600)
+    claim_type: SageClaimType
+    evidence_refs: list[str] = Field(default_factory=list, max_length=6)
+
+
+class SageEthicalConsideration(SageClaim):
+    framework: str | None = Field(
+        default=None, max_length=120, description="The ethical framework or assumption relied on"
+    )
+
+
+class SageHumanImpact(SageClaim):
+    affected_group: str = Field(max_length=120)
+
+
+class SageTradeOff(SageClaim):
+    competing_values: list[str] = Field(min_length=2, max_length=4)
+
+
+class SageMitigation(BaseModel):
+    action: str = Field(max_length=400)
+    addresses: str = Field(max_length=300)
+
+
+class SageAnalysis(BaseModel):
+    """Sage's structured result: perspective on a request, never evidence of its own."""
+
+    executive_summary: str = Field(max_length=1500)
+    stakeholders: list[SageStakeholder] = Field(max_length=12)
+    ethical_considerations: list[SageEthicalConsideration] = Field(max_length=12)
+    human_and_organizational_impacts: list[SageHumanImpact] = Field(max_length=12)
+    risks_and_tradeoffs: list[SageTradeOff] = Field(max_length=10)
+    recommended_mitigations: list[SageMitigation] = Field(max_length=12)
+    assumptions_and_uncertainties: list[str] = Field(max_length=14)
+    recommendations_for_charlie: list[str] = Field(max_length=8)
