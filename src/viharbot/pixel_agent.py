@@ -20,7 +20,7 @@ import re
 import time
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import FastAPI, Header, HTTPException, Response
 from fastapi.responses import FileResponse, HTMLResponse
@@ -173,8 +173,12 @@ def process(
 def _safe_deck_path(deck_id: str, extension: str) -> Path:
     if not DECK_ID.fullmatch(deck_id):
         raise HTTPException(status_code=404, detail="Deck not found")
+    try:
+        canonical_deck_id = str(UUID(deck_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Deck not found") from None
     base = decks_dir().resolve()
-    filename = f"{deck_id}.{extension}"
+    filename = f"{canonical_deck_id}.{extension}"
     path = (base / filename).resolve()
     try:
         path.relative_to(base)
