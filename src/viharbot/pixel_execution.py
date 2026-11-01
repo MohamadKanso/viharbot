@@ -91,6 +91,7 @@ def run_pixel_stage(
             deck_id=deck.deck_id,
             slide_count=deck.slide_count,
             download_url=f"/api/decks/{deck.deck_id}",
+            view_url=f"/api/decks/{deck.deck_id}/view",
             rejected_slides=deck.rejected_slides,
             warnings=deck.warnings,
         ),
@@ -98,12 +99,12 @@ def run_pixel_stage(
     )
 
 
-def fetch_deck(deck_id: str) -> bytes | None:
-    """The finished .pptx from the pixel service, or None if it does not exist."""
-    if not DECK_ID.fullmatch(deck_id):
+def fetch_deck(deck_id: str, kind: str = "pptx") -> bytes | None:
+    """A finished deck file ("pptx" or "html") from the pixel service, or None if it is missing."""
+    if not DECK_ID.fullmatch(deck_id) or kind not in {"pptx", "html"}:
         return None
     parts = urlsplit(pixel_url())
-    request = Request(f"{parts.scheme}://{parts.netloc}/decks/{deck_id}.pptx")
+    request = Request(f"{parts.scheme}://{parts.netloc}/decks/{deck_id}.{kind}")
     try:
         with no_redirect_urlopen(request, 30) as response:
             data = response.read(MAX_DECK_BYTES + 1)

@@ -22,4 +22,6 @@ AgentCore Runtime is an agent invocation endpoint, not a static website host. Th
 - Supply `LITELLM_API_KEY` through the AWS deployment configuration; never add it to source or print it in deployment logs.
 - Current AgentCore microVM sessions and local `/data` files do not provide the project's durable per-agent memory. The current JSONL memory remains ephemeral unless a concrete storage need is designed separately.
 
+**Slide decks.** In production set `VIHARBOT_PPT_GENERATION_ENABLED=true` on the web coordinator and the pixel runtime (it is false on Stage). That also needs a seventh agent runtime for the `pixel` service, which uses `Dockerfile.pixel`, and a Pixel model alias that the gateway routes. See [Pixel slide service](../../docs/pixel-slide-service.md); none of this is provisioned or tested.
+
 No AWS resources are created by this guide. AgentCore Runtime container images are limited to 2 GB, and the service has region-specific quotas and charges. Check current [quotas](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/bedrock-agentcore-limits.html) and [pricing](https://aws.amazon.com/bedrock/agentcore/pricing/) before provisioning seven runtimes and the browser hosting bridge.

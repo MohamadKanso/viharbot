@@ -42,6 +42,11 @@ services:
         value: /app/static
         scope: RUN_TIME
         type: GENERAL
+      # Slide-deck generation is off on Stage, and this spec has no pixel component.
+      - key: VIHARBOT_PPT_GENERATION_ENABLED
+        value: "false"
+        scope: RUN_TIME
+        type: GENERAL
       - key: RESEARCH_URL
         value: http://research:8000/research
         scope: RUN_TIME

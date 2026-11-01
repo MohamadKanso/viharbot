@@ -94,6 +94,11 @@ def _request(resource: str, payload: dict | None = None) -> dict:
         raise LiteLLMError("LiteLLM request failed or returned invalid JSON") from None
 
 
+def model_info() -> dict:
+    """Read-only routing and price metadata (GET model/info). Not an inference call."""
+    return _request("model/info")
+
+
 def check_connection() -> dict:
     """Call the non-inference OpenAI-compatible models endpoint."""
     return _request("models")

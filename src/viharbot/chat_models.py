@@ -46,6 +46,7 @@ class DeckInfo(BaseModel):
     deck_id: str | None = None
     slide_count: int | None = None
     download_url: str | None = None
+    view_url: str | None = None
     rejected_slides: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     error: str | None = None

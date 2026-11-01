@@ -24,6 +24,8 @@ Configure encrypted runtime values for `LITELLM_API_KEY` on every model-using ag
 
 The App Platform web process listens on `0.0.0.0` and uses `PORT` (default 8080). Agent services listen on 8000. The agent memories use `/tmp` and are ephemeral. Review the number of billable components and model usage before operating the full six-agent pipeline.
 
+**Slide-deck flag by environment.** `VIHARBOT_PPT_GENERATION_ENABLED` is **false on Stage**: the spec sets it explicitly and has no pixel component, so Stage never builds decks. It is **true in production** (AWS) once that deployment is configured; no production configuration exists in this repository yet, so nothing sets it today. Local Compose is true while Pixel is tested. See [Pixel slide service](pixel-slide-service.md).
+
 No cloud resources are provisioned automatically.
 
 ## Other targets

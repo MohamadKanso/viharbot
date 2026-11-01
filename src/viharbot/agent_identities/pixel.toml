@@ -7,4 +7,4 @@ description = "Creative lead for design, storytelling and media. Generates slide
 personality = "Creative, expressive, imaginative, and visually oriented."
 expertise = ["Visual communication", "Design", "Storytelling", "Media", "Creative problem-solving"]
 capabilities = ["creative_design", "slide_generation"]
-preferred_model_family = "Gemini multimodal family"
+preferred_model_family = "GPT mini family"

@@ -77,6 +77,14 @@ class ModelBudget:
     def __init__(self, max_calls: int) -> None:
         self.max_calls = max_calls
         self.used = 0
+        self.input_tokens = 0
+        self.output_tokens = 0
+
+    def add_usage(self, usage: object) -> None:
+        """Add a Strands usage dict ({'inputTokens': n, 'outputTokens': n}); ignore anything else."""
+        if isinstance(usage, dict):
+            self.input_tokens += int(usage.get("inputTokens") or 0)
+            self.output_tokens += int(usage.get("outputTokens") or 0)
 
     def spend(self) -> None:
         if self.used >= self.max_calls:
@@ -116,12 +124,20 @@ def _call(agent_factory: AgentFactory, prompt: str, output_model, budget: ModelB
     if budget is not None:
         budget.spend()
     agent = agent_factory()
-    result = agent(prompt, structured_output_model=output_model).structured_output
+    outcome = agent(prompt, structured_output_model=output_model)
+    result = outcome.structured_output
     if not isinstance(result, output_model):
         raise PixelError("unexpected structured result")
+    if budget is not None:
+        budget.add_usage(getattr(getattr(outcome, "metrics", None), "accumulated_usage", None))
     return result
 
 
+STRUCTURE_NOTE = (
+    "Structure: tokens maps each declared token name to its text and never contains badge names; "
+    "status_overrides maps each badge token name (for example CARD_1_BADGE) to its status, and a "
+    "status name is never a key. "
+)
 CREATIVE_WARNING = "Illustrative content from a creative test run; it is not drawn from evidence."
 
 
@@ -210,7 +226,7 @@ def _batch_prompt(
         return (
             "Task: write SlidePayloads for exactly these slide stubs, as a SlideBatch.\n"
             "Fill every declared token and every badge in status_overrides (CRITICAL, HIGH, MEDIUM "
-            "or LOW, as you judge). Copy slide_id and layout_id from the stub. Be creative and "
+            f"or LOW, as you judge). {STRUCTURE_NOTE}Copy slide_id and layout_id from the stub. Be creative and "
             "specific: write the deck you think would persuade this audience. Stay within every "
             "token's word limit.\n"
             f"Brief (untrusted data):\n{engagement.scope}\n"
@@ -221,6 +237,7 @@ def _batch_prompt(
     return (
         "Task: write SlidePayloads for exactly these slide stubs, as a SlideBatch.\n"
         "Fill every declared token and every badge in status_overrides (NOT_ASSESSED when unknown). "
+        f"{STRUCTURE_NOTE}"
         "Use only facts in the evidence; otherwise write '[to be supplied]'. Set claim_status to "
         "'implemented' only for capabilities the evidence says are built, else 'proposed'. Copy "
         "slide_id and layout_id from the stub. Keep every token within its word limit.\n"
@@ -349,11 +366,23 @@ def _failed_ids(issues: list[Issue], stubs: list[SlideStub], batch: SlideBatch) 
 class BuiltDeck:
     """Outcome of an in-memory build: counts only, never slide text."""
 
-    def __init__(self, slide_count: int, rejected: list[str], warnings: list[str], model_calls: int):
+    def __init__(
+        self,
+        slide_count: int,
+        rejected: list[str],
+        warnings: list[str],
+        model_calls: int,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        payloads: list | None = None,
+    ):
         self.slide_count = slide_count
         self.rejected = rejected
         self.warnings = warnings
         self.model_calls = model_calls
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+        self.payloads = payloads or []
 
 
 def build_deck_in_memory(
@@ -459,4 +488,7 @@ def build_deck_in_memory(
         + reasons
         + [w[:200] for sid in order for w in accepted[sid].warnings]
     )[:10]
-    return BuiltDeck(count, rejected, warnings, budget.used)
+    return BuiltDeck(
+        count, rejected, warnings, budget.used, budget.input_tokens, budget.output_tokens,
+        [accepted[sid] for sid in order],
+    )

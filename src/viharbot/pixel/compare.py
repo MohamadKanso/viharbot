@@ -9,6 +9,8 @@ Usage (inside the pixel container, which has the dependencies and the LiteLLM se
   python -m viharbot.pixel.compare --evidence chat.json --out /data/compare ALIAS [ALIAS ...]
   add --all-layouts to force one slide per layout (24), planned by code, with the model filling them
   add --creative (and --question "a brief") for a test where the model gets only the brief
+  add --repeat N to run each alias N times; token counts come from the runs and prices from
+  LiteLLM's read-only /model/info (the same key the agents use), so cost needs no extra setup
 
 `chat.json` is a saved /api/chat response, so the six upstream agents are not run again. Each
 alias costs a few real model calls through LiteLLM (at most --max-calls). It refuses to run
@@ -107,6 +109,29 @@ def deck_stats(path: Path) -> tuple[int, int]:
     return blocks, gaps
 
 
+def price_for(alias: str, info: dict) -> tuple[float, float] | None:
+    """(input, output) dollars per token from LiteLLM model info, matching the alias with or
+    without its provider prefix (the proxy may list `openai/gpt-x` as `gpt-x`)."""
+    names = {alias, alias.split("/", 1)[-1]}
+    for entry in info.get("data", []):
+        if entry.get("model_name") in names:
+            meta = entry.get("model_info") or {}
+            if meta.get("input_cost_per_token") is not None and meta.get("output_cost_per_token") is not None:
+                return float(meta["input_cost_per_token"]), float(meta["output_cost_per_token"])
+    return None
+
+
+def fetch_prices(aliases: list[str]) -> dict[str, tuple[float, float]]:
+    """One read-only metadata call to LiteLLM (GET model/info); no inference, no extra key."""
+    from ..litellm_client import model_info
+
+    try:
+        info = model_info()
+    except Exception:
+        return {}
+    return {a: p for a in aliases if (p := price_for(a, info)) is not None}
+
+
 def compare(
     aliases: list[str],
     evidence: dict[str, str],
@@ -117,56 +142,94 @@ def compare(
     max_model_calls: int = 8,
     all_layouts: bool = False,
     creative: bool = False,
+    repeat: int = 1,
+    prices: dict[str, tuple[float, float]] | None = None,
     factory_for: Callable[[str], AgentFactory] | None = None,
 ) -> list[dict]:
-    """With creative=True the only input is the brief (`question`); evidence is ignored."""
+    """With creative=True the only input is the brief (`question`); evidence is ignored.
+
+    `prices` maps alias to (input, output) dollars per token. Cost needs both prices and token
+    counts, and shows as n/a when either is missing.
+    """
     factory_for = factory_for or (lambda alias: agent_factory_for(alias, creative))
+    prices = prices or {}
     if creative:
         evidence = {"brief": question}
     out_dir.mkdir(parents=True, exist_ok=True)
     rows: list[dict] = []
     for index, alias in enumerate(aliases):
-        row: dict = {"alias": alias, "status": "failed"}
-        path = out_dir / f"deck-{re.sub(r'[^A-Za-z0-9._-]+', '_', alias)}.pptx"
-        started = time.perf_counter()
-        try:
-            built = build_deck_in_memory(
-                f"compare-{index}",
-                EngagementProfile(scope=question[:500]),
-                evidence,
-                len(list_layouts()) if all_layouts else target_slides,
-                path,
-                agent_factory=factory_for(alias),
-                max_model_calls=max_model_calls,
-                manifest=coverage_manifest(evidence) if all_layouts else None,
-                batch_note=COVERAGE_NOTE if all_layouts and not creative else "",
-                creative=creative,
-            )
-            blocks, gaps = deck_stats(path)
-            row.update(
-                status="ok", slides=built.slide_count, left_out=len(built.rejected),
-                blocks=blocks, gaps=gaps, calls=built.model_calls, file=str(path),
-                over_limit=sum(w.count("exceeds") for w in built.warnings),
-                notes=" | ".join(built.warnings)[:300],
-            )
-        except Exception as exc:  # one model failing must not stop the others
-            row["notes"] = str(exc) if isinstance(exc, PixelError) else type(exc).__name__
-        row["seconds"] = round(time.perf_counter() - started, 1)
-        rows.append(row)
+        for run in range(1, repeat + 1):
+            row: dict = {"alias": alias, "run": run, "status": "failed"}
+            safe = re.sub(r"[^A-Za-z0-9._-]+", "_", alias)
+            path = out_dir / f"deck-{safe}-r{run}.pptx"
+            started = time.perf_counter()
+            try:
+                built = build_deck_in_memory(
+                    f"compare-{index}-{run}",
+                    EngagementProfile(scope=question[:500]),
+                    evidence,
+                    len(list_layouts()) if all_layouts else target_slides,
+                    path,
+                    agent_factory=factory_for(alias),
+                    max_model_calls=max_model_calls,
+                    manifest=coverage_manifest(evidence) if all_layouts else None,
+                    batch_note=COVERAGE_NOTE if all_layouts and not creative else "",
+                    creative=creative,
+                )
+                blocks, gaps = deck_stats(path)
+                price = prices.get(alias)
+                tokens = built.input_tokens + built.output_tokens
+                cost = (
+                    built.input_tokens * price[0] + built.output_tokens * price[1]
+                    if price and tokens
+                    else None
+                )
+                row.update(
+                    status="ok", slides=built.slide_count, left_out=len(built.rejected),
+                    blocks=blocks, gaps=gaps, calls=built.model_calls, file=str(path),
+                    over_limit=sum(w.count("exceeds") for w in built.warnings),
+                    tokens_in=built.input_tokens, tokens_out=built.output_tokens, cost=cost,
+                    notes=" | ".join(built.warnings)[:300],
+                )
+            except Exception as exc:  # one model failing must not stop the others
+                row["notes"] = str(exc) if isinstance(exc, PixelError) else type(exc).__name__
+            row["seconds"] = round(time.perf_counter() - started, 1)
+            rows.append(row)
     return rows
 
 
+def _usd(value: float | None) -> str:
+    return "n/a" if value is None else f"${value:.4f}"
+
+
 def format_table(rows: list[dict]) -> str:
-    header = ["model", "status", "slides", "left out", "gaps/blocks", "over limit", "calls", "sec"]
+    header = ["model", "run", "status", "slides", "left out", "gaps/blocks", "over limit", "calls",
+              "tokens in/out", "cost", "cost/slide", "sec"]
     lines = [" | ".join(header), " | ".join("---" for _ in header)]
     for r in rows:
+        per_slide = r["cost"] / r["slides"] if r.get("cost") is not None and r.get("slides") else None
         lines.append(" | ".join(str(x) for x in (
-            r["alias"], r["status"], r.get("slides", "-"), r.get("left_out", "-"),
+            r["alias"], r.get("run", 1), r["status"], r.get("slides", "-"), r.get("left_out", "-"),
             f"{r['gaps']}/{r['blocks']}" if "gaps" in r else "-", r.get("over_limit", "-"),
-            r.get("calls", "-"), r["seconds"])))
+            r.get("calls", "-"),
+            f"{r['tokens_in']}/{r['tokens_out']}" if "tokens_in" in r else "-",
+            _usd(r.get("cost")), _usd(per_slide), r["seconds"])))
+    aliases = list(dict.fromkeys(r["alias"] for r in rows))
+    if any(r.get("run", 1) > 1 for r in rows):
+        lines.append("\naverages over successful runs:")
+        for alias in aliases:
+            ok = [r for r in rows if r["alias"] == alias and r["status"] == "ok"]
+            if not ok:
+                continue
+            costs = [r["cost"] for r in ok if r.get("cost") is not None]
+            lines.append(
+                f"{alias}: {len(ok)} runs | slides {sum(r['slides'] for r in ok) / len(ok):.1f} | "
+                f"left out {sum(r['left_out'] for r in ok) / len(ok):.1f} | "
+                f"sec {sum(r['seconds'] for r in ok) / len(ok):.1f} | "
+                f"cost {_usd(sum(costs) / len(costs) if costs else None)}")
     for r in rows:
         if r.get("notes"):
-            lines.append(f"\n{r['alias']}: {r['notes']}")
+            lines.append(f"\n{r['alias']} run {r.get('run', 1)}: {r['notes']}")
     return "\n".join(lines)
 
 
@@ -182,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--slides", type=int, default=6)
     ap.add_argument("--max-calls", type=int, default=None,
                     help="model-call cap per alias (default 8, or 16 with --all-layouts)")
+    ap.add_argument("--repeat", type=int, default=1, help="runs per alias (1-10); each costs real calls")
     ap.add_argument("--all-layouts", action="store_true",
                     help="one slide per registered layout, planned by code; the model only fills them")
     args = ap.parse_args(argv)
@@ -193,9 +257,14 @@ def main(argv: list[str] | None = None) -> int:
     evidence = {}
     if not args.creative:
         evidence = evidence_from_chat(json.loads(Path(args.evidence).read_text(encoding="utf-8")))
+    prices = fetch_prices(args.aliases)
+    missing = [a for a in args.aliases if a not in prices]
+    if missing:
+        print(f"note: no LiteLLM price found for {', '.join(missing)}; cost will show n/a", file=sys.stderr)
     rows = compare(args.aliases, evidence, args.question, Path(args.out),
                    target_slides=args.slides, all_layouts=args.all_layouts, creative=args.creative,
-                   max_model_calls=args.max_calls or (16 if args.all_layouts else 8))
+                   max_model_calls=args.max_calls or (16 if args.all_layouts else 8),
+                   repeat=max(1, min(10, args.repeat)), prices=prices)
     print(format_table(rows))
     return 0 if all(r["status"] == "ok" for r in rows) else 1
 

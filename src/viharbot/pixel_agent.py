@@ -23,7 +23,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import FastAPI, Header, HTTPException, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
 from .contracts import SpecialistResponse
@@ -33,6 +33,7 @@ from .observability import configure_logging, get_request_id
 from .pixel.flag import ppt_generation_enabled
 from .pixel.instructions import PIXEL_INSTRUCTIONS
 from .pixel.models import EngagementProfile
+from .pixel.render import render_html
 from .pixel.runner import PixelError, build_deck_in_memory
 from .schemas import DeckResult
 
@@ -61,10 +62,18 @@ def _int_env(name: str, default: int, low: int, high: int) -> int:
         return default
 
 
+# The page is self-contained (inline CSS, no scripts or assets), so it can be locked down hard.
+HTML_HEADERS = {
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+    "X-Content-Type-Options": "nosniff",
+}
+
+
 def prune_decks(keep: int) -> None:
     files = sorted(decks_dir().glob("deck-*.pptx"), key=lambda p: p.stat().st_mtime, reverse=True)
     for stale in files[keep:]:
         stale.unlink(missing_ok=True)
+        stale.with_suffix(".html").unlink(missing_ok=True)
 
 
 @app.get("/health")
@@ -108,6 +117,10 @@ def process(
             ),
             max_model_calls=_int_env("PIXEL_MAX_MODEL_CALLS", 8, 2, 40),
         )
+        (decks_dir() / f"{deck_id}.html").write_text(
+            render_html(built.payloads, download_url=f"/api/decks/{deck_id}", warnings=built.warnings),
+            encoding="utf-8",
+        )
         prune_decks(_int_env("PIXEL_MAX_DECKS", 20, 1, 500))
         result = DeckResult(
             deck_id=deck_id,
@@ -123,6 +136,8 @@ def process(
                 "request_id": request_id,
                 **inference.log_extra(),
                 "model_calls": built.model_calls,
+                "input_tokens": built.input_tokens,
+                "output_tokens": built.output_tokens,
                 "slides": built.slide_count,
                 "duration_ms": round((time.perf_counter() - started) * 1000, 2),
             },
@@ -161,3 +176,14 @@ def download(deck_id: str) -> FileResponse:
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         filename=f"{deck_id}.pptx",
     )
+
+
+@app.get("/decks/{deck_id}.html")
+def view(deck_id: str) -> HTMLResponse:
+    """Pixel's HTML rendition of the deck, in the same colours as the .pptx."""
+    if not DECK_ID.fullmatch(deck_id):
+        raise HTTPException(status_code=404, detail="Deck not found")
+    path = decks_dir() / f"{deck_id}.html"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Deck not found")
+    return HTMLResponse(path.read_text(encoding="utf-8"), headers=HTML_HEADERS)

@@ -66,7 +66,7 @@ services:
     environment:
       LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}
       LITELLM_API_KEY: ${LITELLM_API_KEY:-}
-      RESEARCH_MODEL: ${RESEARCH_MODEL:-openai/gpt-5.4-mini}
+      RESEARCH_MODEL: ${RESEARCH_MODEL:-gpt-5.4-mini}
       MEMORY_DIR: /data
     volumes:
       - ./data/research:/data/research
@@ -157,7 +157,7 @@ services:
       AGENT_KIND: privacy-review
       LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}
       LITELLM_API_KEY: ${LITELLM_API_KEY:-}
-      PRIVACY_MODEL: ${PRIVACY_MODEL:-openai/gpt-5.4-mini}
+      PRIVACY_MODEL: ${PRIVACY_MODEL:-gpt-5.4-mini}
       MEMORY_DIR: /data
     volumes:
       - privacy_review_data:/data
@@ -180,7 +180,7 @@ services:
       AGENT_KIND: synthesis
       LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}
       LITELLM_API_KEY: ${LITELLM_API_KEY:-}
-      SYNTHESIS_MODEL: ${SYNTHESIS_MODEL:-openai/gpt-5.4-mini}
+      SYNTHESIS_MODEL: ${SYNTHESIS_MODEL:-gpt-5.4-mini}
       MEMORY_DIR: /data
     volumes:
       - synthesis_data:/data
@@ -202,7 +202,7 @@ services:
     environment:
       LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}
       LITELLM_API_KEY: ${LITELLM_API_KEY:-}
-      PIXEL_MODEL: ${PIXEL_MODEL:-gemini/gemini-3.5-flash}
+      PIXEL_MODEL: ${PIXEL_MODEL:-gpt-5.4-mini}
       # The service refuses to run unless this is true. Same switch as the web service.
       VIHARBOT_PPT_GENERATION_ENABLED: ${VIHARBOT_PPT_GENERATION_ENABLED:-true}
       # Budgets for one deck: slides planned and the hard cap on model calls.

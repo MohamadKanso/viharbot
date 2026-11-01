@@ -14,6 +14,7 @@ Template conventions (also true of hand-made templates):
 from __future__ import annotations
 
 import copy
+import html as _html
 import math
 import re
 from pathlib import Path
@@ -238,3 +239,89 @@ def populate(
         ids.remove(sld_id)
     prs.save(str(out_path))
     return len(items)
+
+
+# ---------------------------------------------------------------------------------------------
+# HTML output page. Pixel renders it from the same design tokens and layout registry as the
+# .pptx, so colours, card structure and badge labels are identical across the two formats.
+# Every value is escaped; the page is self-contained (inline CSS only, no scripts or assets).
+# ---------------------------------------------------------------------------------------------
+
+def _css() -> str:
+    tokens = design_tokens()
+    themes, accents, status = tokens["themes"], tokens["accents"], tokens["status"]
+    rules = [
+        "*{box-sizing:border-box}",
+        "body{margin:0;background:#" + themes["light"]["background"] + ";color:#" + themes["light"]["text"]
+        + ";font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}",
+        "main{max-width:1180px;margin:0 auto;padding:24px 16px 96px}",
+        ".slide{border-radius:14px;padding:28px 28px 24px;margin:0 0 22px;border:1px solid transparent}",
+        ".slide h2{margin:2px 0 18px;font-size:1.45rem;line-height:1.25}",
+        ".tag{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}",
+        ".grid{display:grid;gap:14px}",
+        ".cell{position:relative;border-radius:12px;padding:14px 16px;border:1px solid transparent}",
+        ".cell p{margin:0 0 6px;font-size:.92rem}.cell p:first-of-type{font-weight:700;font-size:.98rem}",
+        ".badges{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin:0 0 8px}",
+        ".badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.7rem;font-weight:700;"
+        "letter-spacing:.04em}",
+        ".dl{position:sticky;bottom:0;background:#" + themes["dark"]["background"] + ";color:#"
+        + themes["dark"]["text"] + ";padding:14px 20px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;"
+        "justify-content:space-between;border-top:3px solid #" + accents["zero_trust"] + "}",
+        ".dl a{color:#" + accents["zero_trust"] + ";font-weight:700}",
+        ".dl .notes{flex-basis:100%;margin:0;padding-left:18px;font-size:.8rem;color:#"
+        + themes["dark"]["muted"] + "}",
+        "@media(max-width:800px){.grid{grid-template-columns:1fr!important}.slide{padding:20px 16px}}",
+    ]
+    for name, theme in themes.items():
+        accent = accents["zero_trust" if name == "dark" else "ai"]
+        rules.append(f".slide.{name}{{background:#{theme['background']};color:#{theme['text']}}}")
+        rules.append(f".slide.{name} .cell{{background:#{theme['card']};border-color:#{theme['border']}}}")
+        rules.append(f".slide.{name} .tag{{color:#{accent}}}")
+    for name, style in status.items():
+        rules.append(f".badge.{name}{{background:#{style['fill']};color:#{style['text']}}}")
+    return "".join(rules)
+
+
+def render_html(
+    payloads: Iterable[SlidePayload | dict[str, Any]],
+    *,
+    download_url: str,
+    warnings: Iterable[str] = (),
+    title: str = "Pixel slide deck",
+) -> str:
+    """A self-contained HTML page of the deck, with the download link in a bar at the bottom."""
+    esc = lambda value: _html.escape(str(value), quote=True)  # noqa: E731
+    statuses = design_tokens()["status"]
+    items = [p if isinstance(p, SlidePayload) else SlidePayload.model_validate(p) for p in payloads]
+    sections: list[str] = []
+    for payload in items:
+        spec = get_layout_spec(payload.layout_id)
+        cells: list[str] = []
+        for cell in spec.cells:
+            badges = "".join(
+                f'<span class="badge {esc(status)}">{esc(statuses[status]["label"])}</span>'
+                for status in (payload.status_overrides.get(b) for b in cell.badges)
+                if status in statuses
+            )
+            texts = "".join(f"<p>{esc(payload.tokens.get(t, ''))}</p>" for t in cell.tokens)
+            cells.append(f'<div class="cell">{f"<div class=badges>{badges}</div>" if badges else ""}{texts}</div>')
+        cols = max(1, spec.grid_cols)
+        sections.append(
+            f'<section class="slide {esc(spec.theme)}" data-layout="{esc(spec.layout_id)}">'
+            f'<div class="tag">{esc(payload.tokens.get("SLIDE_TAG", ""))}</div>'
+            f'<h2>{esc(payload.tokens.get("SLIDE_TITLE", ""))}</h2>'
+            f'<div class="grid" style="grid-template-columns:repeat({cols},minmax(0,1fr))">{"".join(cells)}</div>'
+            "</section>"
+        )
+    notes = "".join(f"<li>{esc(w)}</li>" for w in warnings)
+    footer = (
+        f'<footer class="dl"><span>{len(items)} slide(s)</span>'
+        f'<a href="{esc(download_url)}" download>Download the .pptx</a>'
+        f'{f"<ul class=notes>{notes}</ul>" if notes else ""}</footer>'
+    )
+    return (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        f"<title>{esc(title)}</title><style>{_css()}</style></head>"
+        f"<body><main>{''.join(sections)}</main>{footer}</body></html>"
+    )

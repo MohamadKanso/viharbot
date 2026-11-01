@@ -574,11 +574,20 @@
           box.append(el("p", "", `Pixel could not build the slide deck${deck.error ? `: ${deck.error}` : "."}`));
           return box;
         }
-        box.append(el("p", "", `Pixel built a ${deck.slide_count}-slide deck.`));
+        const line = el("p", "deck-line");
+        line.append(el("span", "", `Slide deck \u00B7 ${deck.slide_count} slides \u00B7 `));
+        if (deck.view_url) {
+          const view = el("a", "deck-link", "View");
+          view.setAttribute("href", deck.view_url);
+          view.setAttribute("target", "_blank");
+          view.setAttribute("rel", "noopener");
+          line.append(view, el("span", "", " \u00B7 "));
+        }
         const link = el("a", "deck-link", "Download the .pptx");
         link.setAttribute("href", deck.download_url);
         link.setAttribute("download", "");
-        box.append(link);
+        line.append(link);
+        box.append(line);
         if (deck.rejected_slides?.length) box.append(el("p", "", `${deck.rejected_slides.length} planned slide(s) failed validation and were left out.`));
         listSection(box, "Deck notes", deck.warnings);
         return box;
@@ -707,10 +716,7 @@
           card.append(points);
         }
         if (synthesis?.caveats?.length) listSection(card, "A few caveats", synthesis.caveats);
-        if (result.deck) {
-          card.append(buildDeck(result.deck));
-          if (result.deck.status === "complete") addDeckIcon(result.deck, true);
-        }
+        if (result.deck?.status === "complete") addDeckIcon(result.deck, true);
         if (live) card.append(buildLiveTabs(live, result));
         else if (result.orchestration) card.append(buildOrchestration(result.orchestration));
         if (result.agent_activity?.length) card.append(buildActivity(result.agent_activity));
@@ -758,6 +764,7 @@
         }
         details.append(body);
         card.append(details);
+        if (result.deck) card.append(buildDeck(result.deck));
         card.append(el("p", "request-meta", `Request ${result.request_id}`));
         row.append(card);
         conversation.append(row);

@@ -274,6 +274,22 @@ def download_deck(deck_id: str, _: None = Depends(require_web_access)) -> Respon
     )
 
 
+@app.get("/api/decks/{deck_id}/view", include_in_schema=False)
+def view_deck(deck_id: str, _: None = Depends(require_web_access)) -> Response:
+    """Pixel's HTML page for a deck. The page is self-contained and served with a strict policy."""
+    data = fetch_deck(deck_id, "html")
+    if data is None:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    return Response(
+        content=data,
+        media_type="text/html; charset=utf-8",
+        headers={
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 STREAM_UNSUPPORTED_DETAIL = "Live streaming requires iterative orchestration"
 
 

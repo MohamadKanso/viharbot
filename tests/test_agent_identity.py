@@ -40,7 +40,7 @@ EXPECTED_FAMILIES = {
     "charlie": "GPT-6 family",
     "nova": "Gemini Pro family",
     "atlas": "Claude Sonnet family",
-    "pixel": "Gemini multimodal family",
+    "pixel": "GPT mini family",
     "sage": "Claude Opus family",
     "cipher": "GPT-6 family",
     "scout": "Gemini Pro family",

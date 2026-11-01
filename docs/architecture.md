@@ -113,7 +113,7 @@ Every model call is `build_agent()` in `model_agent.py`: a Strands `Agent` over 
 
 | Service | Default alias (Compose and Stage template) |
 |---|---|
-| research, privacy-review, synthesis | `openai/gpt-5.4-mini` |
+| research, privacy-review, synthesis | `gpt-5.4-mini` (local Compose; the gateway lists it without the `openai/` prefix) |
 | security | `openai/gpt-5.4` |
 | fact-check, source-quality | `gemini/gemini-3.5-flash` |
 | Charlie's planner | none; set `CHARLIE_PLANNER_MODEL` deliberately |
