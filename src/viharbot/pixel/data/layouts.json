@@ -1,0 +1,1371 @@
+{
+ "version": "0.1",
+ "layouts": [
+  {
+   "layout_id": "LAYOUT_01_BOARD_BLUF",
+   "theme": "dark",
+   "purpose": "Executive bottom line up front",
+   "grid_cols": 4,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "CARD_1",
+     "tokens": [
+      "CARD_1_TITLE",
+      "CARD_1_BODY"
+     ],
+     "badges": [
+      "CARD_1_BADGE"
+     ]
+    },
+    {
+     "id": "CARD_2",
+     "tokens": [
+      "CARD_2_TITLE",
+      "CARD_2_BODY"
+     ],
+     "badges": [
+      "CARD_2_BADGE"
+     ]
+    },
+    {
+     "id": "CARD_3",
+     "tokens": [
+      "CARD_3_TITLE",
+      "CARD_3_BODY"
+     ],
+     "badges": [
+      "CARD_3_BADGE"
+     ]
+    },
+    {
+     "id": "KPI_1",
+     "tokens": [
+      "KPI_1_LABEL",
+      "KPI_1_VALUE"
+     ],
+     "badges": [
+      "KPI_1_BADGE"
+     ]
+    },
+    {
+     "id": "KPI_2",
+     "tokens": [
+      "KPI_2_LABEL",
+      "KPI_2_VALUE"
+     ],
+     "badges": [
+      "KPI_2_BADGE"
+     ]
+    },
+    {
+     "id": "KPI_3",
+     "tokens": [
+      "KPI_3_LABEL",
+      "KPI_3_VALUE"
+     ],
+     "badges": [
+      "KPI_3_BADGE"
+     ]
+    },
+    {
+     "id": "KPI_4",
+     "tokens": [
+      "KPI_4_LABEL",
+      "KPI_4_VALUE"
+     ],
+     "badges": [
+      "KPI_4_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_02_RISK_APPETITE_POSTURE",
+   "theme": "light",
+   "purpose": "Risk appetite versus actual posture variance",
+   "grid_cols": 2,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "ROW_1",
+     "tokens": [
+      "ROW_1_NAME",
+      "ROW_1_APPETITE",
+      "ROW_1_POSTURE",
+      "ROW_1_VARIANCE"
+     ],
+     "badges": [
+      "ROW_1_BADGE"
+     ]
+    },
+    {
+     "id": "ROW_2",
+     "tokens": [
+      "ROW_2_NAME",
+      "ROW_2_APPETITE",
+      "ROW_2_POSTURE",
+      "ROW_2_VARIANCE"
+     ],
+     "badges": [
+      "ROW_2_BADGE"
+     ]
+    },
+    {
+     "id": "ROW_3",
+     "tokens": [
+      "ROW_3_NAME",
+      "ROW_3_APPETITE",
+      "ROW_3_POSTURE",
+      "ROW_3_VARIANCE"
+     ],
+     "badges": [
+      "ROW_3_BADGE"
+     ]
+    },
+    {
+     "id": "ROW_4",
+     "tokens": [
+      "ROW_4_NAME",
+      "ROW_4_APPETITE",
+      "ROW_4_POSTURE",
+      "ROW_4_VARIANCE"
+     ],
+     "badges": [
+      "ROW_4_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_03_STRATEGIC_PILLARS",
+   "theme": "dark",
+   "purpose": "Four-pillar security strategy alignment",
+   "grid_cols": 4,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "PILLAR_1",
+     "tokens": [
+      "PILLAR_1_TITLE",
+      "PILLAR_1_BODY"
+     ],
+     "badges": []
+    },
+    {
+     "id": "PILLAR_2",
+     "tokens": [
+      "PILLAR_2_TITLE",
+      "PILLAR_2_BODY"
+     ],
+     "badges": []
+    },
+    {
+     "id": "PILLAR_3",
+     "tokens": [
+      "PILLAR_3_TITLE",
+      "PILLAR_3_BODY"
+     ],
+     "badges": []
+    },
+    {
+     "id": "PILLAR_4",
+     "tokens": [
+      "PILLAR_4_TITLE",
+      "PILLAR_4_BODY"
+     ],
+     "badges": []
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_04_EXECUTIVE_DECISIONS",
+   "theme": "dark",
+   "purpose": "Board sign-offs and funding approvals",
+   "grid_cols": 3,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "DECISION_1",
+     "tokens": [
+      "DECISION_1_TITLE",
+      "DECISION_1_ASK",
+      "DECISION_1_OWNER",
+      "DECISION_1_DUE"
+     ],
+     "badges": []
+    },
+    {
+     "id": "DECISION_2",
+     "tokens": [
+      "DECISION_2_TITLE",
+      "DECISION_2_ASK",
+      "DECISION_2_OWNER",
+      "DECISION_2_DUE"
+     ],
+     "badges": []
+    },
+    {
+     "id": "DECISION_3",
+     "tokens": [
+      "DECISION_3_TITLE",
+      "DECISION_3_ASK",
+      "DECISION_3_OWNER",
+      "DECISION_3_DUE"
+     ],
+     "badges": []
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_05_RISK_MATRIX_5X5",
+   "theme": "light",
+   "purpose": "Likelihood versus impact heatmap with indexed findings",
+   "grid_cols": 3,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "FINDING_1",
+     "tokens": [
+      "FINDING_1_ID",
+      "FINDING_1_LABEL",
+      "FINDING_1_LIKELIHOOD",
+      "FINDING_1_IMPACT"
+     ],
+     "badges": [
+      "FINDING_1_BADGE"
+     ]
+    },
+    {
+     "id": "FINDING_2",
+     "tokens": [
+      "FINDING_2_ID",
+      "FINDING_2_LABEL",
+      "FINDING_2_LIKELIHOOD",
+      "FINDING_2_IMPACT"
+     ],
+     "badges": [
+      "FINDING_2_BADGE"
+     ]
+    },
+    {
+     "id": "FINDING_3",
+     "tokens": [
+      "FINDING_3_ID",
+      "FINDING_3_LABEL",
+      "FINDING_3_LIKELIHOOD",
+      "FINDING_3_IMPACT"
+     ],
+     "badges": [
+      "FINDING_3_BADGE"
+     ]
+    },
+    {
+     "id": "FINDING_4",
+     "tokens": [
+      "FINDING_4_ID",
+      "FINDING_4_LABEL",
+      "FINDING_4_LIKELIHOOD",
+      "FINDING_4_IMPACT"
+     ],
+     "badges": [
+      "FINDING_4_BADGE"
+     ]
+    },
+    {
+     "id": "FINDING_5",
+     "tokens": [
+      "FINDING_5_ID",
+      "FINDING_5_LABEL",
+      "FINDING_5_LIKELIHOOD",
+      "FINDING_5_IMPACT"
+     ],
+     "badges": [
+      "FINDING_5_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_06_TOP_RISKS_REGISTER",
+   "theme": "light",
+   "purpose": "Top five risks with inherent and residual rating",
+   "grid_cols": 1,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "RISK_1",
+     "tokens": [
+      "RISK_1_NAME",
+      "RISK_1_OWNER"
+     ],
+     "badges": [
+      "RISK_1_INHERENT_BADGE",
+      "RISK_1_RESIDUAL_BADGE"
+     ]
+    },
+    {
+     "id": "RISK_2",
+     "tokens": [
+      "RISK_2_NAME",
+      "RISK_2_OWNER"
+     ],
+     "badges": [
+      "RISK_2_INHERENT_BADGE",
+      "RISK_2_RESIDUAL_BADGE"
+     ]
+    },
+    {
+     "id": "RISK_3",
+     "tokens": [
+      "RISK_3_NAME",
+      "RISK_3_OWNER"
+     ],
+     "badges": [
+      "RISK_3_INHERENT_BADGE",
+      "RISK_3_RESIDUAL_BADGE"
+     ]
+    },
+    {
+     "id": "RISK_4",
+     "tokens": [
+      "RISK_4_NAME",
+      "RISK_4_OWNER"
+     ],
+     "badges": [
+      "RISK_4_INHERENT_BADGE",
+      "RISK_4_RESIDUAL_BADGE"
+     ]
+    },
+    {
+     "id": "RISK_5",
+     "tokens": [
+      "RISK_5_NAME",
+      "RISK_5_OWNER"
+     ],
+     "badges": [
+      "RISK_5_INHERENT_BADGE",
+      "RISK_5_RESIDUAL_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_07_THREAT_ACTOR_PROFILE",
+   "theme": "dark",
+   "purpose": "Threat actor motivations, TTPs and exposures",
+   "grid_cols": 3,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "ACTOR_NAME",
+     "tokens": [
+      "ACTOR_NAME"
+     ],
+     "badges": []
+    },
+    {
+     "id": "ACTOR_MOTIVATION",
+     "tokens": [
+      "ACTOR_MOTIVATION"
+     ],
+     "badges": []
+    },
+    {
+     "id": "TTP_1",
+     "tokens": [
+      "TTP_1_TEXT"
+     ],
+     "badges": []
+    },
+    {
+     "id": "TTP_2",
+     "tokens": [
+      "TTP_2_TEXT"
+     ],
+     "badges": []
+    },
+    {
+     "id": "TTP_3",
+     "tokens": [
+      "TTP_3_TEXT"
+     ],
+     "badges": []
+    },
+    {
+     "id": "EXPOSURE_1",
+     "tokens": [
+      "EXPOSURE_1_TEXT"
+     ],
+     "badges": []
+    },
+    {
+     "id": "EXPOSURE_2",
+     "tokens": [
+      "EXPOSURE_2_TEXT"
+     ],
+     "badges": []
+    },
+    {
+     "id": "EXPOSURE_3",
+     "tokens": [
+      "EXPOSURE_3_TEXT"
+     ],
+     "badges": []
+    }
+   ],
+   "header_cells": 2
+  },
+  {
+   "layout_id": "LAYOUT_08_SUPPLY_CHAIN_RISK",
+   "theme": "light",
+   "purpose": "Third-party and open-source dependency blast radius",
+   "grid_cols": 3,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "VENDOR_CONCENTRATION",
+     "tokens": [
+      "VENDOR_CONCENTRATION"
+     ],
+     "badges": [
+      "VENDOR_BADGE"
+     ]
+    },
+    {
+     "id": "DEPENDENCY_NOTE",
+     "tokens": [
+      "DEPENDENCY_NOTE"
+     ],
+     "badges": [
+      "DEPENDENCY_BADGE"
+     ]
+    },
+    {
+     "id": "BLAST_RADIUS_NOTE",
+     "tokens": [
+      "BLAST_RADIUS_NOTE"
+     ],
+     "badges": [
+      "BLAST_RADIUS_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_09_NIST_CSF_SCORECARD",
+   "theme": "light",
+   "purpose": "NIST CSF 2.0 scorecard: Govern, Identify, Protect, Detect, Respond, Recover",
+   "grid_cols": 3,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "GOVERN",
+     "tokens": [
+      "GOVERN_CURRENT",
+      "GOVERN_TARGET",
+      "GOVERN_NOTE"
+     ],
+     "badges": [
+      "GOVERN_BADGE"
+     ]
+    },
+    {
+     "id": "IDENTIFY",
+     "tokens": [
+      "IDENTIFY_CURRENT",
+      "IDENTIFY_TARGET",
+      "IDENTIFY_NOTE"
+     ],
+     "badges": [
+      "IDENTIFY_BADGE"
+     ]
+    },
+    {
+     "id": "PROTECT",
+     "tokens": [
+      "PROTECT_CURRENT",
+      "PROTECT_TARGET",
+      "PROTECT_NOTE"
+     ],
+     "badges": [
+      "PROTECT_BADGE"
+     ]
+    },
+    {
+     "id": "DETECT",
+     "tokens": [
+      "DETECT_CURRENT",
+      "DETECT_TARGET",
+      "DETECT_NOTE"
+     ],
+     "badges": [
+      "DETECT_BADGE"
+     ]
+    },
+    {
+     "id": "RESPOND",
+     "tokens": [
+      "RESPOND_CURRENT",
+      "RESPOND_TARGET",
+      "RESPOND_NOTE"
+     ],
+     "badges": [
+      "RESPOND_BADGE"
+     ]
+    },
+    {
+     "id": "RECOVER",
+     "tokens": [
+      "RECOVER_CURRENT",
+      "RECOVER_TARGET",
+      "RECOVER_NOTE"
+     ],
+     "badges": [
+      "RECOVER_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_10_MATURITY_GAP_ANALYSIS",
+   "theme": "light",
+   "purpose": "As-is versus peer benchmark versus target state",
+   "grid_cols": 3,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "DOMAIN_1",
+     "tokens": [
+      "DOMAIN_1_NAME",
+      "DOMAIN_1_ASIS",
+      "DOMAIN_1_PEER",
+      "DOMAIN_1_TARGET"
+     ],
+     "badges": [
+      "DOMAIN_1_BADGE"
+     ]
+    },
+    {
+     "id": "DOMAIN_2",
+     "tokens": [
+      "DOMAIN_2_NAME",
+      "DOMAIN_2_ASIS",
+      "DOMAIN_2_PEER",
+      "DOMAIN_2_TARGET"
+     ],
+     "badges": [
+      "DOMAIN_2_BADGE"
+     ]
+    },
+    {
+     "id": "DOMAIN_3",
+     "tokens": [
+      "DOMAIN_3_NAME",
+      "DOMAIN_3_ASIS",
+      "DOMAIN_3_PEER",
+      "DOMAIN_3_TARGET"
+     ],
+     "badges": [
+      "DOMAIN_3_BADGE"
+     ]
+    },
+    {
+     "id": "DOMAIN_4",
+     "tokens": [
+      "DOMAIN_4_NAME",
+      "DOMAIN_4_ASIS",
+      "DOMAIN_4_PEER",
+      "DOMAIN_4_TARGET"
+     ],
+     "badges": [
+      "DOMAIN_4_BADGE"
+     ]
+    },
+    {
+     "id": "DOMAIN_5",
+     "tokens": [
+      "DOMAIN_5_NAME",
+      "DOMAIN_5_ASIS",
+      "DOMAIN_5_PEER",
+      "DOMAIN_5_TARGET"
+     ],
+     "badges": [
+      "DOMAIN_5_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_11_COMPLIANCE_CROSSWALK",
+   "theme": "light",
+   "purpose": "Status across ISO 27001, SOC 2, DORA and the EU AI Act",
+   "grid_cols": 2,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "FRAMEWORK_1",
+     "tokens": [
+      "FRAMEWORK_1_NAME",
+      "FRAMEWORK_1_NOTE"
+     ],
+     "badges": [
+      "FRAMEWORK_1_BADGE"
+     ]
+    },
+    {
+     "id": "FRAMEWORK_2",
+     "tokens": [
+      "FRAMEWORK_2_NAME",
+      "FRAMEWORK_2_NOTE"
+     ],
+     "badges": [
+      "FRAMEWORK_2_BADGE"
+     ]
+    },
+    {
+     "id": "FRAMEWORK_3",
+     "tokens": [
+      "FRAMEWORK_3_NAME",
+      "FRAMEWORK_3_NOTE"
+     ],
+     "badges": [
+      "FRAMEWORK_3_BADGE"
+     ]
+    },
+    {
+     "id": "FRAMEWORK_4",
+     "tokens": [
+      "FRAMEWORK_4_NAME",
+      "FRAMEWORK_4_NOTE"
+     ],
+     "badges": [
+      "FRAMEWORK_4_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_12_AUDIT_FINDINGS_TRACKER",
+   "theme": "light",
+   "purpose": "Remediation timelines for audit deficiencies",
+   "grid_cols": 1,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "FINDING_1",
+     "tokens": [
+      "FINDING_1_TITLE",
+      "FINDING_1_OWNER",
+      "FINDING_1_DUE"
+     ],
+     "badges": [
+      "FINDING_1_BADGE"
+     ]
+    },
+    {
+     "id": "FINDING_2",
+     "tokens": [
+      "FINDING_2_TITLE",
+      "FINDING_2_OWNER",
+      "FINDING_2_DUE"
+     ],
+     "badges": [
+      "FINDING_2_BADGE"
+     ]
+    },
+    {
+     "id": "FINDING_3",
+     "tokens": [
+      "FINDING_3_TITLE",
+      "FINDING_3_OWNER",
+      "FINDING_3_DUE"
+     ],
+     "badges": [
+      "FINDING_3_BADGE"
+     ]
+    },
+    {
+     "id": "FINDING_4",
+     "tokens": [
+      "FINDING_4_TITLE",
+      "FINDING_4_OWNER",
+      "FINDING_4_DUE"
+     ],
+     "badges": [
+      "FINDING_4_BADGE"
+     ]
+    },
+    {
+     "id": "FINDING_5",
+     "tokens": [
+      "FINDING_5_TITLE",
+      "FINDING_5_OWNER",
+      "FINDING_5_DUE"
+     ],
+     "badges": [
+      "FINDING_5_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_13_SHADOW_AI_INVENTORY",
+   "theme": "dark",
+   "purpose": "Unsanctioned versus approved GenAI tools",
+   "grid_cols": 3,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "SANCTIONED_COUNT",
+     "tokens": [
+      "SANCTIONED_COUNT"
+     ],
+     "badges": []
+    },
+    {
+     "id": "UNSANCTIONED_COUNT",
+     "tokens": [
+      "UNSANCTIONED_COUNT"
+     ],
+     "badges": []
+    },
+    {
+     "id": "TOOL_1",
+     "tokens": [
+      "TOOL_1_NAME"
+     ],
+     "badges": [
+      "TOOL_1_BADGE"
+     ]
+    },
+    {
+     "id": "TOOL_2",
+     "tokens": [
+      "TOOL_2_NAME"
+     ],
+     "badges": [
+      "TOOL_2_BADGE"
+     ]
+    },
+    {
+     "id": "TOOL_3",
+     "tokens": [
+      "TOOL_3_NAME"
+     ],
+     "badges": [
+      "TOOL_3_BADGE"
+     ]
+    },
+    {
+     "id": "TOOL_4",
+     "tokens": [
+      "TOOL_4_NAME"
+     ],
+     "badges": [
+      "TOOL_4_BADGE"
+     ]
+    }
+   ],
+   "header_cells": 2
+  },
+  {
+   "layout_id": "LAYOUT_14_OWASP_LLM_TOP10",
+   "theme": "dark",
+   "purpose": "OWASP LLM Top 10 (2025): injection, poisoning, leakage and agency risks",
+   "grid_cols": 3,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "LLM01",
+     "tokens": [
+      "LLM01_NOTE"
+     ],
+     "badges": [
+      "LLM01_BADGE"
+     ]
+    },
+    {
+     "id": "LLM02",
+     "tokens": [
+      "LLM02_NOTE"
+     ],
+     "badges": [
+      "LLM02_BADGE"
+     ]
+    },
+    {
+     "id": "LLM04",
+     "tokens": [
+      "LLM04_NOTE"
+     ],
+     "badges": [
+      "LLM04_BADGE"
+     ]
+    },
+    {
+     "id": "LLM06",
+     "tokens": [
+      "LLM06_NOTE"
+     ],
+     "badges": [
+      "LLM06_BADGE"
+     ]
+    },
+    {
+     "id": "LLM07",
+     "tokens": [
+      "LLM07_NOTE"
+     ],
+     "badges": [
+      "LLM07_BADGE"
+     ]
+    },
+    {
+     "id": "LLM08",
+     "tokens": [
+      "LLM08_NOTE"
+     ],
+     "badges": [
+      "LLM08_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_15_AI_DEFENSE_PIPELINE",
+   "theme": "dark",
+   "purpose": "Four-stage model pipeline: input, prompt, retrieval, output",
+   "grid_cols": 4,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "STAGE_1",
+     "tokens": [
+      "STAGE_1_NAME",
+      "STAGE_1_CONTROL"
+     ],
+     "badges": [
+      "STAGE_1_BADGE"
+     ]
+    },
+    {
+     "id": "STAGE_2",
+     "tokens": [
+      "STAGE_2_NAME",
+      "STAGE_2_CONTROL"
+     ],
+     "badges": [
+      "STAGE_2_BADGE"
+     ]
+    },
+    {
+     "id": "STAGE_3",
+     "tokens": [
+      "STAGE_3_NAME",
+      "STAGE_3_CONTROL"
+     ],
+     "badges": [
+      "STAGE_3_BADGE"
+     ]
+    },
+    {
+     "id": "STAGE_4",
+     "tokens": [
+      "STAGE_4_NAME",
+      "STAGE_4_CONTROL"
+     ],
+     "badges": [
+      "STAGE_4_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_16_AI_AGENT_PRIVILEGE_MATRIX",
+   "theme": "dark",
+   "purpose": "Agent autonomy levels, tool limits and human-in-the-loop gates",
+   "grid_cols": 2,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "AGENT_1",
+     "tokens": [
+      "AGENT_1_NAME",
+      "AGENT_1_AUTONOMY",
+      "AGENT_1_TOOLS",
+      "AGENT_1_GATE"
+     ],
+     "badges": []
+    },
+    {
+     "id": "AGENT_2",
+     "tokens": [
+      "AGENT_2_NAME",
+      "AGENT_2_AUTONOMY",
+      "AGENT_2_TOOLS",
+      "AGENT_2_GATE"
+     ],
+     "badges": []
+    },
+    {
+     "id": "AGENT_3",
+     "tokens": [
+      "AGENT_3_NAME",
+      "AGENT_3_AUTONOMY",
+      "AGENT_3_TOOLS",
+      "AGENT_3_GATE"
+     ],
+     "badges": []
+    },
+    {
+     "id": "AGENT_4",
+     "tokens": [
+      "AGENT_4_NAME",
+      "AGENT_4_AUTONOMY",
+      "AGENT_4_TOOLS",
+      "AGENT_4_GATE"
+     ],
+     "badges": []
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_17_ZERO_TRUST_PILLARS",
+   "theme": "light",
+   "purpose": "Zero Trust maturity: Identity, Device, Network, Application and Data",
+   "grid_cols": 3,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "PILLAR_1",
+     "tokens": [
+      "PILLAR_1_NAME",
+      "PILLAR_1_ZT_TIER",
+      "PILLAR_1_NOTE"
+     ],
+     "badges": [
+      "PILLAR_1_BADGE"
+     ]
+    },
+    {
+     "id": "PILLAR_2",
+     "tokens": [
+      "PILLAR_2_NAME",
+      "PILLAR_2_ZT_TIER",
+      "PILLAR_2_NOTE"
+     ],
+     "badges": [
+      "PILLAR_2_BADGE"
+     ]
+    },
+    {
+     "id": "PILLAR_3",
+     "tokens": [
+      "PILLAR_3_NAME",
+      "PILLAR_3_ZT_TIER",
+      "PILLAR_3_NOTE"
+     ],
+     "badges": [
+      "PILLAR_3_BADGE"
+     ]
+    },
+    {
+     "id": "PILLAR_4",
+     "tokens": [
+      "PILLAR_4_NAME",
+      "PILLAR_4_ZT_TIER",
+      "PILLAR_4_NOTE"
+     ],
+     "badges": [
+      "PILLAR_4_BADGE"
+     ]
+    },
+    {
+     "id": "PILLAR_5",
+     "tokens": [
+      "PILLAR_5_NAME",
+      "PILLAR_5_ZT_TIER",
+      "PILLAR_5_NOTE"
+     ],
+     "badges": [
+      "PILLAR_5_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_18_SECOPS_SOC_METRICS",
+   "theme": "light",
+   "purpose": "MTTD, MTTR, automation ratio and incident velocity",
+   "grid_cols": 4,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "METRIC_1",
+     "tokens": [
+      "METRIC_1_LABEL",
+      "METRIC_1_VALUE",
+      "METRIC_1_TARGET"
+     ],
+     "badges": [
+      "METRIC_1_BADGE"
+     ]
+    },
+    {
+     "id": "METRIC_2",
+     "tokens": [
+      "METRIC_2_LABEL",
+      "METRIC_2_VALUE",
+      "METRIC_2_TARGET"
+     ],
+     "badges": [
+      "METRIC_2_BADGE"
+     ]
+    },
+    {
+     "id": "METRIC_3",
+     "tokens": [
+      "METRIC_3_LABEL",
+      "METRIC_3_VALUE",
+      "METRIC_3_TARGET"
+     ],
+     "badges": [
+      "METRIC_3_BADGE"
+     ]
+    },
+    {
+     "id": "METRIC_4",
+     "tokens": [
+      "METRIC_4_LABEL",
+      "METRIC_4_VALUE",
+      "METRIC_4_TARGET"
+     ],
+     "badges": [
+      "METRIC_4_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_19_INCIDENT_WAR_GAME_TIMELINE",
+   "theme": "dark",
+   "purpose": "Simulated attack and defense chronology",
+   "grid_cols": 1,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "EVENT_1",
+     "tokens": [
+      "EVENT_1_TIME",
+      "EVENT_1_ACTION",
+      "EVENT_1_RESPONSE"
+     ],
+     "badges": []
+    },
+    {
+     "id": "EVENT_2",
+     "tokens": [
+      "EVENT_2_TIME",
+      "EVENT_2_ACTION",
+      "EVENT_2_RESPONSE"
+     ],
+     "badges": []
+    },
+    {
+     "id": "EVENT_3",
+     "tokens": [
+      "EVENT_3_TIME",
+      "EVENT_3_ACTION",
+      "EVENT_3_RESPONSE"
+     ],
+     "badges": []
+    },
+    {
+     "id": "EVENT_4",
+     "tokens": [
+      "EVENT_4_TIME",
+      "EVENT_4_ACTION",
+      "EVENT_4_RESPONSE"
+     ],
+     "badges": []
+    },
+    {
+     "id": "EVENT_5",
+     "tokens": [
+      "EVENT_5_TIME",
+      "EVENT_5_ACTION",
+      "EVENT_5_RESPONSE"
+     ],
+     "badges": []
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_20_MULTI_YEAR_ROADMAP",
+   "theme": "light",
+   "purpose": "Horizon 1 (0-6M), Horizon 2 (6-18M), Horizon 3 (18-36M)",
+   "grid_cols": 3,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "PROGRAM_NAME",
+     "tokens": [
+      "PROGRAM_NAME"
+     ],
+     "badges": []
+    },
+    {
+     "id": "TOTAL_INVESTMENT",
+     "tokens": [
+      "TOTAL_INVESTMENT"
+     ],
+     "badges": []
+    },
+    {
+     "id": "HORIZON_1",
+     "tokens": [
+      "HORIZON_1_THEME",
+      "HORIZON_1_ITEM_1",
+      "HORIZON_1_ITEM_2",
+      "HORIZON_1_ITEM_3",
+      "HORIZON_1_CAPEX",
+      "HORIZON_1_OPEX"
+     ],
+     "badges": []
+    },
+    {
+     "id": "HORIZON_2",
+     "tokens": [
+      "HORIZON_2_THEME",
+      "HORIZON_2_ITEM_1",
+      "HORIZON_2_ITEM_2",
+      "HORIZON_2_ITEM_3",
+      "HORIZON_2_CAPEX",
+      "HORIZON_2_OPEX"
+     ],
+     "badges": []
+    },
+    {
+     "id": "HORIZON_3",
+     "tokens": [
+      "HORIZON_3_THEME",
+      "HORIZON_3_ITEM_1",
+      "HORIZON_3_ITEM_2",
+      "HORIZON_3_ITEM_3",
+      "HORIZON_3_CAPEX",
+      "HORIZON_3_OPEX"
+     ],
+     "badges": []
+    }
+   ],
+   "header_cells": 2
+  },
+  {
+   "layout_id": "LAYOUT_21_CAPEX_OPEX_JUSTIFICATION",
+   "theme": "light",
+   "purpose": "Cost breakdown, tooling ROI and cost avoidance",
+   "grid_cols": 3,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "CAPEX_TOTAL",
+     "tokens": [
+      "CAPEX_TOTAL"
+     ],
+     "badges": []
+    },
+    {
+     "id": "OPEX_TOTAL",
+     "tokens": [
+      "OPEX_TOTAL"
+     ],
+     "badges": []
+    },
+    {
+     "id": "LINE_1",
+     "tokens": [
+      "LINE_1_NAME",
+      "LINE_1_COST"
+     ],
+     "badges": []
+    },
+    {
+     "id": "LINE_2",
+     "tokens": [
+      "LINE_2_NAME",
+      "LINE_2_COST"
+     ],
+     "badges": []
+    },
+    {
+     "id": "LINE_3",
+     "tokens": [
+      "LINE_3_NAME",
+      "LINE_3_COST"
+     ],
+     "badges": []
+    },
+    {
+     "id": "LINE_4",
+     "tokens": [
+      "LINE_4_NAME",
+      "LINE_4_COST"
+     ],
+     "badges": []
+    },
+    {
+     "id": "AVOIDANCE_NOTE",
+     "tokens": [
+      "AVOIDANCE_NOTE"
+     ],
+     "badges": []
+    }
+   ],
+   "header_cells": 2
+  },
+  {
+   "layout_id": "LAYOUT_22_INITIATIVE_PRIORITIZATION",
+   "theme": "light",
+   "purpose": "Impact versus effort: quick wins and big bets",
+   "grid_cols": 3,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "INITIATIVE_1",
+     "tokens": [
+      "INITIATIVE_1_NAME",
+      "INITIATIVE_1_IMPACT",
+      "INITIATIVE_1_EFFORT"
+     ],
+     "badges": []
+    },
+    {
+     "id": "INITIATIVE_2",
+     "tokens": [
+      "INITIATIVE_2_NAME",
+      "INITIATIVE_2_IMPACT",
+      "INITIATIVE_2_EFFORT"
+     ],
+     "badges": []
+    },
+    {
+     "id": "INITIATIVE_3",
+     "tokens": [
+      "INITIATIVE_3_NAME",
+      "INITIATIVE_3_IMPACT",
+      "INITIATIVE_3_EFFORT"
+     ],
+     "badges": []
+    },
+    {
+     "id": "INITIATIVE_4",
+     "tokens": [
+      "INITIATIVE_4_NAME",
+      "INITIATIVE_4_IMPACT",
+      "INITIATIVE_4_EFFORT"
+     ],
+     "badges": []
+    },
+    {
+     "id": "INITIATIVE_5",
+     "tokens": [
+      "INITIATIVE_5_NAME",
+      "INITIATIVE_5_IMPACT",
+      "INITIATIVE_5_EFFORT"
+     ],
+     "badges": []
+    },
+    {
+     "id": "INITIATIVE_6",
+     "tokens": [
+      "INITIATIVE_6_NAME",
+      "INITIATIVE_6_IMPACT",
+      "INITIATIVE_6_EFFORT"
+     ],
+     "badges": []
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_23_SEC_DISCLOSURE_READINESS",
+   "theme": "dark",
+   "purpose": "Escalation from detection to a human materiality decision and Form 8-K Item 1.05 disclosure",
+   "grid_cols": 3,
+   "word_limits": {
+    "RULE": 30
+   },
+   "cells": [
+    {
+     "id": "RULE",
+     "tokens": [
+      "RULE"
+     ],
+     "badges": []
+    },
+    {
+     "id": "ESCALATION_STEP_1",
+     "tokens": [
+      "ESCALATION_STEP_1"
+     ],
+     "badges": []
+    },
+    {
+     "id": "ESCALATION_STEP_2",
+     "tokens": [
+      "ESCALATION_STEP_2"
+     ],
+     "badges": []
+    },
+    {
+     "id": "ESCALATION_STEP_3",
+     "tokens": [
+      "ESCALATION_STEP_3"
+     ],
+     "badges": []
+    },
+    {
+     "id": "AUTOMATION_STATUS",
+     "tokens": [
+      "AUTOMATION_STATUS"
+     ],
+     "badges": [
+      "READINESS_BADGE"
+     ]
+    }
+   ]
+  },
+  {
+   "layout_id": "LAYOUT_24_SEC_CYBER_GOVERNANCE",
+   "theme": "light",
+   "purpose": "Annual cybersecurity risk management, strategy and governance disclosure (Regulation S-K Item 106)",
+   "grid_cols": 3,
+   "word_limits": {},
+   "cells": [
+    {
+     "id": "RISK_PROCESS_NOTE",
+     "tokens": [
+      "RISK_PROCESS_NOTE"
+     ],
+     "badges": []
+    },
+    {
+     "id": "BOARD_OVERSIGHT_NOTE",
+     "tokens": [
+      "BOARD_OVERSIGHT_NOTE"
+     ],
+     "badges": []
+    },
+    {
+     "id": "MGMT_ROLE_NOTE",
+     "tokens": [
+      "MGMT_ROLE_NOTE"
+     ],
+     "badges": [
+      "GOVERNANCE_BADGE"
+     ]
+    }
+   ]
+  }
+ ]
+}

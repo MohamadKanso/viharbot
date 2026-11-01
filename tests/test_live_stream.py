@@ -298,8 +298,13 @@ async def collect_all(agen):
     return [chunk async for chunk in agen]
 
 
-def workers():
-    return [t for t in threading.enumerate() if t.name.startswith("live-")]
+def workers(request_id=None):
+    """Live worker threads. With a request id, only that stream's worker (its thread is named
+    `live-<first 8 characters of the request id>`), so a worker another test left behind, or one
+    that is still exiting, cannot change the count."""
+    name = None if request_id is None else f"live-{request_id[:8]}"
+    return [t for t in threading.enumerate()
+            if (t.name == name if name else t.name.startswith("live-"))]
 
 
 def wait_until(condition, seconds=3.0):
@@ -331,7 +336,7 @@ def test_a_full_queue_closes_a_stream_nobody_is_reading_and_frees_everything():
 
     asyncio.run(scenario())
     assert len(emitted) <= 4  # bounded: the queue held two, and the producer stopped soon after
-    assert cancel.is_set() and wait_until(lambda: not workers())
+    assert cancel.is_set() and wait_until(lambda: not workers("req-slow"))
     assert permits_available() == MAX_CONCURRENT_STREAMS
 
 
@@ -359,11 +364,13 @@ def test_idle_streams_send_keep_alive_comments_that_are_not_events():
 
 
 def test_a_disconnect_cancels_new_work_and_releases_the_slot_without_replaying_anything():
-    gate, calls, cancel, permit = threading.Event(), [], CancelToken(), StreamPermit.acquire()
+    gate, in_flight = threading.Event(), threading.Event()
+    calls, cancel, permit = [], CancelToken(), StreamPermit.acquire()
 
     def work(emitter, token):
         emitter.planner_started(decision_number=1, remaining_ms=1000)
         calls.append("planner")
+        in_flight.set()
         gate.wait(5)  # a model call that is still in flight when the client leaves
         emitter.planner_completed(decision_number=1, duration_ms=1, action="finish", capability=None,
                                   rationale=None, model_alias=None)
@@ -375,11 +382,15 @@ def test_a_disconnect_cancels_new_work_and_releases_the_slot_without_replaying_a
         await agen.__anext__()  # the client reads one event...
         await agen.aclose()  # ...then disconnects
 
-    asyncio.run(scenario())
-    assert cancel.is_set() and permits_available() == MAX_CONCURRENT_STREAMS
-    assert calls == ["planner"] and len(workers()) == 1  # the in-flight call is still running
-    gate.set()  # when it returns, the next event cannot be delivered and the run stops
-    assert wait_until(lambda: not workers())
+    try:
+        asyncio.run(scenario())
+        assert in_flight.wait(5)  # the worker has really started its call (it signals after the event)
+        assert cancel.is_set() and permits_available() == MAX_CONCURRENT_STREAMS
+        # Only this stream's worker is counted, so threads left by other tests cannot change it.
+        assert calls == ["planner"] and len(workers("req-gone")) == 1  # the call is still running
+    finally:
+        gate.set()  # when it returns, the next event cannot be delivered and the run stops
+    assert wait_until(lambda: not workers("req-gone"))
     assert calls == ["planner"]  # nothing further happened and nothing was retried
 
 
@@ -470,15 +481,18 @@ def test_a_real_disconnect_stops_further_delegation_and_never_replays_inference(
     gate, calls = threading.Event(), []
     state.decide = gated_planner(gate, calls)
     with loopback_server() as base, httpx.Client(timeout=15) as http:
-        with http.stream("POST", f"{base}/api/chat/stream", json={"message": QUESTION}) as response:
-            read_events(response.iter_lines(), lambda e: e[-1].event_type == "planner_started"
-                        and e[-1].correlation.decision_number == 2)
-            assert wait_until(lambda: calls == [1, 2])  # decision 2's model call is now in flight
-        # the client has left while that call is still running
-        assert wait_until(lambda: permits_available() == MAX_CONCURRENT_STREAMS)
-        sends_before = len(state.sends[0].calls)
-        gate.set()
-        assert wait_until(lambda: not workers())
+        try:
+            with http.stream("POST", f"{base}/api/chat/stream", json={"message": QUESTION}) as response:
+                request_id = response.headers["x-request-id"]  # names this stream's worker thread
+                read_events(response.iter_lines(), lambda e: e[-1].event_type == "planner_started"
+                            and e[-1].correlation.decision_number == 2)
+                assert wait_until(lambda: calls == [1, 2])  # decision 2's model call is now in flight
+            # the client has left while that call is still running
+            assert wait_until(lambda: permits_available() == MAX_CONCURRENT_STREAMS)
+            sends_before = len(state.sends[0].calls)
+        finally:
+            gate.set()  # never leave the blocked call running if an assertion above fails
+        assert wait_until(lambda: not workers(request_id))
         time.sleep(0.2)
         assert len(state.sends[0].calls) == sends_before == 1  # no second delegation after the disconnect
         assert calls == [1, 2]  # the planner was called once per decision and never replayed

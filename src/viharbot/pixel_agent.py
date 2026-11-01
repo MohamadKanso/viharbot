@@ -20,7 +20,7 @@ import re
 import time
 from pathlib import Path
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from fastapi import FastAPI, Header, HTTPException, Response
 from fastapi.responses import FileResponse, HTMLResponse
@@ -171,20 +171,20 @@ def process(
 
 
 def _safe_deck_path(deck_id: str, extension: str) -> Path:
+    """The stored file for a deck id, or 404.
+
+    The id must match the exact format the service issues (`deck-` and 12 hex digits), and the
+    returned path comes from the directory listing, never from the request, so no request text
+    is ever joined into a file path.
+    """
     if not DECK_ID.fullmatch(deck_id):
         raise HTTPException(status_code=404, detail="Deck not found")
-    try:
-        canonical_deck_id = str(UUID(deck_id))
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Deck not found") from None
-    base = decks_dir().resolve()
-    filename = f"{canonical_deck_id}.{extension}"
-    path = (base / filename).resolve()
-    try:
-        path.relative_to(base)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Deck not found") from None
-    return path
+    wanted = f"{deck_id}.{extension}"
+    folder = decks_dir()
+    for candidate in folder.iterdir() if folder.is_dir() else ():
+        if candidate.name == wanted:
+            return candidate
+    raise HTTPException(status_code=404, detail="Deck not found")
 
 
 @app.get("/decks/{deck_id}.pptx")
