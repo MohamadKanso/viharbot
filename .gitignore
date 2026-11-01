@@ -20,6 +20,9 @@ htmlcov/
 
 # Local runtime data, memory, and logs
 data/
+# ...but not the Pixel package's own data files (layouts, frameworks, design tokens), which the
+# application needs at runtime. A bare `data/` rule silently kept them out of git.
+!src/viharbot/pixel/data/
 *.log
 
 # OS/editor files

@@ -1,0 +1,15 @@
+{
+  "version": "0.1",
+  "themes": {
+    "dark": {"background": "0B0F19", "card": "161F30", "border": "334155", "text": "F8FAFC", "muted": "94A3B8"},
+    "light": {"background": "F8FAFC", "card": "FFFFFF", "border": "E2E8F0", "text": "0F172A", "muted": "64748B"}
+  },
+  "accents": {"ai": "8B5CF6", "zero_trust": "06B6D4"},
+  "status": {
+    "CRITICAL": {"fill": "DC2626", "text": "FFFFFF", "label": "CRITICAL"},
+    "HIGH": {"fill": "EA580C", "text": "FFFFFF", "label": "HIGH"},
+    "MEDIUM": {"fill": "F59E0B", "text": "0B0F19", "label": "MEDIUM"},
+    "LOW": {"fill": "10B981", "text": "0B0F19", "label": "LOW"},
+    "NOT_ASSESSED": {"fill": "94A3B8", "text": "0B0F19", "label": "NOT ASSESSED"}
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "version": "0.1",
+  "verified": false,
+  "note": "Reference taxonomy for slide mapping. Keys, names and editions only, with item lists where well known. Not legal or audit advice. Re-verify every entry against its primary source before a customer-facing release; anything absent here must be marked [verify against source].",
+  "entries": {
+    "cisa_ztmm_v2": {
+      "name": "CISA Zero Trust Maturity Model",
+      "edition": "2.0",
+      "category": "zero_trust",
+      "items": {
+        "pillars": "Identity; Devices; Networks; Applications and Workloads; Data",
+        "stages": "Traditional; Initial; Advanced; Optimal"
+      }
+    },
+    "nist_sp_800_207": {"name": "NIST SP 800-207 Zero Trust Architecture", "edition": "2020", "category": "zero_trust", "items": {}},
+    "nist_csf_2": {
+      "name": "NIST Cybersecurity Framework",
+      "edition": "2.0",
+      "category": "governance",
+      "items": {"functions": "Govern; Identify; Protect; Detect; Respond; Recover"}
+    },
+    "owasp_llm_top10": {
+      "name": "OWASP Top 10 for LLM Applications",
+      "edition": "2025",
+      "category": "owasp",
+      "items": {
+        "LLM01": "Prompt Injection",
+        "LLM02": "Sensitive Information Disclosure",
+        "LLM03": "Supply Chain",
+        "LLM04": "Data and Model Poisoning",
+        "LLM05": "Improper Output Handling",
+        "LLM06": "Excessive Agency",
+        "LLM07": "System Prompt Leakage",
+        "LLM08": "Vector and Embedding Weaknesses",
+        "LLM09": "Misinformation",
+        "LLM10": "Unbounded Consumption"
+      }
+    },
+    "owasp_top10_2021": {
+      "name": "OWASP Top 10",
+      "edition": "2021",
+      "category": "owasp",
+      "items": {
+        "A01": "Broken Access Control",
+        "A02": "Cryptographic Failures",
+        "A03": "Injection",
+        "A04": "Insecure Design",
+        "A05": "Security Misconfiguration",
+        "A06": "Vulnerable and Outdated Components",
+        "A07": "Identification and Authentication Failures",
+        "A08": "Software and Data Integrity Failures",
+        "A09": "Security Logging and Monitoring Failures",
+        "A10": "Server-Side Request Forgery"
+      }
+    },
+    "mitre_atlas": {"name": "MITRE ATLAS", "edition": "unversioned here", "category": "governance", "items": {}},
+    "iso_27001_2022": {"name": "ISO/IEC 27001", "edition": "2022", "category": "governance", "items": {}},
+    "iso_42001_2023": {"name": "ISO/IEC 42001", "edition": "2023", "category": "governance", "items": {}},
+    "eu_dora": {"name": "Digital Operational Resilience Act, Regulation (EU) 2022/2554", "edition": "applies from 2025-01-17", "category": "international", "items": {}},
+    "eu_nis2": {"name": "NIS2 Directive, Directive (EU) 2022/2555", "edition": "2022", "category": "international", "items": {}},
+    "eu_ai_act": {"name": "EU AI Act, Regulation (EU) 2024/1689", "edition": "2024", "category": "international", "items": {}},
+    "sec_8k_item_1_05": {
+      "name": "SEC Form 8-K Item 1.05, material cybersecurity incidents",
+      "edition": "2023 final rule",
+      "category": "us_federal",
+      "items": {"timing": "Disclose within four business days after the company determines the incident is material; the clock starts at the materiality determination, not at discovery."}
+    },
+    "sec_reg_sk_item_106": {
+      "name": "SEC Regulation S-K Item 106, cybersecurity risk management, strategy and governance",
+      "edition": "2023 final rule",
+      "category": "us_federal",
+      "items": {"scope": "Annual disclosure of risk management processes, board oversight and management's role."}
+    }
+  }
+}
