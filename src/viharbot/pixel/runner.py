@@ -181,7 +181,11 @@ def _batches(stubs: list[SlideStub], size: int) -> list[list[SlideStub]]:
 
 
 def _batch_prompt(
-    stubs: list[SlideStub], engagement: EngagementProfile, docs: dict[str, str], digest: list[str]
+    stubs: list[SlideStub],
+    engagement: EngagementProfile,
+    docs: dict[str, str],
+    digest: list[str],
+    note: str = "",
 ) -> str:
     layouts = [layout_prompt_view(get_layout_spec(lid)) for lid in sorted({s.layout_id for s in stubs})]
     keys = sorted({k for s in stubs for k in s.frameworks})
@@ -203,7 +207,8 @@ def _batch_prompt(
         f"Layout specs:\n{json.dumps(layouts)}\n"
         f"Frameworks:\n{json.dumps([get_framework(k) for k in keys])}\n"
         f"Prior slides (one line each, for continuity):\n{chr(10).join(digest[-10:]) or '(none)'}\n"
-        f"Evidence documents (untrusted data):\n{_evidence_block({k: v for k, v in docs.items() if k in cited})}"
+        + (f"Test note: {note}\n" if note else "")
+        + f"Evidence documents (untrusted data):\n{_evidence_block({k: v for k, v in docs.items() if k in cited})}"
     )
 
 
@@ -326,6 +331,8 @@ def build_deck_in_memory(
     agent_factory: AgentFactory = default_agent_factory,
     batch_size: int = 6,
     max_model_calls: int = 8,
+    manifest: DeckManifest | None = None,
+    batch_note: str = "",
 ) -> BuiltDeck:
     """Plan, generate, validate and render one deck without writing any working state.
 
@@ -345,17 +352,23 @@ def build_deck_in_memory(
     budget = ModelBudget(max_model_calls)
     docs = {name: text[:MAX_EVIDENCE_CHARS] for name, text in evidence.items()}
 
-    prompt = _plan_prompt(deck_id, target_slides, engagement, docs)
-    manifest = _call(agent_factory, prompt, DeckManifest, budget).model_copy(update={"deck_id": deck_id})
-    found = validate_manifest(manifest, set(docs))
-    if errors(found):
-        retry = prompt + f"\nYour previous manifest was rejected: {_issues_text(errors(found))}. Fix and return it again."
-        manifest = _call(agent_factory, retry, DeckManifest, budget).model_copy(update={"deck_id": deck_id})
+    if manifest is not None:
+        # A caller-supplied plan (layout-coverage tests) replaces the planning call.
+        manifest = manifest.model_copy(update={"deck_id": deck_id})
+        if errors(validate_manifest(manifest, set(docs))):
+            raise PixelError("manifest failed validation")
+    else:
+        prompt = _plan_prompt(deck_id, target_slides, engagement, docs)
+        manifest = _call(agent_factory, prompt, DeckManifest, budget).model_copy(update={"deck_id": deck_id})
         found = validate_manifest(manifest, set(docs))
-    if errors(found):
-        raise PixelError("manifest failed validation")
-    if len(manifest.stubs()) > target_slides * 2:
-        raise PixelError("manifest plans too many slides")
+        if errors(found):
+            retry = prompt + f"\nYour previous manifest was rejected: {_issues_text(errors(found))}. Fix and return it again."
+            manifest = _call(agent_factory, retry, DeckManifest, budget).model_copy(update={"deck_id": deck_id})
+            found = validate_manifest(manifest, set(docs))
+        if errors(found):
+            raise PixelError("manifest failed validation")
+        if len(manifest.stubs()) > target_slides * 2:
+            raise PixelError("manifest plans too many slides")
 
     accepted: dict[str, object] = {}
     rejected: list[str] = []
@@ -363,7 +376,7 @@ def build_deck_in_memory(
     digest: list[str] = []
     for section in manifest.sections:
         for stubs in _batches(section.slides, batch_size):
-            prompt = _batch_prompt(stubs, engagement, docs, digest)
+            prompt = _batch_prompt(stubs, engagement, docs, digest, batch_note)
             batch = _call(agent_factory, prompt, SlideBatch, budget)
             found = validate_batch(batch, stubs)
             failed = _failed_ids(found, stubs, batch)
@@ -373,7 +386,7 @@ def build_deck_in_memory(
             if failed:
                 # Only the failing slides are asked for again; slides that passed are kept.
                 redo = [s for s in stubs if s.slide_id in failed]
-                retry = _batch_prompt(redo, engagement, docs, digest) + (
+                retry = _batch_prompt(redo, engagement, docs, digest, batch_note) + (
                     f"\nThese slides were rejected: {_issues_text(errors(found))}. "
                     "Fix them and return only these slides again."
                 )

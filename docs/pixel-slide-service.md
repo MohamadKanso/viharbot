@@ -60,6 +60,21 @@ flowchart LR
 4. Code renders the `.pptx` from the layout registry and the validated payloads. Badges carry both a colour and a text label.
 5. The chat response gains a `deck` object (status, slide count, `download_url`, warnings, rejected slides, never slide text), and an agent-activity row for Pixel. A Pixel failure never fails the chat; it appears in `deck`.
 
+## Comparing models
+
+The branding kit is shared by construction: colors, fonts, layouts and badge labels come from `design_tokens.json`, `layouts.json` and `render.py`, and the model only writes token text and badge ratings. To compare models, replay one saved evidence set through each alias and compare the decks:
+
+```bash
+# save a /api/chat response once, then:
+docker cp chat.json <pixel-container>:/tmp/chat.json
+docker compose exec -e VIHARBOT_PPT_GENERATION_ENABLED=true pixel \
+  python -m viharbot.pixel.compare --evidence /tmp/chat.json --out /data/compare \
+  gemini/gemini-3.5-flash openai/gpt-5.4-mini
+docker cp <pixel-container>:/data/compare ./compare
+```
+
+It prints one row per model (slides kept and left out, gap and over-limit counts, model calls, seconds) and writes `deck-<alias>.pptx` for each. Add `--all-layouts` to force one slide per registered layout (24): code plans the slides, so the model is never asked which layouts to use and only fills them, in four batches. Pair it with `scripts/pixel_lorem_chat.json`, a valid `/api/chat` response written entirely in Lorem Ipsum, so the content is neutral and every layout gets filled with text of realistic length (the run asks for 8 to 12 words per token instead of "[to be supplied]"). That run is about layout fit and per-model compliance with the word limits, not content quality. The model is chosen only here, never by a request. Each alias costs a few real model calls through LiteLLM, capped by `--max-calls`, and the tool refuses to run unless the PPT flag is true. A failing model is reported and the others still run.
+
 ## Limitations
 
 - Not run against a real model. The planner and generator prompts, structured-output behaviour and typical slide quality are unverified.
