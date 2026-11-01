@@ -8,6 +8,7 @@ aliases on the command line, never from a request.
 Usage (inside the pixel container, which has the dependencies and the LiteLLM settings):
   python -m viharbot.pixel.compare --evidence chat.json --out /data/compare ALIAS [ALIAS ...]
   add --all-layouts to force one slide per layout (24), planned by code, with the model filling them
+  add --creative (and --question "a brief") for a test where the model gets only the brief
 
 `chat.json` is a saved /api/chat response, so the six upstream agents are not run again. Each
 alias costs a few real model calls through LiteLLM (at most --max-calls). It refuses to run
@@ -25,7 +26,7 @@ from pathlib import Path
 from typing import Callable
 
 from .flag import PPT_FLAG, ppt_generation_enabled
-from .instructions import PIXEL_INSTRUCTIONS
+from .instructions import CREATIVE_INSTRUCTIONS, PIXEL_INSTRUCTIONS
 from .models import DeckManifest, EngagementProfile, Section, SlideStub
 from .registry import list_layouts
 from .runner import AgentFactory, PixelError, build_deck_in_memory
@@ -77,12 +78,15 @@ def coverage_manifest(evidence: dict[str, str], per_section: int = 6) -> DeckMan
     return DeckManifest(deck_id="coverage", sections=sections)
 
 
-def agent_factory_for(alias: str) -> AgentFactory:
+def agent_factory_for(alias: str, creative: bool = False) -> AgentFactory:
     """The same prompt composition the pixel service uses, with the alias under test."""
     from ..inference_config import effective_inference
     from ..model_agent import build_agent
 
-    inference = effective_inference("pixel", legacy_alias=alias, legacy_prompt=PIXEL_INSTRUCTIONS)
+    inference = effective_inference(
+        "pixel", legacy_alias=alias,
+        legacy_prompt=CREATIVE_INSTRUCTIONS if creative else PIXEL_INSTRUCTIONS,
+    )
     return lambda: build_agent(
         model_alias=inference.model_alias, system_prompt=inference.system_prompt
     )
@@ -112,8 +116,13 @@ def compare(
     target_slides: int = 6,
     max_model_calls: int = 8,
     all_layouts: bool = False,
-    factory_for: Callable[[str], AgentFactory] = agent_factory_for,
+    creative: bool = False,
+    factory_for: Callable[[str], AgentFactory] | None = None,
 ) -> list[dict]:
+    """With creative=True the only input is the brief (`question`); evidence is ignored."""
+    factory_for = factory_for or (lambda alias: agent_factory_for(alias, creative))
+    if creative:
+        evidence = {"brief": question}
     out_dir.mkdir(parents=True, exist_ok=True)
     rows: list[dict] = []
     for index, alias in enumerate(aliases):
@@ -130,7 +139,8 @@ def compare(
                 agent_factory=factory_for(alias),
                 max_model_calls=max_model_calls,
                 manifest=coverage_manifest(evidence) if all_layouts else None,
-                batch_note=COVERAGE_NOTE if all_layouts else "",
+                batch_note=COVERAGE_NOTE if all_layouts and not creative else "",
+                creative=creative,
             )
             blocks, gaps = deck_stats(path)
             row.update(
@@ -163,7 +173,10 @@ def format_table(rows: list[dict]) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("aliases", nargs="+", help="LiteLLM model aliases to compare")
-    ap.add_argument("--evidence", required=True, help="a saved /api/chat response (JSON)")
+    ap.add_argument("--evidence", help="a saved /api/chat response (JSON); not used with --creative")
+    ap.add_argument("--creative", action="store_true",
+                    help="test mode: the model gets only --question as a brief and writes freely; "
+                         "output is labelled illustrative and forced to 'proposed'")
     ap.add_argument("--question", default="Compare slide output across models", help="deck scope text")
     ap.add_argument("--out", default="compare", help="directory for the decks")
     ap.add_argument("--slides", type=int, default=6)
@@ -175,9 +188,13 @@ def main(argv: list[str] | None = None) -> int:
     if not ppt_generation_enabled():
         print(f"{PPT_FLAG} is not true; refusing to spend model calls", file=sys.stderr)
         return 2
-    data = json.loads(Path(args.evidence).read_text(encoding="utf-8"))
-    rows = compare(args.aliases, evidence_from_chat(data), args.question, Path(args.out),
-                   target_slides=args.slides, all_layouts=args.all_layouts,
+    if not args.creative and not args.evidence:
+        ap.error("--evidence is required unless --creative is set")
+    evidence = {}
+    if not args.creative:
+        evidence = evidence_from_chat(json.loads(Path(args.evidence).read_text(encoding="utf-8")))
+    rows = compare(args.aliases, evidence, args.question, Path(args.out),
+                   target_slides=args.slides, all_layouts=args.all_layouts, creative=args.creative,
                    max_model_calls=args.max_calls or (16 if args.all_layouts else 8))
     print(format_table(rows))
     return 0 if all(r["status"] == "ok" for r in rows) else 1
