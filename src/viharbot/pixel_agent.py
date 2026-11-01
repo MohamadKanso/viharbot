@@ -174,7 +174,12 @@ def process(
 def download(deck_id: str) -> FileResponse:
     if not DECK_ID.fullmatch(deck_id):
         raise HTTPException(status_code=404, detail="Deck not found")
-    path = decks_dir() / f"{deck_id}.pptx"
+    base = decks_dir().resolve()
+    path = (base / f"{deck_id}.pptx").resolve()
+    try:
+        path.relative_to(base)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Deck not found") from None
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Deck not found")
     return FileResponse(
@@ -189,7 +194,12 @@ def view(deck_id: str) -> HTMLResponse:
     """Pixel's HTML rendition of the deck, in the same colours as the .pptx."""
     if not DECK_ID.fullmatch(deck_id):
         raise HTTPException(status_code=404, detail="Deck not found")
-    path = decks_dir() / f"{deck_id}.html"
+    base = decks_dir().resolve()
+    path = (base / f"{deck_id}.html").resolve()
+    try:
+        path.relative_to(base)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Deck not found") from None
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Deck not found")
     return HTMLResponse(path.read_text(encoding="utf-8"), headers=HTML_HEADERS)
