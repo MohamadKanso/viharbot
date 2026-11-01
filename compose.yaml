@@ -21,7 +21,11 @@ services:
       # Slide-deck generation (Pixel). True while the feature is being tested; set it to false in
       # compose and .env when the feature is done so no request spends model calls on decks.
       VIHARBOT_PPT_GENERATION_ENABLED: ${VIHARBOT_PPT_GENERATION_ENABLED:-true}
-      # Optional coordination modes. All off by default; iterative mode needs all three.
+      # One switch for the live team conversation: it turns on all three modes below. Off by
+      # default. It grants no credentials; the planner also needs WEB_LITELLM_API_KEY.
+      VIHARBOT_LIVE_TEAM_ENABLED: ${VIHARBOT_LIVE_TEAM_ENABLED:-false}
+      # Optional coordination modes. All off by default; iterative mode needs all three, or the
+      # single flag above.
       VIHARBOT_IDENTITY_ROUTING_ENABLED: ${VIHARBOT_IDENTITY_ROUTING_ENABLED:-false}
       VIHARBOT_DELEGATION_ENABLED: ${VIHARBOT_DELEGATION_ENABLED:-false}
       VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED: ${VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED:-false}

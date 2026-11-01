@@ -58,7 +58,7 @@ flowchart LR
     C --> D[Download link: /api/decks/id]
 ```
 
-1. The pipeline runs exactly as before (fixed, identity-routed or delegated; iterative mode answers through `/api/chat/stream` and does not build decks).
+1. The pipeline runs exactly as before (fixed, identity-routed, delegated or iterative). The deck step is shared by `/api/chat` and the live stream (`/api/chat/stream`): on the stream it runs after the last agent and before `final_response`, which carries the `deck` object, and the stream sends keep-alive comments while it builds. No new event type was added, so the live event contract is unchanged. If the client has already left, the deck step is skipped.
 2. If the flag is on and the user's message names a deck (`slide deck`, `slides`, `PowerPoint`, `pptx`, `presentation`), the web service checks Pixel's binding and calls the pixel service with the question and the team's results as named evidence. The trigger is a fixed pattern, not a model call.
 3. The pixel service plans a manifest (one model call), then fills slides in batches of up to six (one call per batch), validating after each call. A failed manifest or batch is retried once with the error text; slides that still fail are left out and reported.
 4. Code renders the `.pptx` from the layout registry and the validated payloads. Badges carry both a colour and a text label.
@@ -94,7 +94,7 @@ Pixel is responsible for the deck's HTML page as well as the `.pptx`. `render_ht
 - Slide visuals are one generic grid per layout. Nobody has looked at the rendered slides, and long text can overflow a cell.
 - Deck generation takes several model calls and can take minutes; the web call allows 300 seconds. Public platforms that cut requests off sooner would need an asynchronous design.
 - Finished decks contain the team's results and live in the pixel container's `MEMORY_DIR` (a named volume locally, `/tmp` on App Platform). Only the newest 20 are kept (`PIXEL_MAX_DECKS`). The pixel and web services are unauthenticated beyond the web login, like the other private agents.
-- Only the non-streaming `/api/chat` path builds decks.
+- On the live stream, the panel shows nothing new while the deck builds (about 15 seconds on `gpt-5.4-mini`, much longer on slower models) and the deck appears with the final answer.
 - Deck detection is a keyword pattern, so a message that merely mentions a presentation can trigger a deck while the flag is on.
 - `PIXEL_MODEL` defaults to `gpt-5.4-mini` in Compose. A 3-run comparison on real evidence (2026-10-31) found it about one tenth the cost per deck and about nine times faster than `gemini/gemini-3.5-flash`, with the same gap rate and no slides left out: roughly $0.025 to $0.042 against $0.28 to $0.34 per deck. Gemini used about ten times more output tokens. Pixel's `preferred_model_family` is now "GPT mini family"; it is still only a description, and the alias comes from the service environment. Quality was judged by metrics only, not by a blind human review, and it is one evidence set.
 - The Stage spec (`deploy/digitalocean/app.yaml`) deliberately has no pixel component; adding one is a cost change that needs your approval first.

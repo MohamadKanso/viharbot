@@ -19,11 +19,14 @@ from .identity import AgentId, Capability, NonEmpty
 from .identity_registry import AgentRegistry, default_registry
 from .pipeline_state import PipelineState
 
+from .live_flags import flag_on, live_team_enabled
+
 IDENTITY_ROUTING_FLAG = "VIHARBOT_IDENTITY_ROUTING_ENABLED"
 
 
 def identity_routing_enabled() -> bool:
-    return os.getenv(IDENTITY_ROUTING_FLAG, "false").strip().lower() in {"1", "true", "yes"}
+    """Its own flag, or the live-team umbrella flag, which turns on every layer above it too."""
+    return flag_on(IDENTITY_ROUTING_FLAG) or live_team_enabled()
 
 
 class IdentityExecutionError(RuntimeError):

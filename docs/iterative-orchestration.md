@@ -194,7 +194,7 @@ The final evaluation never exceeds the decision budget or the deadline, and no c
 
 ## Feature flags
 
-`VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED` (default false) also requires `VIHARBOT_DELEGATION_ENABLED` and `VIHARBOT_IDENTITY_ROUTING_ENABLED`. If either is off, iterative mode stays inactive and the Phase 5, Phase 3 or legacy path runs. `CHARLIE_PLANNER_MODEL` and `VIHARBOT_PLANNER_TIMEOUT_SECONDS` are reused. Personality-aware inference stays on its own flags. Local Compose passes the three flags to the web service (default `false`) and `CHARLIE_PLANNER_MODEL` (default empty, so planning stays unavailable until you set an alias on purpose). None of these is set in the DigitalOcean spec. As in Phase 5, the **web service needs LiteLLM credentials** for planning; Compose gives it a key only when you opt in with `WEB_LITELLM_API_KEY` (see Local Dev testing).
+**`VIHARBOT_LIVE_TEAM_ENABLED` (default false) is the one switch that turns all three layers on**: it enables iterative orchestration, delegation and identity routing together, and grants no credentials (the planner still needs `WEB_LITELLM_API_KEY`). Without it, `VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED` (default false) also requires `VIHARBOT_DELEGATION_ENABLED` and `VIHARBOT_IDENTITY_ROUTING_ENABLED`, and each of the three keeps its own meaning. If either is off, iterative mode stays inactive and the Phase 5, Phase 3 or legacy path runs. `CHARLIE_PLANNER_MODEL` and `VIHARBOT_PLANNER_TIMEOUT_SECONDS` are reused. Personality-aware inference stays on its own flags. Local Compose passes the three flags to the web service (default `false`) and `CHARLIE_PLANNER_MODEL` (default empty, so planning stays unavailable until you set an alias on purpose). None of these is set in the DigitalOcean spec. As in Phase 5, the **web service needs LiteLLM credentials** for planning; Compose gives it a key only when you opt in with `WEB_LITELLM_API_KEY` (see Local Dev testing).
 
 ## Public API and the `orchestration` object
 
@@ -239,7 +239,7 @@ This section describes the Phase 6.2 rendering of the `/api/chat` response, whic
 
 ## Local Dev testing
 
-Nothing here deploys anything. With Docker Compose the web container gets the three flags (all `false` by default), `CHARLIE_PLANNER_MODEL` (`gpt-6-luna` by default), `LITELLM_BASE_URL` (the same default as the agents) and, **only if you opt in**, a LiteLLM key through `WEB_LITELLM_API_KEY`. By default the browser-facing container holds no key, even if `LITELLM_API_KEY` is set in your shell for the agents. The web image also installs the Cloudflare gateway CA, as the agent images do, so its HTTPS calls to LiteLLM verify.
+Nothing here deploys anything. With Docker Compose the web container gets `VIHARBOT_LIVE_TEAM_ENABLED` and the three individual flags (all `false` by default), `CHARLIE_PLANNER_MODEL` (`gpt-6-luna` by default), `LITELLM_BASE_URL` (the same default as the agents) and, **only if you opt in**, a LiteLLM key through `WEB_LITELLM_API_KEY`. By default the browser-facing container holds no key, even if `LITELLM_API_KEY` is set in your shell for the agents. The web image also installs the Cloudflare gateway CA, as the agent images do, so its HTTPS calls to LiteLLM verify.
 
 1. Pick a planner alias that exists in your LiteLLM (check `GET /v1/models`). It is never inferred from another alias.
 2. Start the stack with iterative mode on. The key is passed for this run only and is never written to a file:

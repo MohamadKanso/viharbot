@@ -109,7 +109,7 @@ Notes:
 
 ## JSON examples
 
-Every example below is a real event taken from the run fixtures in `tests/fixtures/live_events/` and validates against the schema (`parse_event`). `final_response.data.response` is the same `ChatResponse` as `/api/chat`, with optional fields omitted when unset.
+Every example below is a real event taken from the run fixtures in `tests/fixtures/live_events/` and validates against the schema (`parse_event`). `final_response.data.response` is the same `ChatResponse` as `/api/chat`, with optional fields omitted when unset. When the PPT flag is on and the request asks for a deck, it also carries `deck` (status, slide count, download and view links, warnings; never slide text); the deck is built before `final_response`, so no event type was added.
 
 ### `planner_started`
 

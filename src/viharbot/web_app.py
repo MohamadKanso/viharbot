@@ -188,6 +188,20 @@ def build_chat_response(
     )
 
 
+def add_deck_step(message: str, pipeline_result: dict, request_id: str) -> DeckInfo | None:
+    """The optional slide-deck step, shared by /api/chat and the live stream.
+
+    Runs only when the PPT flag is on and the message asks for a deck. A failure is reported in
+    the returned DeckInfo and the agent activity; it never fails the request.
+    """
+    if not (ppt_generation_enabled() and wants_deck(message)):
+        return None
+    deck, activity = run_pixel_stage(message.strip(), pipeline_result, request_id)
+    if activity is not None:
+        pipeline_result["agent_activity"].append(activity)
+    return deck
+
+
 @app.post("/api/chat", response_model=ChatResponse, response_model_exclude_unset=True)
 def chat(
     body: ChatRequest,
@@ -219,12 +233,8 @@ def chat(
             ).to_legacy_dict()
         else:
             pipeline_result = run_pipeline(*pipeline_args, **pipeline_urls)
-        deck = None
-        if ppt_generation_enabled() and wants_deck(body.message):
-            # Optional step after the pipeline; a failure is reported in `deck`, never a 502.
-            deck, deck_activity = run_pixel_stage(body.message.strip(), pipeline_result, request_id)
-            if deck_activity is not None:
-                pipeline_result["agent_activity"].append(deck_activity)
+        # Optional step after the pipeline; a failure is reported in `deck`, never a 502.
+        deck = add_deck_step(body.message, pipeline_result, request_id)
         result = build_chat_response(pipeline_result, request_id, orchestration, deck)
         logger.info(
             "chat request completed",
@@ -329,13 +339,19 @@ async def chat_stream(
         raise HTTPException(status_code=429, detail="Too many live requests", headers=headers)
 
     cancel = CancelToken()
+    message = body.message
     question = make_contextual_question(body)
     urls = agent_urls()
 
     def work(emitter, token):
         iterative = run_iterative_pipeline(question, request_id, emit=emitter, cancel=token, **urls)
+        pipeline_result = iterative.to_legacy_dict()
+        token.raise_if_set()  # nobody is listening: do not spend model calls on a deck
+        # The deck is built before final_response, so that event carries it; the stream sends
+        # keep-alive comments meanwhile and no new event type is needed.
+        deck = add_deck_step(message, pipeline_result, request_id)
         response = build_chat_response(
-            iterative.to_legacy_dict(), request_id, build_orchestration_meta(iterative))
+            pipeline_result, request_id, build_orchestration_meta(iterative), deck)
         state = iterative.orchestration
         return response, {
             "status": state.status, "completion_kind": state.completion_kind,

@@ -52,6 +52,7 @@ All default to `false`. None is set in the committed `compose.yaml` defaults or 
 |---|---|---|
 | `VIHARBOT_IDENTITY_ROUTING_ENABLED` | identity-attributed pipeline | none |
 | `VIHARBOT_DELEGATION_ENABLED` | Charlie picks a workflow | identity routing |
+| `VIHARBOT_LIVE_TEAM_ENABLED` | the live team conversation: turns on iterative, delegation and identity routing together | `CHARLIE_PLANNER_MODEL` (defaults to `gpt-6-luna`), `WEB_LITELLM_API_KEY` |
 | `VIHARBOT_ITERATIVE_ORCHESTRATION_ENABLED` | iterative loop and the live stream | the two above, `CHARLIE_PLANNER_MODEL`, `WEB_LITELLM_API_KEY` |
 | `VIHARBOT_PPT_GENERATION_ENABLED` | slide-deck generation by the pixel service (true in local Compose while testing) | `PIXEL_MODEL`, `LITELLM_API_KEY` on the pixel service |
 | `VIHARBOT_PERSONALITY_INFERENCE_ENABLED` | identity prompts on services | identity routing |

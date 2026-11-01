@@ -29,13 +29,15 @@ from .identity_execution import (
 )
 from .identity_registry import AgentRegistry, default_registry
 
+from .live_flags import flag_on, live_team_enabled
+
 DELEGATION_FLAG = "VIHARBOT_DELEGATION_ENABLED"
 logger = logging.getLogger("orchestrator")
 
 
 def delegation_enabled() -> bool:
     """Delegation needs its own flag AND identity routing; otherwise it stays inactive."""
-    own = os.getenv(DELEGATION_FLAG, "false").strip().lower() in {"1", "true", "yes"}
+    own = flag_on(DELEGATION_FLAG) or live_team_enabled()
     return own and identity_routing_enabled()
 
 
