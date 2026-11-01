@@ -302,7 +302,7 @@ def test_capability_vocabulary_and_status():
     implemented = {c for c in Capability if capability_status(c) is CapabilityStatus.IMPLEMENTED}
     assert {c.value for c in implemented} == {
         "research", "fact_check", "source_quality", "security_assessment", "privacy_review",
-        "synthesis", "slide_generation",
+        "synthesis", "slide_generation", "philosophical_analysis",
     }
     assert capability_status(Capability.AUTOMATION_ENGINEERING) is CapabilityStatus.PLANNED
 

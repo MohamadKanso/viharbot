@@ -12,6 +12,7 @@ from .schemas import (
     FinalSynthesis,
     PrivacyAssessment,
     ResearchFindings,
+    SageAnalysis,
     SecurityAssessment,
     SourceQualityReview,
 )
@@ -40,6 +41,7 @@ class PipelineContext(BaseModel):
     source_quality: SourceQualityReview | None = None
     security: SecurityAssessment | None = None
     privacy_review: PrivacyAssessment | None = None
+    sage: SageAnalysis | None = None
 
 
 class PipelineState(BaseModel):

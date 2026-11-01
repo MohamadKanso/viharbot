@@ -30,6 +30,7 @@ INSTRUCTIONS = "SERVICE-INSTRUCTIONS: do not invent sources."
 EXPECTED_IDENTITY = {
     "research": "nova", "fact-check": "scout", "source-quality": "scout",
     "security": "cipher", "privacy-review": "cipher", "synthesis": "charlie", "pixel": "pixel",
+    "sage": "sage",
 }
 
 
@@ -126,9 +127,9 @@ def test_planned_capability_cannot_activate_inference(monkeypatch):
 
 
 def test_identities_without_bindings_can_never_be_resolved():
-    # atlas, sage and orbit declare only planned capabilities and have no bindings.
+    # atlas and orbit declare only planned capabilities and have no bindings.
     bound = {resolve(s).identity_id for s in EXPECTED_IDENTITY}
-    assert bound == {"nova", "scout", "cipher", "charlie", "pixel"}
+    assert bound == {"nova", "scout", "cipher", "charlie", "pixel", "sage"}
 
 
 def test_empty_capability_instructions_are_rejected():

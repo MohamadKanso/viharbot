@@ -282,7 +282,7 @@ def test_alias_is_none_for_agentcore_empty_urls_and_errors(monkeypatch):
 
 
 SERVICES = {name: f"http://{name}:8000/p" for name in
-            ("research", "security", "fact-check", "source-quality", "privacy-review", "synthesis", "pixel")}
+            ("research", "security", "fact-check", "source-quality", "privacy-review", "synthesis", "pixel", "sage")}
 
 
 def test_collect_groups_the_approved_bindings_by_identity(monkeypatch):
@@ -321,7 +321,16 @@ def test_team_models_route_passes_every_service_url(client, monkeypatch):
     monkeypatch.setattr(web_app, "team_models", lambda services: seen.update(services) or {"pixel": []})
     reply = client.get("/api/team-models")
     assert reply.status_code == 200 and reply.json() == {"identities": {"pixel": []}}
-    assert set(seen) == set(SERVICES) and seen["pixel"] == "http://pixel:8000/process"
+    # Sage has no default address, so it is listed only where SAGE_URL is set.
+    assert set(seen) == set(SERVICES) - {"sage"} and seen["pixel"] == "http://pixel:8000/process"
+
+
+def test_team_models_route_includes_sage_when_it_is_configured(client, monkeypatch):
+    seen = {}
+    monkeypatch.setenv("SAGE_URL", "http://sage:8000/process")
+    monkeypatch.setattr(web_app, "team_models", lambda services: seen.update(services) or {})
+    assert client.get("/api/team-models").status_code == 200
+    assert seen["sage"] == "http://sage:8000/process"
 
 
 def test_deck_download_proxies_the_pptx(client, monkeypatch):

@@ -113,6 +113,7 @@ def team_models_route(_: None = Depends(require_web_access)) -> dict:
         "privacy-review": urls["specialist_urls"]["privacy_review"],
         "synthesis": urls["specialist_urls"]["synthesis"],
         "pixel": pixel_url(),
+        **({"sage": sage} if (sage := sage_url()) else {}),
     }
     return {"identities": team_models(services)}
 
@@ -168,6 +169,13 @@ def make_contextual_question(body: ChatRequest) -> str:
     )
 
 
+def sage_url() -> str:
+    """Sage's address if it is configured, else an empty string. There is deliberately no default."""
+    if os.getenv("SAGE_AGENTCORE_ARN", "").strip() or os.getenv("SAGE_URL", "").strip():
+        return configured_agent_url("SAGE", "")
+    return ""
+
+
 def agent_urls() -> dict:
     """Where the six agents are, from configuration. Never taken from a request."""
     return dict(
@@ -182,6 +190,9 @@ def agent_urls() -> dict:
                 "PRIVACY_REVIEW", "http://privacy-review:8000/process"
             ),
             "synthesis": configured_agent_url("SYNTHESIS", "http://synthesis:8000/process"),
+            # Optional: no default address. Sage is offered to Charlie only where it is configured
+            # (compose sets SAGE_URL), so a deployment without a Sage service never delegates to it.
+            **({"sage": sage} if (sage := sage_url()) else {}),
         },
     )
 

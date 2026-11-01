@@ -50,7 +50,7 @@ Eight agent identities are defined; four are connected to running services. Logi
 | Charlie | live | synthesis | `synthesis` | `gpt-5.4-mini` |
 | Charlie | live (opt-in) | planning | in the web container | `gpt-6-luna` (`CHARLIE_PLANNER_MODEL`) |
 | Atlas | planned | none connected | none | none |
-| Sage | service built, not yet delegable ([Sage service](docs/sage-service.md)) | philosophical analysis, still `planned` | `sage`, not bound | `gpt-6.1-sol` in Compose |
+| Sage | live in the dev stack; Charlie may delegate it ([Sage service](docs/sage-service.md)) | philosophical analysis | `sage`, bound | `gpt-6.1-sol` in Compose |
 | Pixel | live, on request (flag) | slide generation | `pixel` | `gpt-5.4-mini` |
 | Orbit | support role, not connected | none connected | none | none |
 
