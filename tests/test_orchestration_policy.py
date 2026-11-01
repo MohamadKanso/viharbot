@@ -70,7 +70,7 @@ def test_malformed_action_combinations_are_rejected(kwargs):
 
 
 @pytest.mark.parametrize("capability", [
-    "automation_engineering", "logistics_planning", "creative_design", "philosophical_analysis",
+    "automation_engineering", "logistics_planning", "creative_design",
     "evidence_discovery", "shell", "RESEARCH", "", "research; security_assessment", 7,
 ])
 def test_unknown_and_planned_capabilities_cannot_be_named(capability):
@@ -103,6 +103,7 @@ def test_dependency_table_is_explicit():
         C.RESEARCH: (), C.FACT_CHECK: (C.RESEARCH,), C.SOURCE_QUALITY: (C.RESEARCH,),
         C.SECURITY_ASSESSMENT: (C.RESEARCH,),
         C.PRIVACY_REVIEW: (C.RESEARCH, C.SECURITY_ASSESSMENT),
+        C.PHILOSOPHICAL_ANALYSIS: (C.RESEARCH,),
         C.SYNTHESIS: (C.RESEARCH, C.SECURITY_ASSESSMENT),
     }
     assert MANDATORY == (C.RESEARCH, C.SECURITY_ASSESSMENT)
@@ -217,7 +218,9 @@ def test_allowed_capabilities_track_dependencies():
     assert names(new_state()) == ["research"]
     assert names(research_done()) == [
         "research", "fact_check", "source_quality", "security_assessment"]
-    assert names(research_security_done()) == [c.value for c in HARD_DEPENDENCIES]
+    # These services have no sage address, so Sage is not offered (see the Sage tests below).
+    assert names(research_security_done()) == [
+        c.value for c in HARD_DEPENDENCIES if c is not C.PHILOSOPHICAL_ANALYSIS]
 
 
 def test_input_versions_record_provenance():

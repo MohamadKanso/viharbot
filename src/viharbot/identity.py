@@ -55,6 +55,7 @@ CAPABILITY_STATUS: dict[Capability, CapabilityStatus] = {
             Capability.PRIVACY_REVIEW,
             Capability.SYNTHESIS,
             Capability.SLIDE_GENERATION,
+            Capability.PHILOSOPHICAL_ANALYSIS,
         }
         else CapabilityStatus.PLANNED
     )

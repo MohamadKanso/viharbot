@@ -39,3 +39,10 @@ service_name = "synthesis"
 identity_id = "pixel"
 capability = "slide_generation"
 service_name = "pixel"
+
+# Sage's philosophical analysis. An optional capability of the live loop: Charlie may delegate it
+# once research exists; it reads the other agents' results and never gates completion.
+[[binding]]
+identity_id = "sage"
+capability = "philosophical_analysis"
+service_name = "sage"

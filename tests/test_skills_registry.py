@@ -275,11 +275,12 @@ def test_existing_bindings_and_capability_status_are_unchanged():
         ("cipher", "privacy_review", "privacy-review"),
         ("charlie", "synthesis", "synthesis"),
         ("pixel", "slide_generation", "pixel"),
+        ("sage", "philosophical_analysis", "sage"),
     }
     implemented = {c for c, s in CAPABILITY_STATUS.items() if s is CapabilityStatus.IMPLEMENTED}
     assert {c.value for c in implemented} == {
         "research", "fact_check", "source_quality", "security_assessment", "privacy_review",
-        "synthesis", "slide_generation",
+        "synthesis", "slide_generation", "philosophical_analysis",
     }
     assert len(Capability) == 12
 

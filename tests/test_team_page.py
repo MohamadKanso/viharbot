@@ -29,7 +29,8 @@ DISPLAY_TO_ID = {"Charlie Chatwin": "charlie", "Nova": "nova", "Atlas": "atlas",
                  "Sage": "sage", "Cipher": "cipher", "Scout": "scout", "Orbit": "orbit"}
 CAPABILITY_WORD = {"research": "Research", "fact_check": "Fact Check", "source_quality": "Sources",
                    "security_assessment": "Security", "privacy_review": "Privacy",
-                   "synthesis": "Synthesis", "slide_generation": "Slide Decks"}
+                   "synthesis": "Synthesis", "slide_generation": "Slide Decks",
+                   "philosophical_analysis": "Perspective"}
 
 
 def cards() -> dict[str, dict[str, str]]:
@@ -94,7 +95,7 @@ def test_status_chips_match_which_agents_are_actually_live():
 
 
 def test_the_agents_without_a_live_role_say_planned_or_support():
-    for display in ("Atlas", "Sage"):
+    for display in ("Atlas",):
         assert CARDS[display]["status"].startswith("Planned")
     assert CARDS["Orbit"]["status"] == "Platform support"
 

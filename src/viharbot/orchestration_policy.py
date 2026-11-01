@@ -6,6 +6,7 @@ only ever a proposal. authorize_action() and check_completion() decide what may 
 
 from __future__ import annotations
 
+import json
 from collections.abc import Collection
 from typing import Any, Literal
 
@@ -21,6 +22,7 @@ from .orchestration_state import (
     StepResult,
 )
 from .pipeline_state import fact_check_payload, legacy_context_payload, legacy_findings_payload
+from .sage import MAX_SECTION_CHARS
 from .schemas import ResearchFindings
 
 CapabilityName = Literal[
@@ -29,6 +31,7 @@ CapabilityName = Literal[
     "source_quality",
     "security_assessment",
     "privacy_review",
+    "philosophical_analysis",
     "synthesis",
 ]
 
@@ -39,15 +42,27 @@ HARD_DEPENDENCIES: dict[Capability, tuple[Capability, ...]] = {
     Capability.SOURCE_QUALITY: (Capability.RESEARCH,),
     Capability.SECURITY_ASSESSMENT: (Capability.RESEARCH,),
     Capability.PRIVACY_REVIEW: (Capability.RESEARCH, Capability.SECURITY_ASSESSMENT),
+    # Sage needs research. It does not need security, so it can run whenever research exists;
+    # security and the other results are read when they are fresh (see SOFT_INPUTS).
+    Capability.PHILOSOPHICAL_ANALYSIS: (Capability.RESEARCH,),
     Capability.SYNTHESIS: (Capability.RESEARCH, Capability.SECURITY_ASSESSMENT),
 }
 # Optional inputs that are included when present, matching the fixed pipeline's payloads.
 SOFT_INPUTS: dict[Capability, tuple[Capability, ...]] = {
     Capability.PRIVACY_REVIEW: (Capability.FACT_CHECK, Capability.SOURCE_QUALITY),
+    # A Sage result that read an older security or privacy result than the current one is stale,
+    # so it is not shown beside findings it never saw.
+    Capability.PHILOSOPHICAL_ANALYSIS: (
+        Capability.FACT_CHECK,
+        Capability.SOURCE_QUALITY,
+        Capability.SECURITY_ASSESSMENT,
+        Capability.PRIVACY_REVIEW,
+    ),
     Capability.SYNTHESIS: (
         Capability.FACT_CHECK,
         Capability.SOURCE_QUALITY,
         Capability.PRIVACY_REVIEW,
+        Capability.PHILOSOPHICAL_ANALYSIS,
     ),
 }
 # The /api/chat contract cannot be answered without these.
@@ -250,6 +265,34 @@ def _context_responses(state: OrchestrationState, capabilities: tuple[Capability
     return responses
 
 
+# The result sections Sage may read, keyed as its request names them.
+_SAGE_SECTIONS: tuple[tuple[str, Capability], ...] = (
+    ("research", Capability.RESEARCH),
+    ("fact_check", Capability.FACT_CHECK),
+    ("source_quality", Capability.SOURCE_QUALITY),
+    ("security", Capability.SECURITY_ASSESSMENT),
+    ("privacy_review", Capability.PRIVACY_REVIEW),
+)
+
+
+def sage_payload(question: str, state: OrchestrationState) -> dict[str, Any]:
+    """Outbound payload for Sage: the question and the fresh results it is authorized to read.
+
+    Bare domain results only, never envelopes. A section too large for Sage's request limit is
+    left out rather than truncated mid-structure; Sage is told which sections it received.
+    """
+    context: dict[str, Any] = {}
+    for key, capability in _SAGE_SECTIONS:
+        step = state.latest(capability) if capability is Capability.RESEARCH else fresh_latest(
+            state, capability)
+        if step is None:
+            continue
+        section = step.domain.model_dump()
+        if len(json.dumps(section, ensure_ascii=False)) <= MAX_SECTION_CHARS:
+            context[key] = section
+    return {"question": question, "context": context}
+
+
 def build_payload(capability: Capability, state: OrchestrationState) -> dict[str, Any]:
     """Outbound payload for one capability, identical to the fixed pipeline's payloads."""
     question = state.original_question
@@ -261,6 +304,8 @@ def build_payload(capability: Capability, state: OrchestrationState) -> dict[str
         return fact_check_payload(question, findings)
     if capability in (Capability.SOURCE_QUALITY, Capability.SECURITY_ASSESSMENT):
         return legacy_findings_payload(findings)
+    if capability is Capability.PHILOSOPHICAL_ANALYSIS:
+        return sage_payload(question, state)
     context_inputs = (
         Capability.RESEARCH,
         Capability.FACT_CHECK,
@@ -271,7 +316,8 @@ def build_payload(capability: Capability, state: OrchestrationState) -> dict[str
     if capability is Capability.PRIVACY_REVIEW:
         return {"question": question, "context": context}
     privacy = fresh_latest(state, Capability.PRIVACY_REVIEW)
-    return {
-        "question": question,
-        "context": {**context, "privacy_review": privacy.envelope.result if privacy else None},
-    }
+    sage = fresh_latest(state, Capability.PHILOSOPHICAL_ANALYSIS)
+    synthesis_context = {**context, "privacy_review": privacy.envelope.result if privacy else None}
+    if sage is not None:  # only when Sage ran on current evidence; the key is absent otherwise
+        synthesis_context["sage"] = sage.envelope.result
+    return {"question": question, "context": synthesis_context}

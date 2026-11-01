@@ -52,6 +52,22 @@ RESPONSES = {
         "request_id": RID, "agent": "synthesis", "requested_model_alias": "m-y",
         "result": {"answer": "a", "key_points": ["k"], "confidence": "high", "caveats": []},
     },
+    "sage": {
+        "request_id": RID, "agent": "sage", "requested_model_alias": "m-sg",
+        "result": {
+            "executive_summary": "Monitoring staff changes trust.",
+            "stakeholders": [{"name": "Employees", "interest": "Fair treatment",
+                              "potential_impact": "Monitored", "impact_direction": "mixed"}],
+            "ethical_considerations": [{"statement": "Proportionality matters.",
+                                        "claim_type": "normative_judgment", "evidence_refs": [],
+                                        "framework": None}],
+            "human_and_organizational_impacts": [],
+            "risks_and_tradeoffs": [],
+            "recommended_mitigations": [],
+            "assumptions_and_uncertainties": ["No staff survey was supplied."],
+            "recommendations_for_charlie": ["Weigh monitoring against proportionality."],
+        },
+    },
 }
 URLS = {
     "fact_check": "u-f",

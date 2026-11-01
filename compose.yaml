@@ -18,6 +18,8 @@ services:
       PRIVACY_REVIEW_URL: http://privacy-review:8000/process
       SYNTHESIS_URL: http://synthesis:8000/process
       PIXEL_URL: http://pixel:8000/process
+      # Sage is offered to Charlie only where this is set; there is no built-in default address.
+      SAGE_URL: http://sage:8000/process
       # Slide-deck generation (Pixel). True while the feature is being tested; set it to false in
       # compose and .env when the feature is done so no request spends model calls on decks.
       VIHARBOT_PPT_GENERATION_ENABLED: ${VIHARBOT_PPT_GENERATION_ENABLED:-true}
@@ -48,6 +50,8 @@ services:
       synthesis:
         condition: service_healthy
       pixel:
+        condition: service_healthy
+      sage:
         condition: service_healthy
     networks:
       - agent-network

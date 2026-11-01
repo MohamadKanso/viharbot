@@ -21,17 +21,20 @@ from .schemas import (
     FinalSynthesis,
     PrivacyAssessment,
     ResearchFindings,
+    SageAnalysis,
     SecurityAssessment,
     SourceQualityReview,
 )
 
-# The six implemented capabilities, in the order the fixed pipeline runs them.
+# The implemented orchestrated capabilities, in the order the fixed pipeline runs them. Sage is
+# not part of the fixed pipeline; it sits before synthesis so synthesis can reconcile it.
 CANONICAL_ORDER: tuple[Capability, ...] = (
     Capability.RESEARCH,
     Capability.FACT_CHECK,
     Capability.SOURCE_QUALITY,
     Capability.SECURITY_ASSESSMENT,
     Capability.PRIVACY_REVIEW,
+    Capability.PHILOSOPHICAL_ANALYSIS,
     Capability.SYNTHESIS,
 )
 # Capability -> the key used in the legacy result dictionary and outbound context.
@@ -41,6 +44,7 @@ LEGACY_KEYS: dict[Capability, str] = {
     Capability.SOURCE_QUALITY: "source_quality",
     Capability.SECURITY_ASSESSMENT: "security",
     Capability.PRIVACY_REVIEW: "privacy_review",
+    Capability.PHILOSOPHICAL_ANALYSIS: "sage",
     Capability.SYNTHESIS: "synthesis",
 }
 
@@ -178,6 +182,9 @@ def build_observation(step: StepResult, stale: bool = False) -> Observation:
     elif isinstance(domain, PrivacyAssessment):
         summary = f"overall privacy risk {domain.overall_risk}; {len(domain.concerns)} concern(s)"
         gaps = list(domain.concerns)
+    elif isinstance(domain, SageAnalysis):
+        summary = domain.executive_summary
+        gaps = list(domain.assumptions_and_uncertainties)
     elif isinstance(domain, FinalSynthesis):
         summary = f"confidence {domain.confidence}; {domain.answer}"
         gaps = list(domain.caveats)
