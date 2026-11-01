@@ -95,7 +95,7 @@ sequenceDiagram
     participant D as RequestDeadline (one per request)
     participant C as Charlie (LiteLLM)
     participant T as REST or AgentCore
-    L->>D: created once: expires_at = start + 120 s
+    L->>D: created once: expires_at = start + 240 s
     loop each decision
         L->>D: expired? (before planning)
         L->>C: timeout = min(30 s, D.remaining), retries off
@@ -164,7 +164,7 @@ After each execution Charlie sees an `Observation` derived only from the validat
 | Decisions | 8 | 16 |
 | Delegated executions | 6 | 12 |
 | Repeats per capability (beyond the first run) | 2 | 3 |
-| Total duration | 120 s | 300 s |
+| Total duration | 240 s | 300 s |
 | Rejected actions | 2 | n/a |
 
 The deadline above enforces the duration budget. The first four can be set with `VIHARBOT_ORCH_MAX_DECISIONS`, `_MAX_EXECUTIONS`, `_MAX_REPEATS` and `_MAX_SECONDS`, and are clamped to the ceilings. Model confidence is not an input anywhere. Every blocking call is bounded by the time remaining and late results are rejected, but the bound is cooperative (see the limits above), so the worst case can overrun by up to one operation's timeout. No platform request timeout is configured in this repository and the browser `fetch` has no abort timeout, so check your platform's limit before enabling this.

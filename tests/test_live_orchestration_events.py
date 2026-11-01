@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from live_helpers import FIXTURES, R, FC, S, P, Y, VersionedSend, collect, live_work, types
-from orchestration_helpers import C, Clock, Script, delegate, finish
+from orchestration_helpers import C, FIXED_TIME_BUDGET, Clock, Script, delegate, finish
 from pipeline_fixtures import RID, FakeSend
 from viharbot.deadline import DeadlineExceeded
 from viharbot.delegation import (
@@ -20,6 +20,7 @@ URLS = {"fact_check": "u-f", "source_quality": "u-s", "privacy_review": "u-p", "
 
 
 def run(script, send=None, **kwargs):
+    kwargs.setdefault("budget", FIXED_TIME_BUDGET)
     events = collect(live_work(script, send, **kwargs))
     return events, check_stream(events)
 

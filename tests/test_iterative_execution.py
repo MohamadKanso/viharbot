@@ -8,7 +8,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from orchestration_helpers import (
-    C, Clock, Forever, Script, URLS_BY_SERVICE, delegate, finish, make_step, new_state, with_steps)
+    C, Clock, FIXED_TIME_BUDGET, Forever, Script, URLS_BY_SERVICE, delegate, finish, make_step,
+    new_state, with_steps)
 from pipeline_fixtures import FINDINGS, ORDER, RID, URLS, FakeSend, response
 from viharbot import delegation_planner, demo, model_agent, orchestration_planner, web_app
 from viharbot.deadline import DeadlineExceeded
@@ -44,6 +45,7 @@ FULL = [C.RESEARCH, C.FACT_CHECK, C.SOURCE_QUALITY, C.SECURITY_ASSESSMENT, C.PRI
 
 def run(decide, send=None, **kwargs):
     send = send or FakeSend()
+    kwargs.setdefault("budget", FIXED_TIME_BUDGET)
     result = run_iterative_pipeline(
         kwargs.pop("question", QUESTION), RID, research_url="u-r", security_url="u-sec",
         specialist_urls=kwargs.pop("specialist_urls", SERVICE_URLS), send=send, decide=decide,

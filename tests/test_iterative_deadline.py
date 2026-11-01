@@ -4,7 +4,7 @@ import socket
 
 import pytest
 
-from orchestration_helpers import C, Clock, Script, delegate, finish
+from orchestration_helpers import C, FIXED_TIME_BUDGET, Clock, Script, delegate, finish
 from pipeline_fixtures import ORDER, RID, FakeSend, response
 from viharbot import iterative_execution
 from viharbot.deadline import DeadlineExceeded, RequestDeadline
@@ -29,6 +29,7 @@ def no_real_network(monkeypatch):
 
 def run(decide, send=None, clock=None, **kwargs):
     send = send or FakeSend()
+    kwargs.setdefault("budget", FIXED_TIME_BUDGET)
     return run_iterative_pipeline(
         QUESTION, RID, research_url="u-r", security_url="u-sec",
         specialist_urls=kwargs.pop("specialist_urls", SERVICE_URLS), send=send, decide=decide,

@@ -7,9 +7,13 @@ from viharbot.contracts import validate_agent_response
 from viharbot.execution_bindings import OPERATIONAL_SERVICES, default_bindings
 from viharbot.identity import Capability
 from viharbot.orchestration_policy import OrchestrationAction
-from viharbot.orchestration_state import OrchestrationState, StepResult
+from viharbot.orchestration_state import ExecutionBudget, OrchestrationState, StepResult
 
 C = Capability
+
+# The tests that simulate time (a fake clock advancing per call) assume a 120 s budget. They pin it
+# here instead of reading the production default, which is a separate decision and may change.
+FIXED_TIME_BUDGET = ExecutionBudget(max_seconds=120.0)
 SERVICE = dict(OPERATIONAL_SERVICES)
 URLS_BY_SERVICE = {"research": "u-r", "security": "u-sec", "fact-check": "u-f",
                    "source-quality": "u-s", "privacy-review": "u-p", "synthesis": "u-y"}

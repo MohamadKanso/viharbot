@@ -72,7 +72,9 @@ class ExecutionBudget(BaseModel):
     max_decisions: int = Field(default=8, ge=1)
     max_executions: int = Field(default=6, ge=1)
     max_repeats_per_capability: int = Field(default=2, ge=0)
-    max_seconds: float = Field(default=120.0, gt=0)
+    # 240 s. Research on gpt-6.1-sol alone takes about 35 s; with the other agents and the planner's
+    # own calls, 120 s ran out before synthesis in a real run (issue #68). The ceiling stays 300 s.
+    max_seconds: float = Field(default=240.0, gt=0)
     max_rejected_actions: int = Field(default=MAX_REJECTED_ACTIONS, ge=1)
 
     @classmethod
@@ -87,7 +89,7 @@ class ExecutionBudget(BaseModel):
                 "VIHARBOT_ORCH_MAX_REPEATS", 2, 0, _CEILINGS["repeats"], int
             ),
             max_seconds=_bounded(
-                "VIHARBOT_ORCH_MAX_SECONDS", 120.0, 1.0, _CEILINGS["seconds"], float
+                "VIHARBOT_ORCH_MAX_SECONDS", 240.0, 1.0, _CEILINGS["seconds"], float
             ),
         )
 
