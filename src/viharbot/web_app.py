@@ -140,9 +140,16 @@ def team_image(
 ) -> FileResponse:
     if image_name not in TEAM_IMAGES:
         raise HTTPException(status_code=404, detail="Image not found")
-    images_dir = Path(os.getenv("WEB_IMAGES_DIR", "/app/images"))
+    images_dir = Path(os.getenv("WEB_IMAGES_DIR", "/app/images")).resolve()
+    requested_path = (images_dir / image_name).resolve()
+    try:
+        requested_path.relative_to(images_dir)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Image not found")
+    if not requested_path.is_file():
+        raise HTTPException(status_code=404, detail="Image not found")
     media_type = "image/svg+xml" if image_name.endswith(".svg") else "image/png"
-    return FileResponse(images_dir / image_name, media_type=media_type)
+    return FileResponse(requested_path, media_type=media_type)
 
 
 def make_contextual_question(body: ChatRequest) -> str:
