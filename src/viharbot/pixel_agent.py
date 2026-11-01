@@ -170,16 +170,22 @@ def process(
         ) from None
 
 
-@app.get("/decks/{deck_id}.pptx")
-def download(deck_id: str) -> FileResponse:
+def _safe_deck_path(deck_id: str, extension: str) -> Path:
     if not DECK_ID.fullmatch(deck_id):
         raise HTTPException(status_code=404, detail="Deck not found")
     base = decks_dir().resolve()
-    path = (base / f"{deck_id}.pptx").resolve()
+    filename = f"{deck_id}.{extension}"
+    path = (base / filename).resolve()
     try:
         path.relative_to(base)
     except ValueError:
         raise HTTPException(status_code=404, detail="Deck not found") from None
+    return path
+
+
+@app.get("/decks/{deck_id}.pptx")
+def download(deck_id: str) -> FileResponse:
+    path = _safe_deck_path(deck_id, "pptx")
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Deck not found")
     return FileResponse(
@@ -192,14 +198,7 @@ def download(deck_id: str) -> FileResponse:
 @app.get("/decks/{deck_id}.html")
 def view(deck_id: str) -> HTMLResponse:
     """Pixel's HTML rendition of the deck, in the same colours as the .pptx."""
-    if not DECK_ID.fullmatch(deck_id):
-        raise HTTPException(status_code=404, detail="Deck not found")
-    base = decks_dir().resolve()
-    path = (base / f"{deck_id}.html").resolve()
-    try:
-        path.relative_to(base)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Deck not found") from None
+    path = _safe_deck_path(deck_id, "html")
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Deck not found")
     return HTMLResponse(path.read_text(encoding="utf-8"), headers=HTML_HEADERS)
