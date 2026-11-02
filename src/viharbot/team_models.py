@@ -17,7 +17,7 @@ from typing import Any
 from urllib.parse import urlsplit
 from urllib.request import Request
 
-from .execution_bindings import default_bindings
+from .execution_bindings import IN_PROCESS_CAPABILITIES, default_bindings
 from .litellm_client import urlopen as no_redirect_urlopen
 
 TIMEOUT_SECONDS = 2.5
@@ -47,7 +47,7 @@ def collect(service_urls: dict[str, str]) -> dict[str, list[dict[str, str | None
         aliases = dict(zip(service_urls, pool.map(_alias, service_urls.values())))
     result: dict[str, list[dict[str, str | None]]] = {}
     for binding in default_bindings().bindings:
-        if binding.enabled:
+        if binding.enabled and binding.capability not in IN_PROCESS_CAPABILITIES:
             result.setdefault(binding.identity_id, []).append({
                 "capability": binding.capability.value,
                 "service": binding.service_name,

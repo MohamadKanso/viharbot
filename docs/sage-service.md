@@ -4,6 +4,8 @@
 
 Sage is a specialist. It does not plan, delegate or call other agents, and it has no tools. Given a question and a fixed set of other agents' results, it returns perspective on the ethical, human, organizational and governance dimensions as a validated `SageAnalysis`.
 
+> Phase 7.2A adds a second, separate capability, `code_review`, for advisory pull request review. It does not run in this service and does not change `philosophical_analysis`. See [sage-code-review.md](sage-code-review.md).
+
 ## What it does
 
 `POST /process` takes a `SageRequest` and returns the standard specialist envelope (`request_id`, `agent: "sage"`, `requested_model_alias`, `result`). `GET /health` and `GET /model` (the configured alias, no secret) follow the other agents. All inference goes through the externally managed LiteLLM gateway with the existing `build_agent()`; there is no provider SDK in the service.

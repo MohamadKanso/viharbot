@@ -30,7 +30,7 @@ INSTRUCTIONS = "SERVICE-INSTRUCTIONS: do not invent sources."
 EXPECTED_IDENTITY = {
     "research": "nova", "fact-check": "scout", "source-quality": "scout",
     "security": "cipher", "privacy-review": "cipher", "synthesis": "charlie", "pixel": "pixel",
-    "sage": "sage",
+    "sage": "sage", "sage-code-review": "sage",
 }
 
 

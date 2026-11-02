@@ -63,7 +63,8 @@ def test_sages_identity_is_unchanged_by_the_service():
     assert identity.id == "sage" and identity.name == "Sage"
     assert identity.title == "Director of Philosophy & Human Perspective"
     assert identity.personality == "Reflective, empathetic, intellectually balanced, and thoughtful."
-    assert identity.capabilities == (Capability.PHILOSOPHICAL_ANALYSIS,)
+    # Phase 7.2A added code_review beside it; philosophical_analysis is unchanged.
+    assert identity.capabilities == (Capability.PHILOSOPHICAL_ANALYSIS, Capability.CODE_REVIEW)
     # A preference, not a configured alias.
     assert identity.preferred_model_family == "Claude Opus family"
     assert identity.model_alias is None

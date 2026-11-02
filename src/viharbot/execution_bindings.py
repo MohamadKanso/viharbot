@@ -28,7 +28,13 @@ OPERATIONAL_SERVICES: dict[Capability, str] = {
     Capability.SYNTHESIS: "synthesis",
     Capability.SLIDE_GENERATION: "pixel",
     Capability.PHILOSOPHICAL_ANALYSIS: "sage",
+    # In-process runner invoked by the GitHub review adapter, not a deployed container.
+    Capability.CODE_REVIEW: "sage-code-review",
 }
+
+# Capabilities fulfilled in-process by a repository workflow, not by a deployed service. They are
+# never chat-delegated and are not shown on the team page or polled for a model alias.
+IN_PROCESS_CAPABILITIES: frozenset[Capability] = frozenset({Capability.CODE_REVIEW})
 
 
 class ExecutionConfigError(ValueError):

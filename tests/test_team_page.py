@@ -12,6 +12,8 @@ import urllib.parse
 from pathlib import Path
 
 import pytest
+
+from viharbot.execution_bindings import IN_PROCESS_CAPABILITIES
 from fastapi.testclient import TestClient
 
 from viharbot import web_app
@@ -83,6 +85,8 @@ def test_bios_do_not_claim_abilities_the_agents_do_not_have():
 def test_status_chips_match_which_agents_are_actually_live():
     bound: dict[str, set[str]] = {}
     for binding in default_bindings().bindings:
+        if binding.capability in IN_PROCESS_CAPABILITIES:  # a repository workflow, not a chat role
+            continue
         bound.setdefault(binding.identity_id, set()).add(binding.capability.value)
     for display, identity_id in DISPLAY_TO_ID.items():
         status = CARDS[display]["status"]

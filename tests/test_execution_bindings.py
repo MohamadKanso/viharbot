@@ -29,6 +29,7 @@ EXPECTED = {
     ("charlie", "synthesis", "synthesis"),
     ("pixel", "slide_generation", "pixel"),
     ("sage", "philosophical_analysis", "sage"),
+    ("sage", "code_review", "sage-code-review"),
 }
 
 
@@ -154,7 +155,7 @@ def test_loading_bindings_makes_no_network_calls(monkeypatch):
 
     monkeypatch.setattr(socket, "socket", blocked)
     monkeypatch.setattr(socket, "getaddrinfo", blocked)
-    assert len(load_bindings()) == 8
+    assert len(load_bindings()) == 9
 
 
 def test_binding_and_planner_modules_do_not_import_inference_clients():

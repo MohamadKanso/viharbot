@@ -276,13 +276,14 @@ def test_existing_bindings_and_capability_status_are_unchanged():
         ("charlie", "synthesis", "synthesis"),
         ("pixel", "slide_generation", "pixel"),
         ("sage", "philosophical_analysis", "sage"),
+        ("sage", "code_review", "sage-code-review"),
     }
     implemented = {c for c, s in CAPABILITY_STATUS.items() if s is CapabilityStatus.IMPLEMENTED}
     assert {c.value for c in implemented} == {
         "research", "fact_check", "source_quality", "security_assessment", "privacy_review",
-        "synthesis", "slide_generation", "philosophical_analysis",
+        "synthesis", "slide_generation", "philosophical_analysis", "code_review",
     }
-    assert len(Capability) == 12
+    assert len(Capability) == 13
 
 
 # 12. existing workflows remain functional: the runtime does not depend on skills
