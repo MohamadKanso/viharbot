@@ -365,8 +365,9 @@ def _synthesis_prompt(monkeypatch, context):
 
 def test_synthesis_is_told_to_reconcile_sage_only_when_a_sage_result_is_supplied(monkeypatch):
     with_sage = _synthesis_prompt(monkeypatch, {"research": {"a": 1}, "sage": {"executive_summary": "s"}})
-    assert "weigh it against the security, privacy and research results" in with_sage
-    assert "do not append it as a separate section" in with_sage
+    assert "Fold its points into your own recommendation" in with_sage
+    assert "do not name the sage result" in with_sage and "write no section or paragraph about it" in with_sage
+    assert "not as evidence" in with_sage  # judgments stay judgments
     assert '"sage"' in with_sage or "'sage'" in with_sage  # the result itself rides in the data
 
     without = _synthesis_prompt(monkeypatch, {"research": {"a": 1}})
