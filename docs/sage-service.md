@@ -89,6 +89,22 @@ Charlie chose to run Sage himself, after security and privacy and before synthes
 
 The control run also showed Charlie, with no Sage, re-running research and security a second time (about 50 s) before synthesis. That is existing planner behavior, not Sage's.
 
+## Monitoring scenario, with and without Sage
+
+The acceptance case: a security team proposes recording every employee's prompts, outputs and keystrokes with the agents and automatically flagging employees to HR. Same dev stack and models as above. Three real runs.
+
+1. **Plain question ("should we adopt this monitoring?").** Charlie ran research and security and then finished, without Sage and without synthesis (41 s). His rationale: research and security already agreed on rejecting blanket surveillance. The planner is allowed to skip Sage, and here it did.
+2. **Same question plus "include the ethical and human impact on employees", Sage offered.** Charlie ran research (twice), security, then Sage (42.9 s, 2,820 tokens in, 2,304 out, about $0.03), then synthesis. 115.6 s of the 240 s budget.
+3. **Same question, Sage not offered.** Research, security, privacy review, synthesis. 57.3 s.
+
+**Result: the recommendation did not change.** The real security agent never recommended monitoring. In every run it said not to deploy blanket keystroke logging and to require human triage before any HR escalation. So there was no monitoring recommendation for Sage to overturn, and both final answers say "no, not as written; run a narrow, non-disciplinary pilot."
+
+What Sage added, in the with-Sage answer and not the control: an explicit separation of security containment from culpability (an alert triggers verification, not blame), employee explanation and challenge rights, consultation with employee representatives as a precondition, the point that employee consent is weak under unequal workplace power, and the recognition that monitoring can protect employees as well as burden them. The answer was longer (about 580 words against about 370). The control already covered trust, dignity, false accusations and human review.
+
+**Caveats that limit what this shows.** Single runs of a stochastic system. The two runs did not use the same evidence: Charlie re-ran research in one and ran privacy review in the other, and the with-Sage synthesis named "the sage analysis" in its own text and said it "mostly reinforces, rather than overturns" the other conclusions, which only partly follows the instruction to reconcile rather than append. The with-Sage prompt had to name ethical and human impact before Charlie chose Sage.
+
+**What this means for the acceptance criterion.** Sage widens and sharpens the answer; with the current security agent it did not reshape a recommendation, because the security agent is already proportionality-aware. Showing Sage reversing a recommendation would need a security result that actually endorses the harmful option, which the real agent did not produce for this prompt. That has not been shown, and I did not fabricate one.
+
 ## What is not done
 
 - A real run where Sage materially changes a recommendation (see above), and any repeat runs to estimate variance.
