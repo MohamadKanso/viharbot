@@ -216,7 +216,7 @@ def test_without_the_live_team_the_fixed_pipeline_answers(web):
     assert reply.headers["X-Request-ID"] == RID
     assert list(reply.json()) == [
         "request_id", "findings", "assessment", "fact_check", "source_quality",
-        "privacy_review", "synthesis", "agent_activity",
+        "privacy_review", "sage", "synthesis", "agent_activity",
     ]
     assert all("identity_id" not in str(a) for a in reply.json()["agent_activity"])
 

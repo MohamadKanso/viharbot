@@ -139,7 +139,8 @@ This is **cooperative deadline enforcement**. It is not a guarantee of end-to-en
 | source_quality | Scout → source-quality | research |
 | security_assessment | Cipher → security | research |
 | privacy_review | Cipher → privacy-review | research, security |
-| synthesis | Charlie → synthesis | research, security |
+| philosophical_analysis | Sage → sage | research (optional: fact check, source quality, security, privacy review) |
+| synthesis | Charlie → synthesis | research, security (optional: Sage and the other reviews) |
 
 `authorize_action()` also requires an enabled binding for the capability, a registered identity that declares it, an implemented capability, a configured service, and remaining repeat, execution and time budget. Outbound payloads are built by the existing legacy builders, and the context keys are always in the fixed pipeline's order, so payloads match the fixed pipeline's bytes whatever order Charlie chooses. Each run records the input versions it used. If research is re-run, anything built on the old version is stale.
 

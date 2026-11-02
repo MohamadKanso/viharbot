@@ -16,7 +16,7 @@ QUESTION_MARK = "SENSITIVE-QUESTION-TEXT"
 RATIONALE = "Rationale text that must stay private."
 GAP = "Unresolved question text that must stay private."
 LEGACY_KEYS = ["request_id", "findings", "assessment", "fact_check", "source_quality",
-               "privacy_review", "synthesis", "agent_activity"]
+               "privacy_review", "sage", "synthesis", "agent_activity"]
 
 
 class VersionedSend(FakeSend):

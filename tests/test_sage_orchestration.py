@@ -26,7 +26,6 @@ from viharbot.orchestration_policy import (
     input_versions, sage_payload, step_is_fresh)
 from viharbot.orchestration_state import CANONICAL_ORDER, build_observation
 from viharbot.sage import MAX_SECTION_CHARS, SageRequest
-from viharbot.schemas import SageAnalysis
 
 REGISTRY, BINDINGS = default_registry(), default_bindings()
 SAGE = C.PHILOSOPHICAL_ANALYSIS
@@ -337,14 +336,6 @@ def test_sages_own_model_timeout_is_below_the_orchestrators_read_cap():
     assert ExecutionBudget().max_seconds == 240.0  # unchanged for Sage; the global budget is not raised
 
 
-# ---- the public contract stays as it was -----------------------------------------------------------
-def test_sage_does_not_change_the_public_chat_response():
-    from viharbot.chat_models import ChatResponse
-
-    assert "sage" not in ChatResponse.model_fields
-    assert isinstance(SageAnalysis.model_validate(response("sage")["result"]), SageAnalysis)
-
-
 # ---- web wiring and synthesis ----------------------------------------------------------------------
 def test_sage_has_no_default_address_and_is_offered_only_where_it_is_configured(monkeypatch):
     from viharbot import web_app
@@ -374,8 +365,9 @@ def _synthesis_prompt(monkeypatch, context):
 
 def test_synthesis_is_told_to_reconcile_sage_only_when_a_sage_result_is_supplied(monkeypatch):
     with_sage = _synthesis_prompt(monkeypatch, {"research": {"a": 1}, "sage": {"executive_summary": "s"}})
-    assert "weigh it against the security, privacy and research results" in with_sage
-    assert "do not append it as a separate section" in with_sage
+    assert "Fold its points into your own recommendation" in with_sage
+    assert "do not name the sage result" in with_sage and "write no section or paragraph about it" in with_sage
+    assert "not as evidence" in with_sage  # judgments stay judgments
     assert '"sage"' in with_sage or "'sage'" in with_sage  # the result itself rides in the data
 
     without = _synthesis_prompt(monkeypatch, {"research": {"a": 1}})

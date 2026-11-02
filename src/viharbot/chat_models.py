@@ -16,6 +16,7 @@ from .schemas import (
     FinalSynthesis,
     PrivacyAssessment,
     ResearchFindings,
+    SageAnalysis,
     SecurityAssessment,
     SourceQualityReview,
 )
@@ -59,6 +60,8 @@ class ChatResponse(BaseModel):
     fact_check: FactCheckReview | None = None
     source_quality: SourceQualityReview | None = None
     privacy_review: PrivacyAssessment | None = None
+    # Present only when Charlie delegated philosophical analysis and the result is current.
+    sage: SageAnalysis | None = None
     synthesis: FinalSynthesis | None = None
     agent_activity: list[AgentActivity]
     # Present only for iterative orchestration; omitted from every other response.

@@ -25,8 +25,10 @@ APPLICATION_IDENTITY = "application"  # the documented system identity for polic
 APPLICATION_NAME = "ViharBot"
 
 Service = Literal[
-    "research", "fact-check", "source-quality", "security", "privacy-review", "synthesis", "pixel"]
+    "research", "fact-check", "source-quality", "security", "privacy-review", "synthesis", "pixel",
+    "sage"]
 # Pixel's slide generation runs after the loop, so the loop's own CapabilityName does not include it.
+# Sage's philosophical_analysis is a loop capability, so CapabilityName already carries it.
 EventCapability = CapabilityName | Literal["slide_generation"]
 
 # Sanitized, documented codes. No free text, no exception names, no URLs.

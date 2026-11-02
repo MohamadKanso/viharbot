@@ -515,7 +515,7 @@ def test_iterative_mode_keeps_the_public_response_contract(web):
     web_app.ChatResponse.model_validate(body)
     # The original eight fields keep their order; iterative responses add one optional key.
     assert list(body) == ["request_id", "findings", "assessment", "fact_check", "source_quality",
-                          "privacy_review", "synthesis", "agent_activity", "orchestration"]
+                          "privacy_review", "sage", "synthesis", "agent_activity", "orchestration"]
     assert body["orchestration"]["mode"] == "iterative"
     assert body["request_id"] == RID and body["findings"] and body["assessment"]
     for field in ("fact_check", "source_quality", "privacy_review", "synthesis"):

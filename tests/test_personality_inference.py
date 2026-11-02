@@ -289,6 +289,6 @@ def test_chat_response_schema_is_unchanged():
     # their order are unchanged.
     assert list(web_app.ChatResponse.model_fields) == [
         "request_id", "findings", "assessment", "fact_check", "source_quality",
-        "privacy_review", "synthesis", "agent_activity",
+        "privacy_review", "sage", "synthesis", "agent_activity",
         "orchestration", "deck",
     ]

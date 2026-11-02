@@ -315,7 +315,7 @@ def test_chat_response_contract_is_unchanged():
     # the original eight fields and their order are unchanged.
     assert list(web_app.ChatResponse.model_fields) == [
         "request_id", "findings", "assessment", "fact_check", "source_quality",
-        "privacy_review", "synthesis", "agent_activity",
+        "privacy_review", "sage", "synthesis", "agent_activity",
         "orchestration", "deck",
     ]
     assert list(web_app.ChatRequest.model_fields) == ["message", "history"]

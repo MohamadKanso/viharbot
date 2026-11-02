@@ -34,6 +34,7 @@ from .schemas import (
     FinalSynthesis,
     PrivacyAssessment,
     ResearchFindings,
+    SageAnalysis,
     SecurityAssessment,
     SourceQualityReview,
 )
@@ -205,6 +206,7 @@ def build_chat_response(
     source_payload = pipeline_result.get("source_quality", {}).get("result")
     privacy_payload = pipeline_result.get("privacy_review", {}).get("result")
     synthesis_payload = pipeline_result.get("synthesis", {}).get("result")
+    sage_payload = pipeline_result.get("sage", {}).get("result")
     return ChatResponse(
         request_id=request_id,
         findings=ResearchFindings.model_validate(pipeline_result["research"]["findings"]),
@@ -218,6 +220,7 @@ def build_chat_response(
         privacy_review=(
             PrivacyAssessment.model_validate(privacy_payload) if privacy_payload else None
         ),
+        sage=SageAnalysis.model_validate(sage_payload) if sage_payload else None,
         synthesis=FinalSynthesis.model_validate(synthesis_payload) if synthesis_payload else None,
         agent_activity=pipeline_result["agent_activity"],
         **({"orchestration": orchestration} if orchestration is not None else {}),
