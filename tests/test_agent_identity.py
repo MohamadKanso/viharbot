@@ -31,7 +31,7 @@ EXPECTED_CAPABILITIES = {
     "nova": {"research", "evidence_discovery"},
     "atlas": {"logistics_planning"},
     "pixel": {"creative_design", "slide_generation"},
-    "sage": {"philosophical_analysis"},
+    "sage": {"philosophical_analysis", "code_review"},
     "cipher": {"security_assessment", "privacy_review"},
     "scout": {"evidence_discovery", "source_quality", "fact_check"},
     "orbit": {"automation_engineering"},
@@ -297,12 +297,12 @@ def test_capability_vocabulary_and_status():
     assert {c.value for c in Capability} == {
         "research", "fact_check", "source_quality", "security_assessment", "privacy_review",
         "synthesis", "creative_design", "philosophical_analysis", "logistics_planning",
-        "automation_engineering", "evidence_discovery", "slide_generation",
+        "automation_engineering", "evidence_discovery", "slide_generation", "code_review",
     }
     implemented = {c for c in Capability if capability_status(c) is CapabilityStatus.IMPLEMENTED}
     assert {c.value for c in implemented} == {
         "research", "fact_check", "source_quality", "security_assessment", "privacy_review",
-        "synthesis", "slide_generation", "philosophical_analysis",
+        "synthesis", "slide_generation", "philosophical_analysis", "code_review",
     }
     assert capability_status(Capability.AUTOMATION_ENGINEERING) is CapabilityStatus.PLANNED
 

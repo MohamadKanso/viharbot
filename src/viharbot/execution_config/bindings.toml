@@ -46,3 +46,10 @@ service_name = "pixel"
 identity_id = "sage"
 capability = "philosophical_analysis"
 service_name = "sage"
+
+# Sage's advisory pull-request review. Not a chat capability: Charlie's planner cannot delegate it
+# (it is absent from the planner vocabulary). Only the GitHub review adapter invokes it, in-process.
+[[binding]]
+identity_id = "sage"
+capability = "code_review"
+service_name = "sage-code-review"

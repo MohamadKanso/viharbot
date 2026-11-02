@@ -33,6 +33,7 @@ class Capability(StrEnum):
     AUTOMATION_ENGINEERING = "automation_engineering"
     EVIDENCE_DISCOVERY = "evidence_discovery"
     SLIDE_GENERATION = "slide_generation"
+    CODE_REVIEW = "code_review"  # advisory repository review; never a chat-delegated capability
 
 
 class CapabilityStatus(StrEnum):
@@ -56,6 +57,7 @@ CAPABILITY_STATUS: dict[Capability, CapabilityStatus] = {
             Capability.SYNTHESIS,
             Capability.SLIDE_GENERATION,
             Capability.PHILOSOPHICAL_ANALYSIS,
+            Capability.CODE_REVIEW,
         }
         else CapabilityStatus.PLANNED
     )
