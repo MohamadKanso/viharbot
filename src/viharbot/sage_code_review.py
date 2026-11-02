@@ -243,6 +243,7 @@ class SageReviewResult(BaseModel):
     requires_independent_human_assessment: bool = False
     self_review_paths: list[str] = Field(default_factory=list)
     adjustments: list[str] = Field(default_factory=list)  # every downgrade or dropped reference
+    ci_pending: bool = False  # CI was unfinished, so a later re-run may change the recommendation
     ci_results: list[CIResult] = Field(default_factory=list)
     model_alias: str | None = None
     request_id: str
@@ -321,7 +322,12 @@ def _incomplete_reasons(request: SageCodeReviewRequest, model_complete: bool) ->
     reasons: list[str] = []
     if request.files_omitted:
         reasons.append(f"{request.files_omitted} changed file(s) were not reviewed (over the file or size limit).")
-    missing = [f.path for f in request.files if f.patch is None and (f.additions or f.deletions)]
+    # GitHub omits the patch for binary and oversized files and reports zero line counts for binary
+    # ones, so a missing patch is only acceptable for a pure rename or copy with no changed lines.
+    missing = [
+        f.path for f in request.files
+        if f.patch is None and not (f.status in ("renamed", "copied") and not f.additions and not f.deletions)
+    ]
     if missing:
         reasons.append(f"No diff was available for {len(missing)} file(s), for example {missing[0]}.")
     if any(f.patch_truncated for f in request.files):
@@ -361,13 +367,16 @@ def finalize_review(
         downgrade("COMMENT", "the pull request contains text aimed at the reviewer.")
     if any(c.conclusion in {"failure", "timed_out", "cancelled", "startup_failure"} for c in request.ci_results):
         downgrade("COMMENT", "at least one CI check did not succeed.")
+    ci_pending = any(c.status != "completed" for c in request.ci_results)
+    if ci_pending:
+        downgrade("COMMENT", "CI had not finished, so approval is withheld until it does. Re-run the review afterwards.")
     if any(f.severity in ("critical", "high") and f.basis != "unknown" for f in findings):
         downgrade("REQUEST_CHANGES", "a critical or high finding is reported.")
 
     uncertainties = list(model_review.assumptions_and_uncertainties)
     if not request.ci_results:
         uncertainties.append("No CI results were supplied, so test outcomes are not verified.")
-    elif any(c.status != "completed" for c in request.ci_results):
+    elif ci_pending:
         uncertainties.append("Some CI checks had not finished when this review ran.")
     if selfref:
         uncertainties.append("Independent human assessment is required for: " + ", ".join(selfref[:8]) + ".")
@@ -391,6 +400,7 @@ def finalize_review(
         incomplete_reasons=reasons,
         requires_independent_human_assessment=bool(selfref),
         self_review_paths=selfref,
+        ci_pending=ci_pending,
         adjustments=adjustments,
         ci_results=request.ci_results,
         model_alias=model_alias,

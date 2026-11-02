@@ -23,11 +23,12 @@ Files: `sage_code_review.py` (models, guard, rules, prompt, model call), `sage_r
 The model proposes; `finalize_review` decides.
 
 - **Fabricated references.** A finding that cites a file not in the pull request is dropped. A line number the supplied diff does not show (new-side added or context lines) is cleared. Each change is disclosed in the comment.
-- **Never approve when unsure.** APPROVE becomes COMMENT when the review is incomplete (files omitted, a diff missing or truncated, or the model says it could not assess everything), when CI has a failure, when the PR changes Sage itself, or when the PR text addresses the reviewer. A failed, timed-out or malformed model call produces a `failed` advisory with `COMMENT`, never an approval. APPROVE with a critical or high finding becomes REQUEST_CHANGES.
+- **Never approve when unsure.** APPROVE becomes COMMENT when the review is incomplete (files omitted, a diff missing or truncated, or the model says it could not assess everything), when CI has a failure, when CI has not finished, when the PR changes Sage itself, or when the PR text addresses the reviewer. A failed, timed-out or malformed model call produces a `failed` advisory with `COMMENT`, never an approval. APPROVE with a critical or high finding becomes REQUEST_CHANGES.
 - **Self-review.** Changes to `sage*.py`, Sage's identity, prompt and skills files, `bindings.toml`, `execution_bindings.py`, `identity.py`, `sage-review.yml`, this document and `docs/governance/*` mark the review "independent human assessment required" and cap it at COMMENT or REQUEST_CHANGES. The list is `SELF_REVIEW_PATTERNS`.
+- **Missing diffs.** GitHub omits the patch for binary and oversized files and reports zero line counts for binary ones, so a file with no patch makes the review incomplete unless it is a pure rename or copy with no changed lines.
 - **CI claims.** CI results come from GitHub check runs, not from the model. With none supplied, the comment says test outcomes are unverified.
 - **Prompt injection.** The title, description, diffs, CI names and policy text go into one escaped JSON data line, and the system prompt calls them untrusted. As a backstop, a small set of phrases aimed at the reviewer (for example "ignore previous instructions", "you must approve") blocks APPROVE and is disclosed. This is a heuristic: it can miss paraphrases and can flag text that merely quotes such a phrase, and it only ever makes the outcome more cautious.
-- **Comment safety.** Model text is escaped so it cannot @-mention people, inject HTML or forge the hidden markers.
+- **Comment safety.** Every model-written field is rendered as one plain line: whitespace is collapsed and Markdown punctuation, HTML, leading list markers, autolinks and @-mentions are escaped, so text cannot form a heading, list, link, image or code span, imitate a report section, or forge the hidden markers. The model's own formatting is lost on purpose. File paths are placed in code spans with backticks removed.
 
 ## Pull request flow
 
@@ -35,6 +36,8 @@ Triggers: `pull_request_target` (opened, synchronize, reopened, base `main`) and
 
 - **One comment per PR**, found by a hidden marker and only if the Actions bot wrote it, so someone pasting the marker cannot hijack or suppress the review. It is updated in place and shows the reviewed commit SHA and a timestamp.
 - **Idempotent.** A finished review (complete or incomplete) for the same head SHA makes a rerun a no-op with no model call. A failed or skipped one is retried. `force` overrides.
+- **Consistent snapshot.** The PR record is read, the file list is fetched, and the head is read again; if it moved, the run stops with nothing published. The head is checked once more after the model call, and a result for a commit that is no longer the head is discarded (the new commit's own run reviews it, and the old comment already carries the stale banner). A manual run that is superseded this way publishes nothing; run it again.
+- **Pending CI.** APPROVE is withheld while any check is unfinished. That comment carries a hidden pending marker, so an ordinary rerun (reopen, or `workflow_dispatch`) refreshes it instead of skipping. Sage does not re-run when CI finishes; there is no `workflow_run` trigger. After a refresh the review is final for that commit again, so a later CI change needs `force`.
 - **Fresh.** When a new commit arrives, the old comment is marked stale ("applies to commit X, new review in progress") before the new review runs, then replaced. A per-PR concurrency group cancels a superseded run.
 - **Forks.** Automatic runs skip fork PRs with a short comment and never give the job the LiteLLM key. A founder-run `workflow_dispatch` may review a fork PR; the diff is still only data.
 - **Failure.** If the model fails, a `failed` advisory is posted. If the comment itself cannot be posted, the job exits non-zero. Neither affects mergeability. The job summary records the recommendation, completeness, model alias and duration, never review content.
@@ -49,7 +52,7 @@ Triggers: `pull_request_target` (opened, synchronize, reopened, base `main`) and
 | `SAGE_REVIEW_TIMEOUT_SECONDS` | env | 120, clamped to 5 to 300 |
 | `SageReviewConfig` | request | 40 files, 120,000 diff characters, 24,000 policy characters; ceilings 100 files, 400,000 and 60,000 |
 
-Limits: one model call per review with no retries; output bounded by schema length limits; input bounded by the character limits above (there is no token counter, so the characters are the bound). Over-limit PRs are reviewed in part, reported incomplete and never approved. Token counts are logged when the client reports them; the client reports no cost, so none is logged. Logs carry agent, request ID, model alias, duration, outcome and error type, never prompts, PR text, review text or secrets.
+Limits: one model call per review with no retries; output bounded by schema length limits; input bounded by the character limits above (there is no token counter, so the characters are the bound). Each file's patch is trimmed to the smaller of the remaining total budget and 60,000 characters, with the trim recorded. Over-limit PRs are reviewed in part, reported incomplete and never approved. Token counts are logged when the client reports them; the client reports no cost, so none is logged. Logs carry agent, request ID, model alias, duration, outcome and error type, never prompts, PR text, review text or secrets.
 
 Policy text (`CONTRIBUTING.md` and the `docs/governance` documents, trimmed to the budget with the trim disclosed) is read from the base-branch checkout, never from the pull request.
 
@@ -77,19 +80,19 @@ An illustrative comment, produced by the real formatter from a scripted review o
 > Reviewed commit `bbbbbbbbbbbb` · 2026-11-02 12:00 UTC · review completeness: **complete**
 > 
 > ### Executive summary
-> The change lets any request that sets a `trusted` flag skip the per-agent capability check. That weakens the authorization boundary the Agent Constitution relies on, and no test covers the new branch.
+> The change lets any request that sets a \`trusted\` flag skip the per-agent capability check. That weakens the authorization boundary the Agent Constitution relies on, and no test covers the new branch.
 > 
 > ### Recommended changes
 > _Advice only; nothing here is enforced._
 > - **HIGH** · security · verified observation `src/viharbot/orchestration_policy.py:12-13`
->   The capability check is now bypassed when `request.trusted` is true. Nothing in the diff shows who can set that field.
->   - Evidence: Lines 12-13 add `and not request.trusted` to the condition that raises Forbidden.
+>   The capability check is now bypassed when \`request.trusted\` is true. Nothing in the diff shows who can set that field.
+>   - Evidence: Lines 12-13 add \`and not request.trusted\` to the condition that raises Forbidden.
 >   - Suggested remediation: Remove the bypass, or derive trust from configuration the request cannot set, and keep the check unconditional.
 > 
 > ### Nonblocking observations
 > - **MEDIUM** · testing · reasoned interpretation
 >   No test file changed, so the new branch and the denial path appear unexercised.
->   - Evidence: The supplied file list contains only src/viharbot/orchestration_policy.py.
+>   - Evidence: The supplied file list contains only src/viharbot/orchestration\_policy.py.
 >   - Suggested remediation: Add a test showing an untrusted request is still denied.
 > 
 > ### Architectural implications
@@ -109,14 +112,14 @@ An illustrative comment, produced by the real formatter from a scripted review o
 > - Python tests: success
 > 
 > ### Uncertainties
-> - I could not see where `request.trusted` is set.
+> - I could not see where \`request.trusted\` is set.
 > 
 > ### Suggested next steps
 > - Restore the unconditional check.
 > - Add a regression test for the denial path.
 > 
 > ---
-> Model alias: `SAGE_REVIEW_MODEL alias` · request `00000000-sample`
+> Model alias: `SAGE\_REVIEW\_MODEL alias` · request `00000000-sample`
 
 
 ## Not done

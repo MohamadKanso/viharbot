@@ -20,14 +20,37 @@ STATUS_RE = re.compile(r"<!-- sage-status:(complete|incomplete|failed|skipped|st
 MAX_COMMENT_CHARS = 60_000
 TITLE = "Sage AI Code Review — Advisory Recommendation"
 
+CI_PENDING_MARKER = "<!-- sage-ci:pending -->"
+
 _MENTION = re.compile(r"@(?=[A-Za-z0-9])")
+_WHITESPACE = re.compile(r"\s+")
+# Punctuation that starts or changes Markdown structure in the middle of a line.
+_MD_SPECIALS = re.compile(r"([\\`*_\[\]()#!|~>])")
+_LEADING = re.compile(r"^(?:[-+]|\d+[.)])(?=\s|$)")
+ZWSP = "​"
+
+
+def _escape_marker(match: re.Match[str]) -> str:
+    """Escape a leading list marker: the bullet itself, or the dot or paren after the number."""
+    marker = match.group(0)
+    return "\\" + marker if marker[0] in "-+" else marker[:-1] + "\\" + marker[-1]
 
 
 def neutralize(text: str) -> str:
-    """Make untrusted text inert in GitHub markdown."""
-    text = text.replace("<", "&lt;").replace(">", "&gt;")
-    text = _MENTION.sub("@​", text)
-    return text.replace("\r", "").strip()
+    """Make untrusted text inert in GitHub markdown: one plain line, so it cannot open a heading,
+    list, quote, table, link, image, code span or HTML, imitate a report section, or mention anyone.
+    The model's own formatting is deliberately lost; the report supplies the structure."""
+    text = _WHITESPACE.sub(" ", text).strip()
+    text = text.replace("&", "&amp;").replace("<", "&lt;")
+    text = _MD_SPECIALS.sub(lambda m: "\\" + m.group(1), text)
+    text = _LEADING.sub(_escape_marker, text)
+    text = text.replace("://", ":" + ZWSP + "//")  # no autolinks
+    return _MENTION.sub("@" + ZWSP, text)
+
+
+def _code(text: str) -> str:
+    """A file path for an inline code span: no backticks or line breaks to break out of it."""
+    return _WHITESPACE.sub(" ", text.replace("`", "'")).strip()
 
 
 def _lines(items: list[str]) -> str:
@@ -38,9 +61,9 @@ def _where(finding: ReviewFinding) -> str:
     if not finding.file_path:
         return ""
     if finding.line_start is None:
-        return f" `{neutralize(finding.file_path)}`"
+        return f" `{_code(finding.file_path)}`"
     end = f"-{finding.line_end}" if finding.line_end and finding.line_end != finding.line_start else ""
-    return f" `{neutralize(finding.file_path)}:{finding.line_start}{end}`"
+    return f" `{_code(finding.file_path)}:{finding.line_start}{end}`"
 
 
 def _finding(finding: ReviewFinding) -> str:
@@ -72,6 +95,7 @@ def format_comment(result: SageReviewResult, *, timestamp: datetime | None = Non
         MARKER,
         SHA_MARKER.format(sha=result.head_sha),
         STATUS_MARKER.format(status=result.completeness),
+        *([CI_PENDING_MARKER] if result.ci_pending else []),
         f"## {TITLE}",
         "",
         f"**Recommendation: {review.recommendation}**",

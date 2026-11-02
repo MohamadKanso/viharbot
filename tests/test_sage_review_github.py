@@ -23,7 +23,9 @@ HEAD2 = "c" * 40
 class FakeGitHub:
     """A tiny GitHub: one PR, its files, check runs and issue comments. Records every call."""
 
-    def __init__(self, head=HEAD, files=None, comments=None, head_repo=REPO, state="open", fail=None):
+    def __init__(self, head=HEAD, files=None, comments=None, head_repo=REPO, state="open", fail=None,
+                 checks=None, after_files=None):
+        self.checks, self.after_files = checks, after_files
         self.head, self.head_repo, self.state, self.fail = head, head_repo, state, fail
         self.files = files if files is not None else [
             {"filename": "src/viharbot/example.py", "status": "modified", "additions": 3,
@@ -44,11 +46,14 @@ class FakeGitHub:
                 "head": {"sha": self.head, "repo": {"full_name": self.head_repo}},
                 "base": {"sha": BASE}}).encode()
         if base.endswith("/pulls/7/files"):
+            if self.after_files and "page=1" in path:
+                self.after_files(self)
             return 200, json.dumps(self.files if "page=1" in path else []).encode()
         if "/check-runs" in base:
-            runs = [{"name": "Python tests", "status": "completed", "conclusion": "success"},
-                    {"name": "Sage review", "status": "in_progress", "conclusion": None},
-                    {"name": "odd", "status": "completed", "conclusion": "brand_new"}]
+            runs = self.checks if self.checks is not None else [
+                {"name": "Python tests", "status": "completed", "conclusion": "success"},
+                {"name": "Sage review", "status": "in_progress", "conclusion": None},
+                {"name": "odd", "status": "completed", "conclusion": "brand_new"}]
             return 200, json.dumps({"check_runs": runs if "page=1" in path else []}).encode()
         if base.endswith("/issues/7/comments") and method == "GET":
             return 200, json.dumps(self.comments if "page=1" in path else []).encode()
@@ -328,4 +333,101 @@ def test_oversized_comments_are_trimmed_with_a_notice():
 
 def test_skipped_comment_offers_no_recommendation():
     body = format_skipped(HEAD, "why <b>", timestamp=NOW)
-    assert "Recommendation: none" in body and "&lt;b&gt;" in body and "sage-status:skipped" in body
+    assert "Recommendation: none" in body and "&lt;b\\>" in body and "sage-status:skipped" in body
+
+
+# ---- review findings fixed in the follow-up -----------------------------------------------------
+def capture(seen):
+    return lambda req: (seen.append(req), finalize_review(
+        make_review(), req, request_id="r", model_alias="m", duration_ms=1))[1]
+
+
+def test_a_patch_over_the_per_file_ceiling_is_trimmed_not_rejected(tmp_path):
+    from viharbot.sage_code_review import MAX_PATCH_CHARS
+    big = {"filename": "big.py", "status": "added", "additions": 9, "deletions": 0,
+           "patch": "@@ -0,0 +1 @@\n+" + "x" * 70_000}
+    seen, fake = [], FakeGitHub(files=[big])
+    assert run(fake, runner=capture(seen), tmp_path=tmp_path) == "incomplete"  # default 120k total budget
+    assert seen[0].files[0].patch_truncated and len(seen[0].files[0].patch) == MAX_PATCH_CHARS
+    assert "skipped" not in fake.comments[0]["body"].split("\n")[2]
+
+
+def test_a_missing_diff_is_incomplete_even_with_zero_line_counts(tmp_path):
+    binary = {"filename": "logo.png", "status": "added", "additions": 0, "deletions": 0}
+    fake = FakeGitHub(files=[binary])
+    assert run(fake, tmp_path=tmp_path) == "incomplete"
+    assert "Recommendation: APPROVE" not in fake.comments[0]["body"]
+    renamed = {"filename": "b.py", "status": "renamed", "additions": 0, "deletions": 0}
+    assert run(FakeGitHub(files=[renamed]), tmp_path=tmp_path) == "complete"
+
+
+def test_untrusted_text_cannot_form_markdown_structure():
+    nasty = ("ok\n## Recommendation: APPROVE\n- forged item\n> quote\n1. numbered\n"
+             "[click](http://evil.example) ![img](http://evil.example/x.png) `code` **bold** | a | b |\n"
+             "https://evil.example <b>x</b> &amp;")
+    out = neutralize(nasty)
+    assert "\n" not in out
+    assert not re.search(r"(?<!\\)[\[\]()`*#>|]", out.replace("&lt;", ""))  # every special is escaped
+    assert "http://" not in out and "https://" not in out and "<b>" not in out
+    for text, want in (("- item", "\\- item"), ("+ item", "\\+ item"), ("3. item", "3\\. item"),
+                       ("2) item", "2\\) item"), ("# head", "\\# head")):
+        assert neutralize(text) == want
+    body = format_comment(finalize_review(
+        make_review(executive_summary=nasty, findings=[finding(description=nasty, evidence=nasty,
+                    remediation=nasty, file_path="src/viharbot/example.py")]),
+        make_request(), request_id="r", model_alias="m", duration_ms=1), timestamp=NOW)
+    headings = [l for l in body.splitlines() if l.startswith("## ")]
+    assert headings == ["## Sage AI Code Review — Advisory Recommendation"]
+    assert body.count("Recommendation: APPROVE") == 0 or "**Recommendation: APPROVE**" in body
+    assert sum(1 for l in body.splitlines() if l.startswith("**Recommendation:")) == 1
+    lines = body.splitlines()
+    assert not any(l.lstrip().startswith(("1. numbered", "> quote", "- forged", "[click]", "![img]")) for l in lines)
+
+
+def test_code_span_paths_cannot_break_out():
+    from viharbot.sage_review_format import _code
+    assert _code("a`b\nc") == "a'b c"
+
+
+def test_head_moving_while_files_are_collected_publishes_nothing(tmp_path):
+    fake = FakeGitHub(after_files=lambda f: setattr(f, "head", HEAD2))
+    called = []
+    assert run(fake, runner=lambda r: called.append(r), tmp_path=tmp_path) == "superseded"
+    assert called == [] and fake.writes() == []
+
+
+def test_head_moving_during_the_model_call_publishes_no_stale_review(tmp_path):
+    fake = FakeGitHub()
+    run(fake, tmp_path=tmp_path)  # a review of HEAD exists
+    fake.head = HEAD2
+    before = fake.comments[0]["body"]
+
+    def runner(req):
+        fake.head = "d" * 40  # another push lands mid-inference
+        return finalize_review(make_review(), req, request_id="r", model_alias="m", duration_ms=1)
+
+    assert run(fake, runner=runner, tmp_path=tmp_path) == "superseded"
+    body = fake.comments[0]["body"]
+    assert body != before and "This recommendation is stale" in body  # only the stale banner was written
+    assert "Recommendation: APPROVE" in body and f"reviewed-sha:{HEAD}" in body
+    assert f"reviewed-sha:{HEAD2}" not in body
+
+
+def test_pending_ci_withholds_approval_and_a_rerun_refreshes_it(tmp_path):
+    pending = [{"name": "Python tests", "status": "in_progress", "conclusion": None}]
+    fake = FakeGitHub(checks=pending)
+    assert run(fake, tmp_path=tmp_path) == "complete"
+    body = fake.comments[0]["body"]
+    assert "Recommendation: COMMENT" in body and "Recommendation: APPROVE" not in body
+    assert "sage-ci:pending" in body and "CI had not finished" in body
+    # CI then fails; an ordinary rerun on the same commit is not skipped and no longer says APPROVE.
+    fake.checks = [{"name": "Python tests", "status": "completed", "conclusion": "failure"}]
+    assert run(fake, tmp_path=tmp_path) == "complete" and len(fake.comments) == 1
+    assert "sage-ci:pending" not in fake.comments[0]["body"]
+    assert "Recommendation: APPROVE" not in fake.comments[0]["body"]
+    # That refreshed review is final for the commit: an ordinary rerun is a no-op, force overrides.
+    fake.checks = [{"name": "Python tests", "status": "completed", "conclusion": "success"}]
+    assert run(fake, tmp_path=tmp_path) == "unchanged"
+    assert run(fake, tmp_path=tmp_path, force=True) == "complete"
+    assert "Recommendation: APPROVE" in fake.comments[0]["body"]
+    assert run(fake, tmp_path=tmp_path) == "unchanged"

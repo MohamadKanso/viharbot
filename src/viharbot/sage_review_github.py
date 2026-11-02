@@ -34,6 +34,7 @@ from pydantic import ValidationError
 from .observability import configure_logging
 from .sage_code_review import (
     HARD_MAX_FILES,
+    MAX_PATCH_CHARS,
     ChangedFile,
     CIResult,
     PolicyExcerpt,
@@ -43,6 +44,7 @@ from .sage_code_review import (
     run_code_review,
 )
 from .sage_review_format import (
+    CI_PENDING_MARKER,
     MARKER,
     SHA_RE,
     STATUS_RE,
@@ -75,6 +77,10 @@ Transport = Callable[[str, str, dict[str, str], bytes | None], tuple[int, bytes]
 
 class GitHubError(RuntimeError):
     """A GitHub call failed. The message never includes the token or response bodies."""
+
+
+class HeadMoved(RuntimeError):
+    """The pull request received a new commit while it was being reviewed."""
 
 
 def urllib_transport(method: str, url: str, headers: dict[str, str], body: bytes | None) -> tuple[int, bytes]:
@@ -175,9 +181,10 @@ def build_request(
         patch = raw.get("patch")
         truncated = False
         if isinstance(patch, str):
-            room = config.max_diff_chars - used
+            # Bounded by the remaining total budget and by the schema's per-file ceiling.
+            room = max(min(config.max_diff_chars - used, MAX_PATCH_CHARS), 0)
             if len(patch) > room:
-                patch, truncated = patch[: max(room, 0)], True
+                patch, truncated = patch[:room], True
             used += len(patch)
         else:
             patch = None
@@ -190,6 +197,9 @@ def build_request(
         )
     if not files:
         return None, pr
+    # The file list is fetched after the PR record and can be newer; refuse a mixed snapshot.
+    if client.request("GET", f"/repos/{repo}/pulls/{number}")["head"]["sha"] != pr["head"]["sha"]:
+        raise HeadMoved
     total = int(pr.get("changed_files") or len(raw_files))
     omitted = max(omitted, total - len(files))
     head = pr["head"]["sha"]
@@ -236,6 +246,8 @@ def already_reviewed(existing: dict[str, Any] | None, head_sha: str) -> bool:
         return False
     body = existing.get("body") or ""
     sha, status = SHA_RE.search(body), STATUS_RE.search(body)
+    if CI_PENDING_MARKER in body:  # approval was withheld for unfinished CI; a rerun may refresh it
+        return False
     return bool(sha and status and sha.group(1) == head_sha and status.group(1) in {"complete", "incomplete"})
 
 
@@ -293,6 +305,8 @@ def review_pull_request(
 
     try:
         request, _ = build_request(client, repo, number, config, policy_root)
+    except HeadMoved:
+        return "superseded"
     except ValidationError:
         publish(client, repo, number, format_skipped(
             head, "This pull request's data could not be turned into a valid review request "
@@ -302,7 +316,13 @@ def review_pull_request(
         publish(client, repo, number, format_skipped(
             head, "This pull request has no changed files to review.", timestamp=now()), existing)
         return "skipped-empty"
+    if request.head_sha != head:
+        return "superseded"
     result = (runner or run_code_review)(request)
+    # A push during the model call makes this result stale before it is shown. Publish nothing; the
+    # new commit's own run reviews it, and the old comment already carries the stale banner.
+    if client.request("GET", f"/repos/{repo}/pulls/{number}")["head"]["sha"] != request.head_sha:
+        return "superseded"
     # Re-find: the stale-marking update above changed nothing about the comment's id.
     publish(client, repo, number, format_comment(result, timestamp=now()), existing or find_comment(client, repo, number))
     write_summary(outcome_line(result))

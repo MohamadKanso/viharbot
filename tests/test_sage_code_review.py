@@ -100,6 +100,17 @@ def test_request_needs_files_and_bounds_them():
         SageReviewConfig(max_files=10_000)
 
 
+@pytest.mark.parametrize("status,adds,dels,complete", [
+    ("added", 0, 0, False), ("modified", 0, 0, False), ("modified", 4, 1, False),
+    ("removed", 0, 0, False), ("renamed", 0, 0, True), ("copied", 0, 0, True), ("renamed", 2, 0, False),
+])
+def test_missing_diff_rule_allows_only_pure_renames(status, adds, dels, complete):
+    from viharbot.sage_code_review import ChangedFile
+    file = ChangedFile(path="a.bin", status=status, additions=adds, deletions=dels, patch=None)
+    result = finalize(make_review(), make_request(files=[file]))
+    assert (result.completeness == "complete") is complete
+
+
 def test_missing_patch_makes_the_review_incomplete():
     request = make_request(files=[changed(patch=None)])
     result = finalize(make_review(), request)
@@ -183,7 +194,10 @@ def test_ci_failure_blocks_approval_but_not_comment_and_no_ci_is_disclosed():
     assert none.review.recommendation == "APPROVE"
     assert any("No CI results" in u for u in none.review.assumptions_and_uncertainties)
     pending = make_request(ci_results=[CIResult(name="t", status="in_progress")])
-    assert any("not finished" in u for u in finalize(make_review(), pending).review.assumptions_and_uncertainties)
+    held = finalize(make_review(), pending)
+    assert any("not finished" in u for u in held.review.assumptions_and_uncertainties)
+    assert held.review.recommendation == "COMMENT" and held.ci_pending
+    assert finalize(make_review(recommendation="REQUEST_CHANGES"), pending).review.recommendation == "REQUEST_CHANGES"
 
 
 # 8. prompt injection -------------------------------------------------------------------------
