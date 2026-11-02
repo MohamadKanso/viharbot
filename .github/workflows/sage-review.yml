@@ -1,0 +1,82 @@
+name: Sage review
+
+# Sage's advisory review of a pull request. It posts ONE comment per pull request and updates it.
+# It is not a required check, submits no GitHub review, and cannot merge, block or deploy. The
+# repository founder decides. See docs/sage-code-review.md.
+#
+# Security model. This uses `pull_request_target` on purpose: the workflow file and the code that
+# runs are the ones on the protected base branch, so a pull request cannot edit this file or the
+# reviewer to reach the LiteLLM credential. The pull request itself is fetched through the GitHub
+# API as data. NOTHING from the pull request is checked out, installed, imported or executed, and
+# the checkout below is pinned to the default branch. Do not add a step that checks out the pull
+# request's head or merge ref; tests/test_sage_review_workflow.py fails if one appears.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull request number to review"
+        required: true
+        type: number
+      force:
+        description: "Review again even if this commit was already reviewed"
+        required: false
+        type: boolean
+        default: false
+
+# One run per pull request; a newer push supersedes a running review.
+concurrency:
+  group: sage-review-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  sage-review:
+    name: Sage review
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Least privilege: read code and checks, write one comment. No `contents: write`, no
+    # `pull-requests` review events are ever sent, no `statuses`/`deployments`/`administration`.
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      checks: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The trusted base branch, never the pull request.
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install Sage from the base branch
+        run: python -m pip install .
+      - name: Review the pull request
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          IS_DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+          FORCE: ${{ inputs.force }}
+          SAGE_REVIEW_MODEL: ${{ vars.SAGE_REVIEW_MODEL || 'gpt-6.1-sol' }}
+          LITELLM_BASE_URL: ${{ vars.LITELLM_BASE_URL || 'https://litellm.viharchokshi.com' }}
+          # The credential exists only in this step, and only for a same-repository pull request
+          # or a manual run by someone with write access. Forks never receive it.
+          LITELLM_API_KEY: ${{ (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) && secrets.LITELLM_API_KEY || '' }}
+        run: |
+          args=(--repo "$GITHUB_REPOSITORY" --pr "$PR_NUMBER")
+          if [ "$IS_DISPATCH" = "true" ]; then args+=(--allow-fork); fi
+          if [ "$FORCE" = "true" ]; then args+=(--force); fi
+          python -m viharbot.sage_review_github "${args[@]}"
