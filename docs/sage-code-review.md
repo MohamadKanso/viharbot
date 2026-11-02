@@ -1,6 +1,6 @@
 # Sage code review (Phase 7.2A)
 
-> **Status: implemented, advisory only.** Sage can review pull requests to `main` and post one recommendation as a comment. The recommendation cannot merge, block, approve or deploy anything. The repository founder keeps every merge decision. The GitHub Actions workflow that triggers it (`.github/workflows/sage-review.yml`) is a separate follow-up PR, so until that merges nothing runs automatically, and the workflow sections below describe that follow-up. Nothing here has run against a real pull request through Actions yet; see "Not done".
+> **Status: implemented, advisory only.** Sage can review pull requests to `main` and post one recommendation as a comment. The recommendation cannot merge, block, approve or deploy anything. The repository founder keeps every merge decision. Nothing here has run against a real model or a real pull request yet; see "Not done".
 
 ## What it is
 
