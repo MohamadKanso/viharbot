@@ -26,7 +26,6 @@ from viharbot.orchestration_policy import (
     input_versions, sage_payload, step_is_fresh)
 from viharbot.orchestration_state import CANONICAL_ORDER, build_observation
 from viharbot.sage import MAX_SECTION_CHARS, SageRequest
-from viharbot.schemas import SageAnalysis
 
 REGISTRY, BINDINGS = default_registry(), default_bindings()
 SAGE = C.PHILOSOPHICAL_ANALYSIS
@@ -335,14 +334,6 @@ def test_sages_own_model_timeout_is_below_the_orchestrators_read_cap():
     assert FIXED_TIME_BUDGET.max_seconds == 120.0
     from viharbot.orchestration_state import ExecutionBudget
     assert ExecutionBudget().max_seconds == 240.0  # unchanged for Sage; the global budget is not raised
-
-
-# ---- the public contract stays as it was -----------------------------------------------------------
-def test_sage_does_not_change_the_public_chat_response():
-    from viharbot.chat_models import ChatResponse
-
-    assert "sage" not in ChatResponse.model_fields
-    assert isinstance(SageAnalysis.model_validate(response("sage")["result"]), SageAnalysis)
 
 
 # ---- web wiring and synthesis ----------------------------------------------------------------------

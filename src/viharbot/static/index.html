@@ -542,14 +542,14 @@
 
       const agentNames = {
         research: "Research", "fact-check": "Fact Check", "source-quality": "Source Quality",
-        security: "Security", "privacy-review": "Privacy Review", synthesis: "Synthesis", pixel: "Pixel",
+        security: "Security", "privacy-review": "Privacy Review", synthesis: "Synthesis", pixel: "Pixel", sage: "Sage",
       };
 
-      const identityNames = { nova: "Nova", scout: "Scout", cipher: "Cipher", charlie: "Charlie", pixel: "Pixel" };
+      const identityNames = { nova: "Nova", scout: "Scout", cipher: "Cipher", charlie: "Charlie", pixel: "Pixel", sage: "Sage" };
       const capabilityLabels = {
         research: "Research", fact_check: "Fact Check", source_quality: "Source Quality",
         security_assessment: "Security", privacy_review: "Privacy Review", synthesis: "Synthesis",
-        slide_generation: "Slide Decks",
+        slide_generation: "Slide Decks", philosophical_analysis: "Perspective",
       };
       const completionNotes = {
         charlie_finished: "Charlie reviewed the evidence and decided it was sufficient.",
@@ -629,6 +629,31 @@
         }).catch(() => {});
       }
       loadTeamModels();
+      // Sage's perspective. It reasons over the other agents' results; it did not research or verify
+      // anything. Each claim carries its type so a reader can tell evidence from judgment.
+      const claimTypeLabels = {
+        evidence_supported: "Supported by supplied results", reasoned_interpretation: "Interpretation",
+        normative_judgment: "Value judgment", recommendation: "Recommendation",
+      };
+      function claimLine(claim, extra) {
+        const label = labelFor(claimTypeLabels, claim.claim_type);
+        const refs = claim.evidence_refs && claim.evidence_refs.length ? `; from ${claim.evidence_refs.join(", ")}` : "";
+        return `[${label}${refs}] ${claim.statement}${extra ? " " + extra : ""}`;
+      }
+      function buildSage(sage) {
+        const section = el("section", "result-section sage-section");
+        section.append(el("h4", "", "Sage \u00B7 human and organizational perspective"));
+        section.append(el("p", "sage-note", "Reasoning over the team\u2019s results, not new research. Claims are labelled by type."));
+        section.append(el("p", "", sage.executive_summary));
+        listSection(section, "Who is affected", sage.stakeholders.map((s) => `${s.name} (${s.impact_direction}): ${s.potential_impact} Interest: ${s.interest}`));
+        listSection(section, "Ethical considerations", sage.ethical_considerations.map((c) => claimLine(c, c.framework ? `(${c.framework})` : "")));
+        listSection(section, "Human and organizational impacts", sage.human_and_organizational_impacts.map((c) => claimLine(c, `Affects: ${c.affected_group}.`)));
+        listSection(section, "Risks and trade-offs", sage.risks_and_tradeoffs.map((c) => claimLine(c, `Between: ${c.competing_values.join(" vs ")}.`)));
+        listSection(section, "Recommended mitigations", sage.recommended_mitigations.map((m) => `${m.action} (addresses: ${m.addresses})`));
+        listSection(section, "Assumptions and uncertainties", sage.assumptions_and_uncertainties);
+        listSection(section, "For Charlie", sage.recommendations_for_charlie);
+        return section;
+      }
       function buildDeckFrame(deck) {
         // Pixel's own HTML page, shown in the output. It has no scripts and is served with a strict
         // policy; the sandbox allows nothing but the page's download link.
@@ -812,6 +837,7 @@
           listSection(section, "Limitations", result.source_quality.limitations);
           body.append(section);
         }
+        if (result.sage) body.append(buildSage(result.sage));
         const security = el("section", "result-section");
         security.append(el("h4", "", "Security review"));
         security.append(el("span", `risk ${result.assessment.overall_risk}`, `${result.assessment.overall_risk} risk`));

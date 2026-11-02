@@ -204,7 +204,7 @@ def test_chat_accepts_valid_request_and_keeps_response_contract(client):
     body = reply.json()
     assert list(body) == [
         "request_id", "findings", "assessment", "fact_check", "source_quality",
-        "privacy_review", "synthesis", "agent_activity",
+        "privacy_review", "sage", "synthesis", "agent_activity",
     ]
     assert body["request_id"] == RID
     assert all("error" not in a for a in body["agent_activity"])
