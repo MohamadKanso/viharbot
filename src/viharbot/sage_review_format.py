@@ -16,6 +16,8 @@ MARKER = "<!-- sage-code-review:v1 -->"
 SHA_MARKER = "<!-- sage-reviewed-sha:{sha} -->"
 STATUS_MARKER = "<!-- sage-status:{status} -->"
 SHA_RE = re.compile(r"<!-- sage-reviewed-sha:([0-9a-f]{40}) -->")
+BASE_MARKER = "<!-- sage-base-sha:{sha} -->"
+BASE_RE = re.compile(r"<!-- sage-base-sha:([0-9a-f]{40}) -->")
 STATUS_RE = re.compile(r"<!-- sage-status:(complete|incomplete|failed|skipped|stale) -->")
 MAX_COMMENT_CHARS = 60_000
 TITLE = "Sage AI Code Review — Advisory Recommendation"
@@ -95,6 +97,7 @@ def format_comment(result: SageReviewResult, *, timestamp: datetime | None = Non
         MARKER,
         SHA_MARKER.format(sha=result.head_sha),
         STATUS_MARKER.format(status=result.completeness),
+        BASE_MARKER.format(sha=result.base_sha),
         *([CI_PENDING_MARKER] if result.ci_pending else []),
         f"## {TITLE}",
         "",

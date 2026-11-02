@@ -333,3 +333,29 @@ def test_code_review_is_authorized_for_sage_but_not_for_chat_delegation():
         orchestration_planner, "PLANNER_PROMPT") else True
     # Charlie's own capabilities are unchanged.
     assert Capability.CODE_REVIEW not in default_registry().get("charlie").capabilities
+
+
+def test_previous_path_is_validated_and_matched_for_self_review():
+    from viharbot.sage_code_review import ChangedFile
+    with pytest.raises(ValidationError):
+        ChangedFile(path="a.py", status="renamed", additions=0, deletions=0, previous_path="../x")
+    file = ChangedFile(path="src/viharbot/ok.py", status="renamed", additions=1, deletions=1, patch=PATCH_ONE,
+                       previous_path="docs/governance/agent-constitution-v1.md")
+    result = finalize(make_review(), make_request(files=[file]))
+    assert result.self_review_paths == ["docs/governance/agent-constitution-v1.md"]
+    assert result.requires_independent_human_assessment and result.review.recommendation == "COMMENT"
+    assert failed_review(make_request(files=[file]), "x", request_id="r").requires_independent_human_assessment
+
+
+PATCH_ONE = "@@ -1 +1 @@\n-a\n+b"
+
+
+def test_omitted_ci_checks_withhold_approval_in_the_rules():
+    result = finalize(make_review(), make_request(ci_omitted=3))
+    assert result.review.recommendation == "COMMENT"
+    for conclusion in ("action_required", "stale"):
+        request = make_request(ci_results=[CIResult(name="t", status="completed", conclusion=conclusion)])
+        assert finalize(make_review(), request).review.recommendation == "COMMENT"
+    ok = make_request(ci_results=[CIResult(name="t", status="completed", conclusion="neutral"),
+                                  CIResult(name="u", status="completed", conclusion="skipped")])
+    assert finalize(make_review(), ok).review.recommendation == "APPROVE"

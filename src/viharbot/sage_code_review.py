@@ -118,11 +118,16 @@ class ChangedFile(BaseModel):
     # incomplete for this file.
     patch: str | None = Field(default=None, max_length=MAX_PATCH_CHARS)
     patch_truncated: bool = False
+    # For a rename, where the file was before. Self-review matching covers both paths.
+    previous_path: str | None = Field(default=None, max_length=400)
 
-    @field_validator("path")
+    @field_validator("path", "previous_path")
     @classmethod
-    def _path_ok(cls, value: str) -> str:
-        return _safe_path(value)
+    def _path_ok(cls, value: str | None) -> str | None:
+        return None if value is None else _safe_path(value)
+
+    def all_paths(self) -> list[str]:
+        return [self.path, *([self.previous_path] if self.previous_path else [])]
 
 
 class PolicyExcerpt(BaseModel):
@@ -163,6 +168,8 @@ class SageCodeReviewRequest(BaseModel):
     files_omitted: int = Field(default=0, ge=0, le=1_000_000)
     policies: list[PolicyExcerpt] = Field(default_factory=list, max_length=12)
     ci_results: list[CIResult] = Field(default_factory=list, max_length=60)
+    # Check runs the adapter could not include. While non-zero, CI state is unknown, so no approval.
+    ci_omitted: int = Field(default=0, ge=0, le=1_000_000)
     config: SageReviewConfig = Field(default_factory=SageReviewConfig)
 
     @model_validator(mode="after")
@@ -349,7 +356,7 @@ def finalize_review(
     """Apply every deterministic rule to the model's review. The model proposes; this decides."""
     findings, adjustments = validate_findings(model_review.findings, request)
     reasons = _incomplete_reasons(request, model_review.review_completeness == "complete")
-    selfref = self_review_paths(f.path for f in request.files)
+    selfref = self_review_paths(p for f in request.files for p in f.all_paths())
     recommendation: Recommendation = model_review.recommendation
 
     def downgrade(target: Recommendation, why: str) -> None:
@@ -367,6 +374,13 @@ def finalize_review(
         downgrade("COMMENT", "the pull request contains text aimed at the reviewer.")
     if any(c.conclusion in {"failure", "timed_out", "cancelled", "startup_failure"} for c in request.ci_results):
         downgrade("COMMENT", "at least one CI check did not succeed.")
+    # A completed check with no usable result, or one that needs action or is stale, is unresolved.
+    unresolved = [c for c in request.ci_results
+                  if c.status == "completed" and c.conclusion in {"action_required", "stale", None}]
+    if unresolved:
+        downgrade("COMMENT", "a CI check needs action or has no usable result.")
+    if request.ci_omitted:
+        downgrade("COMMENT", "some CI checks could not be included, so CI state is unknown.")
     ci_pending = any(c.status != "completed" for c in request.ci_results)
     if ci_pending:
         downgrade("COMMENT", "CI had not finished, so approval is withheld until it does. Re-run the review afterwards.")
@@ -378,6 +392,8 @@ def finalize_review(
         uncertainties.append("No CI results were supplied, so test outcomes are not verified.")
     elif ci_pending:
         uncertainties.append("Some CI checks had not finished when this review ran.")
+    if request.ci_omitted:
+        uncertainties.append(f"{request.ci_omitted} CI check(s) were not included, so CI state is incomplete.")
     if selfref:
         uncertainties.append("Independent human assessment is required for: " + ", ".join(selfref[:8]) + ".")
     uncertainties = [u[:600] for u in uncertainties][:12]
@@ -420,7 +436,7 @@ def failed_review(
     duration_ms: float = 0.0,
 ) -> SageReviewResult:
     """An advisory failure. Never an approval, and the reason is a fixed string, not model output."""
-    selfref = self_review_paths(f.path for f in request.files)
+    selfref = self_review_paths(p for f in request.files for p in f.all_paths())
     review = SageCodeReview(
         recommendation="COMMENT",
         executive_summary="Sage could not complete this review. No recommendation about the changes is made.",

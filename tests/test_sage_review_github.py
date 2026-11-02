@@ -53,7 +53,7 @@ class FakeGitHub:
             runs = self.checks if self.checks is not None else [
                 {"name": "Python tests", "status": "completed", "conclusion": "success"},
                 {"name": "Sage review", "status": "in_progress", "conclusion": None},
-                {"name": "odd", "status": "completed", "conclusion": "brand_new"}]
+                {"name": "Lint", "status": "completed", "conclusion": "skipped"}]
             return 200, json.dumps({"check_runs": runs if "page=1" in path else []}).encode()
         if base.endswith("/issues/7/comments") and method == "GET":
             return 200, json.dumps(self.comments if "page=1" in path else []).encode()
@@ -94,7 +94,7 @@ def test_clean_pr_gets_one_advisory_comment_with_every_section(tmp_path):
                  "Governance considerations", "Evidence references", "Uncertainties",
                  "Suggested next steps", HEAD[:12], "2026-11-02 12:00 UTC"):
         assert part in body
-    assert "Python tests: success" in body and "odd" in body and "Sage review" not in body.split("Evidence")[1]
+    assert "Python tests: success" in body and "Lint: skipped" in body and "Sage review" not in body.split("Evidence")[1]
 
 
 def test_defective_pr_reports_request_changes_with_evidence_as_advice_only():
@@ -431,3 +431,53 @@ def test_pending_ci_withholds_approval_and_a_rerun_refreshes_it(tmp_path):
     assert run(fake, tmp_path=tmp_path, force=True) == "complete"
     assert "Recommendation: APPROVE" in fake.comments[0]["body"]
     assert run(fake, tmp_path=tmp_path) == "unchanged"
+
+
+# ---- gaps found by the second live review -----------------------------------------------------------
+@pytest.mark.parametrize("conclusion", ["action_required", "stale", "brand_new_conclusion"])
+def test_unresolved_ci_conclusions_withhold_approval(tmp_path, conclusion):
+    fake = FakeGitHub(checks=[{"name": "Deploy gate", "status": "completed", "conclusion": conclusion}])
+    run(fake, tmp_path=tmp_path)
+    assert "Recommendation: APPROVE" not in fake.comments[0]["body"]
+    assert "Recommendation: COMMENT" in fake.comments[0]["body"]
+
+
+def test_check_runs_beyond_the_cap_are_counted_and_withhold_approval(tmp_path):
+    many = [{"name": f"job{i}", "status": "completed", "conclusion": "success"} for i in range(75)]
+    seen, fake = [], FakeGitHub(checks=many)
+    run(fake, runner=capture(seen), tmp_path=tmp_path)
+    assert len(seen[0].ci_results) == 60 and seen[0].ci_omitted == 15
+    body = fake.comments[0]["body"]
+    assert "Recommendation: APPROVE" not in body and "15 CI check" in body and "were not included" in body
+    ok = FakeGitHub()
+    seen2 = []
+    run(ok, runner=capture(seen2), tmp_path=tmp_path)
+    assert seen2[0].ci_omitted == 0 and "Recommendation: APPROVE" in ok.comments[0]["body"]
+
+
+def test_a_new_base_commit_invalidates_the_same_head_review(tmp_path):
+    fake = FakeGitHub()
+    run(fake, tmp_path=tmp_path)
+    assert run(fake, tmp_path=tmp_path) == "unchanged"
+    new_base = "e" * 40
+    original = fake.__call__
+
+    def moved(method, url, headers, body):
+        status, data = original(method, url, headers, body)
+        if url.endswith("/pulls/7"):
+            payload = json.loads(data)
+            payload["base"]["sha"] = new_base
+            data = json.dumps(payload).encode()
+        return status, data
+
+    assert run(moved, tmp_path=tmp_path) == "complete"
+    assert f"sage-base-sha:{new_base}" in fake.comments[0]["body"] and len(fake.comments) == 1
+
+
+def test_renaming_a_protected_file_still_triggers_self_review(tmp_path):
+    renamed = {"filename": "src/viharbot/harmless.py", "previous_filename": "src/viharbot/sage_code_review.py",
+               "status": "renamed", "additions": 1, "deletions": 1, "patch": "@@ -1 +1 @@\n-a\n+b"}
+    fake = FakeGitHub(files=[renamed])
+    run(fake, tmp_path=tmp_path)
+    body = fake.comments[0]["body"]
+    assert "Independent human assessment required" in body and "Recommendation: APPROVE" not in body

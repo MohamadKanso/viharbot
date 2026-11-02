@@ -44,6 +44,7 @@ from .sage_code_review import (
     run_code_review,
 )
 from .sage_review_format import (
+    BASE_RE,
     CI_PENDING_MARKER,
     MARKER,
     SHA_RE,
@@ -192,7 +193,7 @@ def build_request(
             ChangedFile(
                 path=raw["filename"], status=raw.get("status", "changed"),
                 additions=int(raw.get("additions", 0)), deletions=int(raw.get("deletions", 0)),
-                patch=patch, patch_truncated=truncated,
+                patch=patch, patch_truncated=truncated, previous_path=raw.get("previous_filename"),
             )
         )
     if not files:
@@ -203,16 +204,19 @@ def build_request(
     total = int(pr.get("changed_files") or len(raw_files))
     omitted = max(omitted, total - len(files))
     head = pr["head"]["sha"]
-    runs = client.pages(f"/repos/{repo}/commits/{head}/check-runs", 100)
-    ci = [
+    runs = client.pages(f"/repos/{repo}/commits/{head}/check-runs", 101)
+    ci_all = [
         CIResult(name=str(r["name"])[:200], status=r.get("status", "queued"), conclusion=r.get("conclusion") if r.get("conclusion") in CONCLUSIONS else None)
         for r in runs
         if r.get("name") not in SELF_CHECK_NAMES and r.get("status") in {"queued", "in_progress", "completed"}
-    ][:60]
+    ]
+    ci = ci_all[:60]
+    # Anything trimmed or not fetched is counted, never dropped silently.
+    ci_omitted = len(ci_all) - len(ci) + (1 if len(runs) >= 200 else 0)
     request = SageCodeReviewRequest(
         repository=repo, pr_number=number, base_sha=pr["base"]["sha"], head_sha=head,
         title=(pr.get("title") or "")[:500], description=(pr.get("body") or "")[:20_000],
-        files=files, files_omitted=omitted, ci_results=ci, config=config,
+        files=files, files_omitted=omitted, ci_results=ci, ci_omitted=ci_omitted, config=config,
         policies=load_policies(policy_root, config.max_policy_chars),
     )
     return request, pr
@@ -239,13 +243,16 @@ def publish(client: GitHubClient, repo: str, number: int, body: str, existing: d
         client.request("POST", f"/repos/{repo}/issues/{number}/comments", {"body": body})
 
 
-def already_reviewed(existing: dict[str, Any] | None, head_sha: str) -> bool:
+def already_reviewed(existing: dict[str, Any] | None, head_sha: str, base_sha: str | None = None) -> bool:
     """A finished review (complete or incomplete) for exactly this commit makes a rerun redundant.
     A failed or skipped one does not, so a rerun can recover."""
     if not existing:
         return False
     body = existing.get("body") or ""
     sha, status = SHA_RE.search(body), STATUS_RE.search(body)
+    base = BASE_RE.search(body)
+    if base_sha and base and base.group(1) != base_sha:  # the base branch moved: the diff may differ
+        return False
     if CI_PENDING_MARKER in body:  # approval was withheld for unfinished CI; a rerun may refresh it
         return False
     return bool(sha and status and sha.group(1) == head_sha and status.group(1) in {"complete", "incomplete"})
@@ -296,7 +303,7 @@ def review_pull_request(
             "a credential that must not be exposed to forked changes. The founder can run the "
             "workflow manually if a review is wanted.", timestamp=now()), existing)
         return "skipped-fork"
-    if not force and already_reviewed(existing, head):
+    if not force and already_reviewed(existing, head, pr["base"]["sha"]):
         return "unchanged"
     previous = SHA_RE.search((existing or {}).get("body") or "")
     if existing and previous and previous.group(1) != head:
