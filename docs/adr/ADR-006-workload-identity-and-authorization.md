@@ -18,15 +18,36 @@ The platform will soon span DigitalOcean containers, Amazon Bedrock AgentCore, a
 ## Decision
 
 1. **Every call between ViharBot services carries a short-lived signed token, and every callee verifies it itself.** The callee never trusts a caller, a network position, or a claim in the request body.
-2. **Token format: a signed JWT** (`Authorization: Bearer`), over HTTPS, or HTTP to a literal loopback or private IP only, as `AGENTS.md` already requires.
-   - Claims: `iss`, `sub` (caller identity), `aud` (target service), `exp` (60 seconds or less), `iat`, `jti`, `cap` (capability), `eng` (engagement), `cls` (data-classification ceiling), `chain` (delegation hops), `req_sha256` (hash of the request body).
+2. **Token format: a signed JWT** (`Authorization: Bearer`). Claims: `iss`, `sub` (caller identity), `aud` (target service), `exp` (60 seconds or less), `iat`, `jti`, `cap` (capability), `eng` (engagement), `cls` (data-classification ceiling), `dlg` (the issuer-signed delegation grant, see below), `mth` (HTTP method), `tgt` (canonical request target: path plus the sorted query string), `req_sha256` (hash of the body, including the empty body).
    - `sub` and every other identity claim come from the verified token. A value in the body or in an `X-Agent` header is ignored.
-3. **Authorization tuple, enforced by the callee independently of Charlie:** caller identity, target service, capability, resource, engagement, data classification, delegation context. The callee compares `cap` with its own fixed capability and checks the effective scope as the intersection of scopes along `chain`. Charlie's existing checks remain a first pass, not the authority.
+   - **Request binding.** The callee recomputes `mth`, `tgt` and `req_sha256` from the request it actually received and rejects any mismatch. A token minted for one route, artifact ID, method or security-relevant query parameter is therefore unusable for another, even when the body is empty (for example two deck downloads).
+3. **Authorization tuple, enforced by the callee independently of Charlie:** caller identity, target service, capability, resource, engagement, data classification, delegation context. The callee compares `cap` with its own fixed capability and computes the effective scope as the intersection of the issuer-signed grant, the caller's registry entry and its own policy (see "Key authority"). Charlie's existing checks remain a first pass, not the authority.
 4. **Policy lives in versioned repository configuration**, in the style of `bindings.toml`, not in prompts. Models never decide authorization.
-5. **Fail closed.** A missing, malformed, expired, wrong-audience, wrong-capability or unknown-key token returns 401 or 403. A service started with authentication enabled and no verification keys refuses to start. `/health` stays open and returns nothing sensitive; `/model` and Pixel's deck routes require a token.
-6. **Replay protection:** short expiry, a per-process cache of `jti` values held until expiry plus clock skew (10 seconds at most), audience binding, and the body hash. A callee with several replicas needs shared state for this cache (open question 5).
-7. **Keys:** asymmetric signing keys, one issuer key and one key per service, two public keys valid at a time (`kid`) so rotation overlaps, 30 to 90 day rotation, revocation by removing a `kid`. Secrets come from the platform's secret store, never from source.
-8. **Logs record allow and deny decisions** with `request_id`, caller, target, capability and reason. They never record tokens, keys, prompts or memory content.
+5. **Transport.** A token is not confidentiality: it does not stop an observer on the path from reading prompts, artifacts or the bearer token, and it does not stop an intercepted request from being replayed once before the original arrives. Therefore:
+   - **TLS is required** for every connection that crosses a platform or cloud boundary or any public path: DigitalOcean to AWS, anything through an ALB or API endpoint, and any call to LiteLLM.
+   - Plaintext HTTP between two containers on the same private network is the one exception `AGENTS.md` already allows (credentials over HTTP only to a literal loopback or private IP). This ADR does not relax that rule, and it **records the exception as an accepted confidentiality and interception risk**, not a protected path. The JWT, the audience and the body hash narrow what an interceptor can do, but do not remove the risk. The founder decides whether to tighten `AGENTS.md` to require TLS everywhere once the platform allows it. The verified DigitalOcean internal-routing documentation neither promises nor denies in-transit encryption.
+6. **Fail closed.** A missing, malformed, expired, wrong-audience, wrong-capability or unknown-key token returns 401 or 403. A service started with authentication enabled and no verification keys refuses to start. `/health` stays open and returns nothing sensitive; `/model` and Pixel's deck routes require a token.
+7. **Replay protection:** short expiry, a per-process cache of `jti` values held until expiry plus clock skew (10 seconds at most), audience binding, and the body hash. A callee with several replicas needs shared state for this cache (open question 5).
+8. **Keys and who may sign what** (see the next section): asymmetric signing keys, one issuer key and one key per service, two public keys valid at a time (`kid`) so rotation overlaps, 30 to 90 day rotation, revocation by removing a `kid`. Secrets come from the platform's secret store, never from source.
+9. **Logs record allow and deny decisions** with `request_id`, caller, target, capability and reason. They never record tokens, keys, prompts or memory content.
+
+### Key authority: which key may assert what
+
+Verifying a signature proves who signed, not that the signer may assert a given subject or scope. Two token types keep those separate.
+
+| Token | Signed by | May assert |
+|---|---|---|
+| **Caller assertion** (the bearer token on a call) | The calling service's own key | Only that service's fixed identity. Each callee holds a registry mapping `kid` to one `sub` and the capabilities that identity may ever request. A token whose `sub` differs from the registry entry for its `kid` is rejected. |
+| **Delegation grant** (`dlg`, embedded in the assertion) | The issuer key only (the web process or the internal signer, option A or B below) | The engagement, the permitted capabilities and the data-classification ceiling for this delegation, and its depth. |
+
+Rules:
+
+- A service key can never sign a grant, so a compromised specialist cannot forge another subject or widen the scope it was granted. At most it can forward a grant, narrower or the same, never wider.
+- The callee computes the effective scope as the **intersection** of the grant, the caller's registry permissions and the callee's own policy. The delegation chain is validated by verifying the grant signature and its recorded hops against the maximum depth.
+- Only the issuer can create a first-hop grant, and the issuer does so only for an authenticated user request and only within the platform's policy for that user's engagement, not on the strength of a model's plan.
+- Both registries and the policy are repository configuration reviewed like `bindings.toml`.
+
+Negative tests: a service key used to claim another `sub`; a service key used to sign a grant; a forwarded grant with widened capabilities, engagement or classification; a grant past the depth limit; a grant signed by a retired issuer `kid`.
 
 ### Runtime-specific rules
 
@@ -60,12 +81,12 @@ Recommendation: implement A first behind an interface, and move to B before any 
 ## Implementation sequence
 
 - **A2:** authentication (token issue and verification, fail closed, replay cache, tests).
-- **A3:** capability authorization at the callee and at the model and memory call sites (#38), with the delegation `chain`.
+- **A3:** capability authorization at the callee and at the model and memory call sites (#38), with the issuer-signed delegation grant.
 - Per-agent LiteLLM keys and audit-log fields follow.
 
 ## Required tests (deterministic, no inference, no cloud calls)
 
-No token, malformed token, unknown `kid`; expired and not-yet-valid token with an injected clock; wrong audience; tampered body; replayed `jti` and eviction after expiry; identity supplied in body or header is ignored; capability the callee does not own; disabled or missing binding; delegation chain too deep, missing or exceeding scope; classification above the ceiling; cross-agent denial (a Cipher token sent to Nova) and each approved binding's happy path; key rotation overlap and revocation; authentication enabled with no keys refuses to start; unreadable keys returns 503; `/health` open while `/model` and deck routes need a token; log hygiene; no key material in source.
+No token, malformed token, unknown `kid`; expired and not-yet-valid token with an injected clock; wrong audience; tampered body; replayed `jti` and eviction after expiry; identity supplied in body or header is ignored; capability the callee does not own; disabled or missing binding; delegation grant missing, forged, past the depth limit or exceeding scope; a token reused against another route, method, artifact ID, query parameter or body (including an empty body); a service key used to claim another subject or to sign a grant; classification above the ceiling; cross-agent denial (a Cipher token sent to Nova) and each approved binding's happy path; key rotation overlap and revocation; authentication enabled with no keys refuses to start; unreadable keys returns 503; `/health` open while `/model` and deck routes need a token; log hygiene; no key material in source.
 
 ## Open questions
 
@@ -75,6 +96,18 @@ No token, malformed token, unknown `kid`; expired and not-yet-valid token with a
 4. How are engagement and classification established when the web tier has one shared user?
 5. How many replicas does each agent run, given the in-memory replay cache?
 6. Which signing library is acceptable as a dependency?
+
+## Sources and verification dates
+
+Retrieved 2026-11-02 by a read-only assessment. These pages are summarised here, not quoted, and the specific passages were not re-captured; re-check them before implementation. "Not documented" below means the page says nothing, which is not evidence that a feature is unsupported.
+
+| Claim | Source | Status |
+|---|---|---|
+| AgentCore Runtime inbound auth is IAM SigV4 or a custom JWT authorizer, not both on one runtime; a JWT authorizer takes a discovery URL, allowed clients, audiences and scopes; passing `Authorization` to the agent needs a request-header allowlist | https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-oauth.html | Documented |
+| Whether the JWT authorizer accepts a non-Cognito, self-hosted issuer | the same page shows only a Cognito example | **Not documented; unverified** |
+| DigitalOcean App Platform service-to-service routing by internal name | https://docs.digitalocean.com/products/app-platform/how-to/manage-internal-routing/ | Documented; the page does not mention authentication, mutual TLS, workload identity or in-transit encryption |
+| Any DigitalOcean workload-identity or OIDC offering | none found | **Not documented; assumed absent** |
+| Repository facts (no agent authentication, authorization only in the web process) | the files cited under Context | Verified in the repository at commit `main` of 2026-11-02 |
 
 ## Related
 

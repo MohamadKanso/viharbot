@@ -25,13 +25,14 @@ The web tier holds the planner key when the live team is enabled, so it is both 
 
 | Threat | Control (ADR-006) | Residual risk |
 |---|---|---|
-| **Impersonation:** any workload on the network calls any agent | Callee verifies a signed token; `sub` comes only from the token | Compromise of the issuer key |
+| **Impersonation:** any workload on the network calls any agent | Callee verifies a signed token; each key is bound to one subject; `sub` comes only from the token | Compromise of the issuer key |
+| **Interception of traffic** (prompts, artifacts, bearer token) | TLS across platform or cloud boundaries; request binding and short expiry limit a stolen token | Plaintext between containers on one private network is an accepted risk, not a control |
 | **Unauthorized invocation** of `/process`, `/model`, deck downloads | Token required on all but `/health`; capability check at the callee | A misconfigured route left open; covered by a route-enumeration test |
 | **Credential compromise** | Short expiry, per-service keys, `kid` rotation and revocation, secrets from the platform store | A stolen key is valid until revoked |
 | **Replay** | `exp` of 60 s or less, `jti` cache, audience and body-hash binding | Multi-replica callees need shared replay state |
 | **Lateral movement** from one compromised agent | Callee-side allowlist of caller to capability; internal ports only; per-agent keys | Agents that legitimately call each other |
 | **Excessive privilege** | Bindings grant suitability only; policy decides; DigitalOcean and AWS credentials never go to ordinary agents | Policy mistakes; reviewed by humans |
-| **Unauthorized or laundered delegation (confused deputy via Charlie)** | Platform authorizes the tuple independently; the user's engagement scope bounds data and tools; `chain` scope is an intersection | A prompt-injected plan can still request something allowed |
+| **Unauthorized or laundered delegation (confused deputy via Charlie)** | Platform authorizes the tuple independently; the user's engagement scope bounds data and tools; only the issuer signs delegation grants, and the effective scope is an intersection | A prompt-injected plan can still request something allowed |
 | **Cross-agent data leakage** | Per-engagement and per-agent scope checks at memory and data boundaries (ADR-009) | Content copied into prompts is outside this control |
 | **Cross-runtime trust** (DigitalOcean, AgentCore, Fargate) | The same in-app token check on every runtime; no reliance on cloud identity across clouds | Differences in what each cloud logs |
 | **Prompt injection** | Retrieved content is data; authorization never reads model output | Model may still be misled in what it writes |
@@ -46,4 +47,11 @@ Denial of service, supply-chain compromise of dependencies or images, the securi
 
 ## Verification status
 
-Verified in the repository: the current absence of authentication and where authorization runs. Verified in AWS and DigitalOcean documentation: AgentCore accepts SigV4 or a JWT authorizer but not both on one runtime; DigitalOcean internal routing documents no authentication. **Unverified:** whether AgentCore's JWT authorizer accepts a self-hosted issuer, and any DigitalOcean workload-identity or internal-encryption feature.
+Sources are listed with retrieval dates (2026-11-02) in `docs/adr/ADR-006-workload-identity-and-authorization.md`, section "Sources and verification dates". In short:
+
+- **Verified in the repository:** the current absence of agent authentication and where authorization runs.
+- **Documented by AWS** (https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-oauth.html): AgentCore accepts SigV4 or a JWT authorizer, not both on one runtime.
+- **Not documented by DigitalOcean** (https://docs.digitalocean.com/products/app-platform/how-to/manage-internal-routing/): the internal-routing page says nothing about authentication or encryption. That is the absence of documentation, not proof the feature does not exist.
+- **Unverified:** whether AgentCore's JWT authorizer accepts a self-hosted issuer, and any DigitalOcean workload-identity or internal-encryption feature.
+
+Transport confidentiality is a separate matter from authentication; ADR-006 records the private-network plaintext exception as an accepted risk.
