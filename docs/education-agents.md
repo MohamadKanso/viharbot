@@ -12,7 +12,7 @@ ViharBot adds two identities that will turn its verified engineering history int
 - Identity files and system prompts for both agents, loaded by the existing identity registry. Ten identities now load; the original eight keep their IDs and files.
 - Two new planned capabilities, `knowledge_curation` and `curriculum_design`. Nothing executes them.
 - 20 declarative skills (10 each, domain `education`), all `proposed`.
-- No execution binding, endpoint, service, GitHub access, memory access, model alias or UI change. Neither agent can be reached by orchestration or chat.
+- No execution binding, endpoint, service, GitHub access, memory access or model alias. The team page gains a coming-soon section with their portrait; the chat sidebar and every execution path are unchanged. Neither agent can be reached by orchestration or chat.
 
 ## What is not implemented
 
