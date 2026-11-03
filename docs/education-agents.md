@@ -30,6 +30,19 @@ ViharBot adds two identities that will turn its verified engineering history int
 
 Model-assisted enrichment (objectives, rationale synthesis) through LiteLLM, `learning.*` activity events, and a webhook endpoint. The instructor repo has no `knowledge/` directory yet; the first proposal creates it. Human review of the artifact format is needed before any are merged.
 
+## Phase 4 groundwork: curriculum schema (implemented, inert)
+
+`src/viharbot/curriculum/` holds typed records and checks only. `web_app` does not import it.
+
+- **Models:** `Lesson` with the 14 specified fields, `Exercise` (required `mode`: `simulated` or `live_system`; a live exercise needs an explicit `authorization_note` and a non-production target, and no exercise may target production), seven assessment kinds, and `Track`/`Curriculum`.
+- **Tracks:** eight tracks exist as data, all marked `proposed` and empty. The specification text is not in this repository, so the titles were derived from Phase 2's topic areas and must be reconciled with the specification and the onboarding repositories by a human.
+- **Loader:** parses one lesson from Markdown with TOML (`+++`) front matter and fixed `##` sections. The onboarding repositories' lessons have no front matter, so existing lessons would need conversion. Lesson text is stored as strings and never interpreted.
+- **Validation:** `validate_traceability` fails when a lesson cites an instructor artifact that is missing, not `approved`, or at a different commit or version, and reports lessons with no instructor reference. `validate_prerequisites` reports unknown ids, self-references, duplicates and cycles.
+
+### Not done in Phase 4 groundwork
+
+No lesson generation, no model call, no GitHub access, no pull requests for curriculum, no writes to any repository, and no source of approved instructor artifacts (callers must supply one). Ada is still inactive: no execution binding, endpoint or model alias. The track list is unapproved, and founder approval to start Phase 4 is not recorded.
+
 ## What is not implemented
 
 Institutional memory, curriculum generation, learner records, lessons, assessments, `learning.*`/`curriculum.*`/`lesson.*` events and repository credentials. These are phases 2 to 6 of the specification and each needs its own reviewed change.
