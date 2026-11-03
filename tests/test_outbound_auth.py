@@ -234,6 +234,7 @@ def test_end_to_end_post_json_to_specialist_with_auth_enabled(on, monkeypatch, t
             return Response(response.content)
 
         monkeypatch.setattr(demo, "urlopen", transport)
+        monkeypatch.setattr(demo, "no_redirect_urlopen", transport)
 
         def call(destination):
             with pytest.raises(HTTPError) as raised:
@@ -248,3 +249,13 @@ def test_end_to_end_post_json_to_specialist_with_auth_enabled(on, monkeypatch, t
         assert call("fact-check") == 401  # unsigned: refused by the same callee
     finally:
         load_specialist(monkeypatch, tmp_path)
+
+
+def test_signed_requests_use_the_no_redirect_opener(on, monkeypatch):
+    plain, strict = Transport(), Transport()
+    monkeypatch.setattr(demo, "urlopen", plain)
+    monkeypatch.setattr(demo, "no_redirect_urlopen", strict)
+    demo.post_json("http://fact-check:8000/process", {"a": 1}, "rid", "fact-check")
+    assert (len(plain.requests), len(strict.requests)) == (0, 1)
+    demo.post_json("http://research:8000/research", {"a": 1}, "rid", "research")  # unsigned
+    assert (len(plain.requests), len(strict.requests)) == (1, 1)

@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from .contracts import AgentResponse, validate_agent_response
 from .deadline import DeadlineExceeded, RequestDeadline, bounded_timeout, is_timeout_error
+from .litellm_client import urlopen as no_redirect_urlopen
 from .observability import configure_logging
 from .outbound_auth import OutboundAuthError, outbound_headers
 from .pipeline_state import (
@@ -125,18 +126,19 @@ def post_json(
     headers = {"Content-Type": "application/json", "X-Request-ID": request_id}
     try:
         # Off by default (adds nothing). When on, a failure here stops the call: no unsigned fallback.
-        headers.update(
-            outbound_headers(
-                url, destination=destination, method="POST", body=data, request_id=request_id
-            )
+        assertion = outbound_headers(
+            url, destination=destination, method="POST", body=data, request_id=request_id
         )
     except OutboundAuthError as exc:
         log_failure(exc)
         raise
+    headers.update(assertion)
+    # A signed request never follows redirects, so the token cannot be forwarded to another origin.
+    opener = no_redirect_urlopen if assertion else urlopen
     request = Request(url, data=data, headers=headers)
     try:
         timeout = bounded_timeout(timeout_cap, deadline)
-        with urlopen(request, timeout=timeout) as response:
+        with opener(request, timeout=timeout) as response:
             if deadline is not None:
                 deadline.require_remaining()  # the response arrived after the deadline
             result = json.loads(_read_body(response, deadline).decode("utf-8"))

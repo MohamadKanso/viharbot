@@ -82,8 +82,7 @@ Not wired:
   verifier yet.
 - AgentCore (`agentcore://`): untouched; the SigV4-plus-assertion carrier is separate work.
 - No Sage client exists in `src`; Sage is not called by the web tier.
-- `post_json` follows HTTP redirects (standard `urlopen`), so a redirecting callee would see the
-  token; the token is bound to one target and expires in 30 s, but redirects are not blocked.
+- Redirects: a signed request is sent through the no-redirect opener (`litellm_client.urlopen`), so the token is never forwarded to another origin; a redirecting callee surfaces as an HTTP error. Unsigned calls keep the default behavior.
 - `eng` and `cls` are fixed placeholders (`unscoped`, `unclassified`); there is no `dlg` (A3).
 - No sustained rotation, no separate signer, no per-user identity.
 
