@@ -455,9 +455,16 @@ class NovaRouter:
             return RoutingResult("failed", error, final, tuple(log))
 
         # Eligibility is evaluated per request and instance, so failover never widens it.
+        # Stateful work may start on a non-primary only if it shares the primary's state.
         candidates = [
             i for i in self._manifest.instances
-            if request.operation_class in i.operation_classes and self._eligible(i, request)
+            if request.operation_class in i.operation_classes
+            and self._eligible(i, request)
+            and (
+                request.operation_class != "stateful"
+                or i is self._manifest.primary
+                or self._shares_state(i)
+            )
         ]
         if not candidates:
             return stop("no_eligible_instance", 0, False)
@@ -489,9 +496,10 @@ class NovaRouter:
             if outcome is Outcome.COMPLETED:
                 return RoutingResult("completed", None, result, tuple(log))
             if outcome is Outcome.FAILED_AFTER_RUNNING:
-                return stop("failure_after_running", attempt, False, result)
+                return stop("failure_after_running", attempt, possible_dup, result)
             unknown = outcome is Outcome.UNKNOWN
-            dup: bool | str = "unknown" if unknown else False
+            # Uncertainty is cumulative: an earlier unresolved attempt stays unresolved.
+            dup: bool | str = "unknown" if unknown or possible_dup else False
             others = [i for i in candidates if i is not target]
             if attempt >= MAX_ATTEMPTS:
                 return stop("attempts_exhausted", attempt, dup, result)
@@ -508,11 +516,12 @@ class NovaRouter:
                 return stop("deadline_exhausted", attempt, dup, result)
             if unknown and not (
                 target.budget_enforcement == "metered"
+                and secondary.budget_enforcement == "metered"
                 and retry_budget_admitted(request.budget, self._defaults)
             ):
                 return stop("retry_budget_not_admitted", attempt, dup, result)
             failover_from, target = target.instance_id, secondary
             reason = "unknown_outcome" if unknown else "not_accepted"
             decision = "retry_after_unknown" if unknown else "failover_not_accepted"
-            possible_dup = unknown
+            possible_dup = possible_dup or unknown
         raise AssertionError("unreachable: the loop returns on its final attempt")  # pragma: no cover

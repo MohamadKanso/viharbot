@@ -41,16 +41,16 @@ class Clock:
         return self.now
 
 
-def manifest_dict(metered=True, classes=("read_only",), honors=False):
+def manifest_dict(metered=True, classes=("read_only",), honors=False, secondary_metered=True):
     raw = json.loads(EXAMPLE.read_text())
     for inst in raw["instances"]:
         inst["operation_classes"] = list(classes)
         inst["honors_idempotency_key"] = honors
     if metered:
-        raw["instances"][0]["budget_enforcement"] = "metered"
-        raw["instances"][0]["budget_evidence"] = {
-            k: "recorded" for k in EVIDENCE_ITEMS + EVIDENCE_SCOPE
-        }
+        targets = raw["instances"] if secondary_metered else raw["instances"][:1]
+        for entry in targets:
+            entry["budget_enforcement"] = "metered"
+            entry["budget_evidence"] = {k: "recorded" for k in EVIDENCE_ITEMS + EVIDENCE_SCOPE}
     return raw
 
 
@@ -389,6 +389,18 @@ def test_unknown_outcome_not_retried_when_primary_not_metered():
     assert r.error == "retry_budget_not_admitted" and len(t.calls) == 1
 
 
+def test_unknown_outcome_not_retried_on_unmetered_secondary():
+    t = Scripted(**{PRIMARY: [TIMEOUT]})
+    r = router(t, manifest(secondary_metered=False)).route(request())
+    assert r.error == "retry_budget_not_admitted" and len(t.calls) == 1
+    # Reverse direction: start on the unmetered secondary (primary breaker open).
+    breaker = CircuitBreaker(failure_threshold=1, clock=Clock())
+    breaker.record_attempt(False)
+    t = Scripted(**{SECONDARY: [TIMEOUT]})
+    r = router(t, manifest(secondary_metered=False), breakers={PRIMARY: breaker}).route(request())
+    assert r.error == "retry_budget_not_admitted" and len(t.calls) == 1
+
+
 def test_secondary_unavailable_after_failover_fails_with_two_attempts_at_most():
     t = Scripted(**{PRIMARY: [TIMEOUT], SECONDARY: [TIMEOUT]})
     r = router(t).route(request(budget={**GOOD_BUDGET, "total_max_output_tokens": 5000,
@@ -396,6 +408,16 @@ def test_secondary_unavailable_after_failover_fails_with_two_attempts_at_most():
     assert (r.status, r.error) == ("failed", "attempts_exhausted")
     assert len(t.calls) == 2  # never a third attempt
     assert r.decisions[-1].possible_duplicate == "unknown"
+
+
+def test_terminal_record_keeps_uncertainty_from_unknown_first_attempt():
+    big = {**GOOD_BUDGET, "total_max_output_tokens": 5000, "total_max_cost_usd": 500_000}
+    t = Scripted(**{PRIMARY: [TIMEOUT], SECONDARY: [app_error(SECONDARY)]})
+    r = router(t).route(request(budget=big))
+    assert (r.error, r.decisions[-1].possible_duplicate) == ("failure_after_running", True)
+    t = Scripted(**{PRIMARY: [TIMEOUT], SECONDARY: [PRE_SEND]})
+    r = router(t).route(request(budget=big))
+    assert (r.error, r.decisions[-1].possible_duplicate) == ("attempts_exhausted", "unknown")
 
 
 def test_secondary_unavailable_after_not_accepted():
@@ -509,10 +531,24 @@ def test_stateful_and_side_effecting_unknown_never_retried(op):
 OPERATION_CLASSES_ALL = ("read_only", "idempotent", "stateful", "side-effecting")
 
 
+def test_stateful_initial_selection_on_secondary_needs_shared_state():
+    m = manifest(classes=OPERATION_CLASSES_ALL)
+    breaker = CircuitBreaker(failure_threshold=1, clock=Clock())
+    breaker.record_attempt(False)  # primary breaker open
+    t = Scripted(**{PRIMARY: [PRE_SEND]})
+    r = router(t, m, breakers={PRIMARY: breaker}).route(request(op="stateful"))
+    assert [c[0] for c in t.calls] == [PRIMARY]  # the secondary never received it
+    assert r.error == "no_failover_target"
+    t = Scripted(**{SECONDARY: [ok(SECONDARY)]})
+    r = router(t, m, breakers={PRIMARY: breaker}, shares_state=lambda i: True).route(
+        request(op="stateful"))
+    assert r.status == "completed" and [c[0] for c in t.calls] == [SECONDARY]
+
+
 def test_stateful_not_accepted_needs_shared_state():
     m = manifest(classes=OPERATION_CLASSES_ALL)
     t = Scripted(**{PRIMARY: [PRE_SEND]})
-    assert router(t, m).route(request(op="stateful")).error == "failover_not_allowed"
+    assert router(t, m).route(request(op="stateful")).error == "no_failover_target"
     t = Scripted(**{PRIMARY: [PRE_SEND], SECONDARY: [ok(SECONDARY)]})
     r = router(t, m, shares_state=lambda i: i.instance_id == SECONDARY).route(request(op="stateful"))
     assert r.status == "completed"
