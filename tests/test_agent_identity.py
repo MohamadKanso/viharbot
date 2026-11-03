@@ -81,7 +81,10 @@ def test_all_ten_identities_load_with_unique_ids():
 def test_the_eight_original_identities_keep_their_stable_ids_and_names():
     registry = load_registry()
     assert ORIGINAL_IDS <= {i.id for i in registry.list()}
-    assert registry.get("charlie").name == "Charlie Chatwin"
+    names = {i: registry.get(i).name for i in ORIGINAL_IDS}
+    assert names == {"charlie": "Charlie Chatwin", "nova": "Nova", "atlas": "Atlas",
+                     "pixel": "Pixel", "sage": "Sage", "cipher": "Cipher", "scout": "Scout",
+                     "orbit": "Orbit"}
     assert registry.get("archie").title == "Chief Knowledge & Learning Officer"
     assert registry.get("ada").title == "Director of Curriculum & Learning Experience"
     assert registry.get("archie").system_prompt != registry.get("ada").system_prompt
