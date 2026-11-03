@@ -23,9 +23,10 @@ from viharbot.skills import (
 )
 
 AGENTS = load_registry()
-EXPECTED_IDS = {"charlie", "nova", "atlas", "pixel", "sage", "cipher", "scout", "orbit"}
+ORIGINAL_IDS = {"charlie", "nova", "atlas", "pixel", "sage", "cipher", "scout", "orbit"}
+EXPECTED_IDS = ORIGINAL_IDS | {"archie", "ada"}
 EXPECTED_COUNTS = {"charlie": 8, "nova": 8, "scout": 8, "cipher": 12, "atlas": 10, "pixel": 8,
-                   "sage": 10, "orbit": 14}
+                   "sage": 10, "orbit": 14, "archie": 10, "ada": 10}
 SRC = Path(__file__).resolve().parent.parent / "src" / "viharbot"
 REGISTRY_DOC = (
     Path(__file__).resolve().parent.parent / "docs" / "governance" / "agent-skills-registry-v1.md"
@@ -54,15 +55,15 @@ def load(tmp_path: Path, *skills: dict, agent: str = "charlie"):
     return load_skill_registry(tmp_path, AGENTS)
 
 
-# 1. exactly eight established identities remain registered
-def test_exactly_the_eight_established_identities_remain_registered():
-    assert {a.id for a in AGENTS.list()} == EXPECTED_IDS and len(AGENTS) == 8
+# 1. the eight established identities remain registered, alongside Archie and Ada
+def test_the_eight_established_identities_remain_registered_with_the_two_education_agents():
+    assert {a.id for a in AGENTS.list()} == EXPECTED_IDS and len(AGENTS) == 10
 
 
-# 2. all skill definitions load successfully, and all 78 are represented
+# 2. all skill definitions load successfully, and all 98 are represented
 def test_packaged_skills_load_and_cover_the_registry_document():
     registry = default_skill_registry()
-    assert len(registry) == 78
+    assert len(registry) == 98
     assert {a: len(registry.owned_by(a)) for a in EXPECTED_IDS} == EXPECTED_COUNTS
     documented = set(re.findall(r"(?m)^\| `([a-z_]+\.[a-z_]+)` \|", REGISTRY_DOC.read_text()))
     assert {s.skill_id for s in registry.list()} == documented
@@ -283,7 +284,7 @@ def test_existing_bindings_and_capability_status_are_unchanged():
         "research", "fact_check", "source_quality", "security_assessment", "privacy_review",
         "synthesis", "slide_generation", "philosophical_analysis", "code_review",
     }
-    assert len(Capability) == 13
+    assert len(Capability) == 15
 
 
 # 12. existing workflows remain functional: the runtime does not depend on skills
@@ -312,7 +313,7 @@ def test_loading_makes_no_network_calls(monkeypatch):
 
     monkeypatch.setattr(socket, "socket", blocked)
     monkeypatch.setattr(socket, "getaddrinfo", blocked)
-    assert len(load_skill_registry(agents=AGENTS)) == 78
+    assert len(load_skill_registry(agents=AGENTS)) == 98
 
 
 def test_skills_package_does_not_import_inference_clients():

@@ -1,0 +1,107 @@
+# Archie: Knowledge and Learning. Declarative skills proposed in the education-agents specification.
+# Every skill here is `proposed`: declared only, with no execution contract. Listing a
+# skill grants no tool, scope or data access and does not make it executable.
+
+[[skill]]
+skill_id = "education.pr_analysis"
+version = "0.1.0"
+name = "Pull request analysis"
+description = "Pull request analysis. Expected deliverable: pull request analysis notes."
+owner = "archie"
+category = "education"
+outputs = ["Pull request analysis notes"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.engineering_history"
+version = "0.1.0"
+name = "Engineering history"
+description = "Engineering history. Expected deliverable: engineering history summary."
+owner = "archie"
+eligible_agents = ["ada"]
+category = "education"
+outputs = ["Engineering history summary"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.knowledge_extraction"
+version = "0.1.0"
+name = "Knowledge extraction"
+description = "Knowledge extraction. Expected deliverable: provenance-tagged learning artifact."
+owner = "archie"
+category = "education"
+outputs = ["Provenance-tagged learning artifact"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.memory_synthesis"
+version = "0.1.0"
+name = "Memory synthesis"
+description = "Memory synthesis. Expected deliverable: synthesis of authorized knowledge."
+owner = "archie"
+category = "education"
+outputs = ["Synthesis of authorized knowledge"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.institutional_knowledge"
+version = "0.1.0"
+name = "Institutional knowledge curation"
+description = "Institutional knowledge curation. Expected deliverable: institutional knowledge entries."
+owner = "archie"
+eligible_agents = ["ada"]
+category = "education"
+outputs = ["Institutional knowledge entries"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.instructor_material"
+version = "0.1.0"
+name = "Instructor material authoring"
+description = "Instructor material authoring. Expected deliverable: instructor guide."
+owner = "archie"
+eligible_agents = ["ada"]
+category = "education"
+outputs = ["Instructor guide"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.technical_explanation"
+version = "0.1.0"
+name = "Technical explanation"
+description = "Technical explanation. Expected deliverable: technical explanation."
+owner = "archie"
+eligible_agents = ["ada"]
+category = "education"
+outputs = ["Technical explanation"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.lesson_delivery"
+version = "0.1.0"
+name = "Lesson delivery"
+description = "Lesson delivery. Expected deliverable: lesson delivery plan."
+owner = "archie"
+category = "education"
+outputs = ["Lesson delivery plan"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.socratic_teaching"
+version = "0.1.0"
+name = "Socratic teaching"
+description = "Socratic teaching. Expected deliverable: socratic question sequence."
+owner = "archie"
+category = "education"
+outputs = ["Socratic question sequence"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.knowledge_validation"
+version = "0.1.0"
+name = "Knowledge validation"
+description = "Knowledge validation. Expected deliverable: validation status report."
+owner = "archie"
+category = "education"
+outputs = ["Validation status report"]
+status = "proposed"

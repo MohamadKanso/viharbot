@@ -130,6 +130,7 @@ TEAM_IMAGES = {
     "Scout_headshot.png",
     "Orbit_headshot.png",
     "AI Robot Team Portrait Grid.png",
+    "Professor_and_Assistant.png",
     "model-openai.svg",
     "model-gemini.svg",
 }

@@ -218,6 +218,40 @@ Execution availability shall additionally depend on capability bindings, runtime
 
 **Quality requirements:** Reproducibility, testability, least-privilege execution, rollback planning, and accurate deployment reporting.
 
+### 10a. Education Extension: Archie and Ada
+
+*Proposed amendment, see [Education agents](../education-agents.md). These skills are `proposed` and executable by nobody.*
+
+#### Archie — Knowledge and Learning
+
+| Skill ID | Skill | Expected deliverable |
+|---|---|---|
+| `education.pr_analysis` | Pull request analysis | Pull request analysis notes |
+| `education.engineering_history` | Engineering history | Engineering history summary |
+| `education.knowledge_extraction` | Knowledge extraction | Provenance-tagged learning artifact |
+| `education.memory_synthesis` | Memory synthesis | Synthesis of authorized knowledge |
+| `education.institutional_knowledge` | Institutional knowledge curation | Institutional knowledge entries |
+| `education.instructor_material` | Instructor material authoring | Instructor guide |
+| `education.technical_explanation` | Technical explanation | Technical explanation |
+| `education.lesson_delivery` | Lesson delivery | Lesson delivery plan |
+| `education.socratic_teaching` | Socratic teaching | Socratic question sequence |
+| `education.knowledge_validation` | Knowledge validation | Validation status report |
+
+#### Ada — Curriculum and Learning Experience
+
+| Skill ID | Skill | Expected deliverable |
+|---|---|---|
+| `education.curriculum_design` | Curriculum design | Curriculum structure |
+| `education.lesson_authoring` | Lesson authoring | Lesson |
+| `education.learning_objectives` | Learning objectives | Learning objectives |
+| `education.prerequisite_mapping` | Prerequisite mapping | Prerequisite map |
+| `education.exercise_generation` | Exercise generation | Exercise set |
+| `education.assessment_design` | Assessment design | Assessment |
+| `education.curriculum_versioning` | Curriculum versioning | Curriculum change record |
+| `education.learning_progression` | Learning progression | Progression plan |
+| `education.student_feedback` | Student feedback | Feedback on learner responses |
+| `education.learning_analytics` | Learning analytics | Learning gap report |
+
 ### 11. Shared Skills
 
 Some skills should be available to multiple agents without creating duplicate identities.
