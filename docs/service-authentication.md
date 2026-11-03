@@ -63,3 +63,8 @@ inject them from the platform secret store.
   upper-cased and an escape of an unreserved character is rejected. An empty query (`/x?`) is signed
   as no query because ASGI does not distinguish it. A space or a `#` in the target is rejected.
 - Plaintext HTTP on a private network is still an accepted interception risk (ADR-006, Transport).
+- **No body-size cap before authentication.** The request body is buffered before the assertion is
+  checked (the assertion binds a hash of the body, so it must be read first), and no body-size cap
+  exists before authentication. This is tracked in
+  https://github.com/vchokshi/viharbot/issues/101 and must be settled before authentication is
+  enabled on any service reachable beyond the private network. It is not implemented in this PR.

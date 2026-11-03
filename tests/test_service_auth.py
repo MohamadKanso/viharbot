@@ -843,12 +843,38 @@ def test_structurally_invalid_refresh_keeps_last_known_good_then_fails_closed(wo
            "key_registry_unavailable")
 
 
-def test_deeply_nested_token_json_is_a_401_not_a_server_error(world):
+def test_oversized_deeply_nested_token_is_a_401_from_the_size_limit(world):
+    # These payloads exceed MAX_TOKEN_BYTES, so the size limit stops them before the nesting
+    # guard; the guard itself is exercised by the two tests after the next one.
     header = sa.b64url_encode(json.dumps(good_header()).encode())
     for payload in ('{"a":' * 3000 + "1" + "}" * 3000, "[" * 4000 + "]" * 4000):
         seg = sa.b64url_encode(payload.encode())
         denied(world, f"{header}.{seg}.AAAA", 401, "malformed_token")
         denied(world, f"{seg}.{header}.AAAA", 401, "malformed_token")
+
+
+def _nested_object(levels):
+    # A valid JSON object with exactly `levels` nested containers.
+    return '{"a":' * (levels - 1) + "{}" + "}" * (levels - 1)
+
+
+def _token_with_claims_payload(payload):
+    header = sa.b64url_encode(json.dumps(good_header()).encode())
+    token = f"{header}.{sa.b64url_encode(payload.encode())}.AAAA"
+    assert len(token.encode()) < sa.MAX_TOKEN_BYTES  # the size limit must not be what rejects it
+    return token
+
+
+def test_nesting_exactly_at_the_limit_passes_the_guard(world):
+    token = _token_with_claims_payload(_nested_object(sa.MAX_JSON_NESTING))
+    with pytest.raises(sa.AuthError) as info:
+        verify(world, token)
+    assert info.value.reason != "malformed_token"  # decoded, then rejected for a later reason
+
+
+def test_nesting_just_above_the_limit_is_rejected_by_the_guard(world):
+    token = _token_with_claims_payload(_nested_object(sa.MAX_JSON_NESTING + 1))
+    denied(world, token, 401, "malformed_token")
 
 
 def test_nesting_within_the_bound_still_parses(world):
