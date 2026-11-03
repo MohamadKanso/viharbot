@@ -32,9 +32,9 @@ Implementation order: A2 (authentication), A3 (authorization), B2 (controller), 
 | DigitalOcean deployment controller | about $5/month | one 512 MiB App Platform component |
 | DigitalOcean test apps | about $0.01 per hour each; capped at 3 | destroyed by expiry sweep |
 | DigitalOcean container registry | $0 (starter) or $5/month | image allowlist source |
-| AgentCore Nova (on demand) | about $3 to $40/month at 1,000 requests/day | no idle floor; assumptions in ADR-008 (a warm Fargate standby brings the pair to about $38 to $92/month) |
-| Fargate Nova, always on, one small task plus ALB | about $31 to $52/month | the load balancer (including its public IPv4 addresses) is the largest fixed item |
-| Fargate with desired count 0 | about $23 to $30/month (ALB only) | tear down the ALB between tests for about $0.05/hour |
+| AgentCore Nova (on demand) | about $3 to $40/month at 1,000 requests/day | no idle floor; assumptions in ADR-008 (a warm Fargate standby brings the pair to about $43 to $88/month) |
+| Fargate Nova, always on, one small task plus ALB | about $40 to $48/month | ALB $29.57 (assumes two AZs and 1 LCU-hour) plus task IPv4 $3.65 plus task $7.23 to $14.45; arithmetic in ADR-008 |
+| Fargate with desired count 0 | about $29.57/month (ALB only; same assumptions) | tear down the ALB between tests: about $0.055 to $0.065 per hour while up |
 | Memory: DynamoDB plus a small memory API | under $5/month | recommended |
 | Memory: add Aurora/pgvector | about $45 to $60/month | deferred |
 | Memory: add OpenSearch Serverless | about $175 to $350/month | deferred |
