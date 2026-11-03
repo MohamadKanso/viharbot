@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from .contracts import AgentResponse, validate_agent_response
 from .deadline import DeadlineExceeded, RequestDeadline, bounded_timeout, is_timeout_error
 from .observability import configure_logging
+from .outbound_auth import OutboundAuthError, outbound_headers
 from .pipeline_state import (
     AgentActivity,
     PipelineContext,
@@ -120,11 +121,19 @@ def post_json(
         log_success()
         return result
 
-    request = Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", "X-Request-ID": request_id},
-    )
+    data = json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json", "X-Request-ID": request_id}
+    try:
+        # Off by default (adds nothing). When on, a failure here stops the call: no unsigned fallback.
+        headers.update(
+            outbound_headers(
+                url, destination=destination, method="POST", body=data, request_id=request_id
+            )
+        )
+    except OutboundAuthError as exc:
+        log_failure(exc)
+        raise
+    request = Request(url, data=data, headers=headers)
     try:
         timeout = bounded_timeout(timeout_cap, deadline)
         with urlopen(request, timeout=timeout) as response:
