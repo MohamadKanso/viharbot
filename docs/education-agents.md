@@ -14,9 +14,11 @@ ViharBot adds two identities that will turn its verified engineering history int
 - 20 declarative skills (10 each, domain `education`), all `proposed`.
 - No execution binding, endpoint, service, GitHub access, memory access or model alias. The team page gains a coming-soon section with their portrait; the chat sidebar and every execution path are unchanged. Neither agent can be reached by orchestration or chat.
 
+- Eleven `learning.*`, `curriculum.*`, `lesson.*` and `assessment.*` activity events are **declared** in `live_events.py` (`EDUCATION_EVENT_TYPES`) and documented in [live observability](live-observability.md#education-events-declared-not-emitted). They are **not yet emitted** by any code, are never terminal, and are not part of the chat stream.
+
 ## What is not implemented
 
-Pull request ingestion, learning artifacts, institutional memory, curriculum generation, learner records, lessons, assessments, `learning.*`/`curriculum.*`/`lesson.*` events and repository credentials. These are phases 2 to 6 of the specification and each needs its own reviewed change.
+Pull request ingestion, learning artifacts, institutional memory, curriculum generation, learner records, lessons, assessments, emission of the `learning.*`/`curriculum.*`/`lesson.*` events and repository credentials. These are phases 2 to 6 of the specification and each needs its own reviewed change.
 
 ## Findings that shape later phases
 
