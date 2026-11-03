@@ -178,7 +178,7 @@ def canonical_target(raw_path: bytes, query_string: bytes | None) -> str:
     _check_printable(raw_path)
     if query_string is not None:
         _check_printable(query_string)
-    if b"?" in raw_path or b"#" in raw_path:
+    if b"?" in raw_path or b"#" in raw_path or (query_string is not None and b"#" in query_string):
         raise AuthError(400, "target_unexpected_delimiter")
     _check_path(raw_path)
     target = raw_path
@@ -365,7 +365,14 @@ class ServiceAuthenticator:
         self._replay = replay or ReplayCache()
 
     def verify(
-        self, token: str | None, *, method: str, raw_path: bytes, query: bytes | None, body: bytes
+        self,
+        token: str | None,
+        *,
+        method: str,
+        raw_path: bytes,
+        query: bytes | None,
+        body: bytes,
+        required_capability: str | None = None,
     ) -> Caller:
         if not token:
             raise AuthError(401, "missing_token")
@@ -399,6 +406,8 @@ class ServiceAuthenticator:
         capability = claims["cap"]
         if capability not in entry.capabilities:
             raise AuthError(403, "capability_not_permitted")
+        if required_capability is not None and capability != required_capability:
+            raise AuthError(403, "capability_not_permitted")  # not the operation this route is
         self._check_binding(claims, method, raw_path, query, body)
         self._replay.check_and_add(entry.sub, claims["jti"], claims["exp"], now)
         return Caller(entry.sub, kid, capability, claims["eng"], claims["cls"])
@@ -413,6 +422,9 @@ class ServiceAuthenticator:
         if not _is_int(claims["exp"]) or not _is_int(claims["iat"]):
             raise AuthError(401, "malformed_claim")
         if len(claims["jti"]) > MAX_JTI_LENGTH:
+            raise AuthError(401, "malformed_claim")
+        # JSON allows escaped lone surrogates; keep the bound claims to the ASCII they must be.
+        if not claims["tgt"].isascii() or not claims["req_sha256"].isascii():
             raise AuthError(401, "malformed_claim")
         # `dlg` is optional and ignored in A2 (issue #95); it is neither read nor trusted.
         if claims["iss"] != entry.sub or claims["sub"] != entry.sub:
@@ -460,8 +472,14 @@ def _log_decision(
     )
 
 
-def require_assertion(authenticator: ServiceAuthenticator) -> Callable[[Request], Any]:
-    """Build a FastAPI dependency. Identity comes only from the ``X-Viharbot-Assertion`` token."""
+def require_assertion(
+    authenticator: ServiceAuthenticator, capability: str | None = None
+) -> Callable[[Request], Any]:
+    """Build a FastAPI dependency. Identity comes only from the ``X-Viharbot-Assertion`` token.
+
+    When ``capability`` is given the route accepts only that capability (403 otherwise), in
+    addition to the registry permitting the caller to assert it.
+    """
 
     async def dependency(request: Request) -> Caller:
         request_id = get_request_id(request.headers.get("x-request-id")) or str(uuid4())
@@ -479,6 +497,7 @@ def require_assertion(authenticator: ServiceAuthenticator) -> Callable[[Request]
                 raw_path=raw_path,
                 query=query,
                 body=body,
+                required_capability=capability,
             )
         except AuthError as error:
             _log_decision(

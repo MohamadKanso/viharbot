@@ -862,3 +862,92 @@ def test_recursion_error_in_the_decoder_is_a_401(world, monkeypatch):
 
     monkeypatch.setattr(sa.json, "loads", boom)
     denied(world, mint(world), 401, "malformed_token")
+
+
+# --- review round 2 regressions ---------------------------------------------------------------
+
+
+def _allow_other_capability(world):
+    world.path.write_text(
+        registry_text(("web-1", "web", world.key, ["specialist.process", "other"]))
+    )
+    world.clock.now += sa.REGISTRY_REFRESH_SECONDS
+
+
+def test_required_capability_is_enforced_beyond_registry_membership(world):
+    _allow_other_capability(world)
+    path, query = sa.split_target("/process")
+    kwargs = dict(method="POST", raw_path=path, query=query, body=b'{"question":"q"}')
+    other = forge(world.key, good_header(), good_claims(world, cap="other", jti="o"))
+    assert world.auth.verify(other, **kwargs).capability == "other"  # no route requirement
+    with pytest.raises(sa.AuthError) as info:
+        world.auth.verify(
+            forge(world.key, good_header(), good_claims(world, cap="other", jti="o2")),
+            required_capability="specialist.process", **kwargs,
+        )
+    assert (info.value.status, info.value.reason) == (403, "capability_not_permitted")
+    right = forge(world.key, good_header(), good_claims(world, jti="r"))
+    assert world.auth.verify(right, required_capability="specialist.process", **kwargs).sub == "web"
+
+
+def test_dependency_with_required_capability_returns_403_for_another_capability(world):
+    _allow_other_capability(world)
+    app = FastAPI()
+    dependency = sa.require_assertion(world.auth, "specialist.process")
+
+    @app.post("/process")
+    async def process(caller: sa.Caller = Depends(dependency)):
+        return {"cap": caller.capability}
+
+    client = TestClient(app)
+    body = b'{"question":"q"}'
+    other = mint(world, capability="other")
+    denied_response = client.post("/process", content=body, headers={sa.ASSERTION_HEADER: other})
+    assert denied_response.status_code == 403
+    good = mint(world)
+    allowed = client.post("/process", content=body, headers={sa.ASSERTION_HEADER: good})
+    assert allowed.status_code == 200
+
+
+def test_specialist_routes_require_the_specialist_capability(monkeypatch, tmp_path):
+    key = Ed25519PrivateKey.generate()
+    registry = tmp_path / "registry.toml"
+    registry.write_text(registry_text(("web-1", "web", key, ["unrelated.cap"])))
+    key_file = tmp_path / "k"
+    key_file.write_text(raw_seed(key))
+    module = load_specialist(
+        monkeypatch, tmp_path, **{sa.ENABLE_ENV: "on", sa.REGISTRY_ENV: str(registry)}
+    )
+    try:
+        client = TestClient(module.app)
+        body = b"{}"
+        for target in ("/process", "/invocations"):
+            token = sa.mint_assertion(
+                kid="web-1", sub="web", audience="fact-check", capability="unrelated.cap",
+                engagement="e", classification="c", method="POST", target=target, body=body,
+                key_path=str(key_file),
+            )
+            response = client.post(
+                target, content=body,
+                headers={sa.ASSERTION_HEADER: token, "Content-Type": "application/json"},
+            )
+            assert response.status_code == 403
+    finally:
+        load_specialist(monkeypatch, tmp_path)
+
+
+@pytest.mark.parametrize("claim", ["tgt", "req_sha256"])
+def test_signed_lone_surrogate_claims_are_a_401(world, claim):
+    token = forge(world.key, good_header(), good_claims(world, **{claim: "\ud800"}))
+    denied(world, token, 401, "malformed_claim")
+    response = TestClient(make_app(world)).post(
+        "/process", content=b'{"question":"q"}', headers={sa.ASSERTION_HEADER: token}
+    )
+    assert response.status_code == 401
+
+
+def test_fragment_delimiter_in_query_is_rejected():
+    with pytest.raises(sa.AuthError) as info:
+        sa.canonical_target(b"/x", b"a=1#frag")
+    assert info.value.reason == "target_unexpected_delimiter"
+    assert sa.canonical_target(b"/x", b"a=%23") == "/x?a=%23"

@@ -130,8 +130,9 @@ app = FastAPI(title=definition.title, version="1.0")
 # Service authentication (ADR-006 A2) is off unless VIHARBOT_SERVICE_AUTH is set. When it is on, a
 # missing or empty key registry raises here and the service refuses to start. /health, /ping and
 # /model stay open (follow-up: /model).
+SPECIALIST_CAPABILITY = "specialist.process"
 _authenticator = authenticator_from_environment(AGENT_KIND)
-_auth_dependencies = [Depends(require_assertion(_authenticator))] if _authenticator else []
+_auth_dependencies = [Depends(require_assertion(_authenticator, SPECIALIST_CAPABILITY))] if _authenticator else []
 
 
 def _make_prompt(body: SpecialistRequest) -> str:
