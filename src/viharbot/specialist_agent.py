@@ -8,7 +8,7 @@ import time
 from typing import Any, Type
 from uuid import uuid4
 
-from fastapi import FastAPI, Header, HTTPException, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from .contracts import SpecialistResponse
@@ -18,6 +18,7 @@ from .memory import remember
 from .agentcore_runtime import add_agentcore_routes
 from .model_agent import build_agent
 from .observability import configure_logging, get_request_id
+from .service_auth import authenticator_from_environment, require_assertion
 from .schemas import (
     FactCheckReview,
     FinalSynthesis,
@@ -126,6 +127,13 @@ if AGENT_KIND not in DEFINITIONS:
 definition = DEFINITIONS[AGENT_KIND]
 app = FastAPI(title=definition.title, version="1.0")
 
+# Service authentication (ADR-006 A2) is off unless VIHARBOT_SERVICE_AUTH is set. When it is on, a
+# missing or empty key registry raises here and the service refuses to start. /health, /ping and
+# /model stay open (follow-up: /model).
+SPECIALIST_CAPABILITY = "specialist.process"
+_authenticator = authenticator_from_environment(AGENT_KIND)
+_auth_dependencies = [Depends(require_assertion(_authenticator, SPECIALIST_CAPABILITY))] if _authenticator else []
+
 
 def _make_prompt(body: SpecialistRequest) -> str:
     if AGENT_KIND in {"fact-check", "source-quality"}:
@@ -179,7 +187,7 @@ def model() -> dict[str, str | None]:
     return {"agent": AGENT_KIND, "model_alias": os.getenv(definition.model_env, "").strip() or None}
 
 
-@app.post("/process", response_model=SpecialistResponse)
+@app.post("/process", response_model=SpecialistResponse, dependencies=_auth_dependencies)
 def process(
     body: SpecialistRequest,
     response: Response,
@@ -242,4 +250,4 @@ def process(
         ) from None
 
 
-add_agentcore_routes(app, SpecialistRequest, process)
+add_agentcore_routes(app, SpecialistRequest, process, dependencies=_auth_dependencies)
