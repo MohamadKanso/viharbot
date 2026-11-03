@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 
 import pytest
 from deployment_controller_helpers import (
@@ -169,7 +170,17 @@ def test_execute_needs_an_approval_that_exists_and_was_granted(world):
     assert reason_of(world.ctrl.execute, "apr_missing", caller="x", request_id="r") == (
         "unknown_approval")
     assert reason_of(execute, world, submit(world, payload())) == "not_approved"
-    dep = submit_approved(world.ctrl, payload(2))
+    done = run_all(world.ctrl, payload(2))
+    assert reason_of(world.ctrl.approve, done["approval_id"], approver="approver",
+                     reviewed_hash=done["request_hash"], request_id="r") == "approval_not_pending"
+
+
+def test_approving_again_is_a_safe_retry_only_for_the_same_approver_and_hash(world):
+    dep = submit_approved(world.ctrl, payload())
+    approve(world.ctrl, dep)  # same approver, same hash, still pending
+    assert reason_of(world.ctrl.approve, dep["approval_id"], approver="approver",
+                     reviewed_hash="wrong", request_id="r") == "request_hash_mismatch"
+    world.ctrl.store.data["approvals"][dep["approval_id"]]["approver"] = "someone-else"
     assert reason_of(approve, world.ctrl, dep) == "approval_not_pending"
 
 
@@ -571,6 +582,18 @@ def test_sole_copied_claim_inside_the_reserved_window_is_left_unbound(world):
     assert markers.BOUND_KEY not in planted.env
 
 
+def test_recovery_after_a_lost_bind_response_refreshes_the_deployment_record(world):
+    dep, done = bind_fails(world)
+    app = app_of(world, done)  # the bind landed at the provider but the controller never heard
+    claim = markers.parse_claim(KEY, app.env)
+    app.spec["env"][markers.BOUND_KEY] = markers.bound_entry(KEY, claim, app.app_id)
+    restarted = controller(world)
+    assert [r["action"] for r in restarted.reconcile()] == ["adopted"]
+    record = restarted.get(done["deployment_id"])
+    assert record["status"] == "running" and record["reason"] is None
+    assert restarted.get_approval(dep["approval_id"])["state"] == "executed"
+
+
 def test_stop_and_delete_refuse_an_app_without_verified_ownership(world):
     dep = run_all(world.ctrl, payload())
     del app_of(world, dep).spec["env"][markers.BOUND_KEY]
@@ -663,6 +686,17 @@ def test_store_writes_are_atomic_and_a_corrupt_file_is_treated_as_lost(world, mo
     monkeypatch.undo()
     world.path.write_text("{corrupt")
     assert RecordStore(world.path).all("approvals") == []
+
+
+def test_the_rename_is_made_durable_with_a_directory_fsync(world, monkeypatch):
+    synced = []
+    real = os.fsync
+    monkeypatch.setattr("os.fsync", lambda fd: (synced.append(fd), real(fd))[1])
+    world.ctrl.store.commit(approvals={"x": {"approval_id": "x"}})
+    assert len(synced) == 2  # the temporary file, then the containing directory
+    monkeypatch.setattr("os.fsync", lambda fd: (_ for _ in ()).throw(OSError("no")))
+    with pytest.raises(StoreError):
+        world.ctrl.store.commit(approvals={"y": {"approval_id": "y"}})
 
 
 # --- audit ---------------------------------------------------------------------------------------

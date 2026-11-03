@@ -1,4 +1,7 @@
-"""A small JSON-file record store with atomic, durable writes. No database."""
+"""A small JSON-file record store with atomic, durable writes. No database.
+
+Assumes a POSIX filesystem where fsync of the containing directory persists a rename.
+"""
 
 from __future__ import annotations
 
@@ -55,5 +58,11 @@ class RecordStore:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(tmp, self._path)
+            # Make the rename itself durable, or a crash could bring back an older pending approval.
+            directory = os.open(self._path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
         except OSError as exc:
             raise StoreError("store write failed") from exc

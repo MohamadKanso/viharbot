@@ -171,13 +171,15 @@ class DeploymentController:
             dep = self.store.get("deployments", appr["deployment_id"])
             if approver == appr["requester"]:
                 raise refuse("self_approval_refused", 403, dep)
-            if appr["state"] != "pending" or appr["approver"]:
+            if appr["state"] != "pending" or appr["approver"] not in (None, approver):
                 raise refuse("approval_not_pending", 409, dep)
             if self._clock() >= appr["expires_at"]:
                 self._expire(appr, "approval_expired")
                 raise refuse("approval_expired", 409, dep)
             if not hmac.compare_digest(str(reviewed_hash), appr["request_hash"]):
                 raise refuse("request_hash_mismatch", 409, dep)
+            if appr["approver"]:
+                return appr  # same approver, same hash, still pending: a retry after a 429 or 502
             appr.update(approver=approver, approved_at=int(self._clock()))
             self._save(approvals={approval_id: appr})
             self.audit.emit("approve", "allow", request_id=request_id, caller=approver,
@@ -467,13 +469,18 @@ class DeploymentController:
                 "expires_at": claim.expires_at, "reason": None, "kind": "adopted",
             }
             self._save(deployments={dep_id: dep})
-        approvals = {}
+        approvals, deployments = {}, {}
         for appr in self.store.all("approvals"):  # crash after bind, before `executed` was saved
             if appr["state"] == "reserved" and appr["claim_id"] == claim.claim_id:
                 appr.update(state="executed", app_id=app.app_id)
                 approvals[appr["approval_id"]] = appr
+                owner = self.store.get("deployments", appr["deployment_id"])
+                if owner:
+                    owner.update(status="running", reason=None, app_id=app.app_id,
+                                 expires_at=claim.expires_at)
+                    deployments[owner["deployment_id"]] = owner
         if approvals:
-            self._save(approvals=approvals)
+            self._save(approvals=approvals, deployments=deployments)
         self.audit.emit("adopt", "allow", request_id=request_id, app_id=app.app_id)
         return "adopted"
 
