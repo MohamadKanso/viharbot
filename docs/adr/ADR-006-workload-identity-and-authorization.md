@@ -57,13 +57,13 @@ Verifying a signature proves who signed, not that the signer may assert a given 
 
 - the requester's assertion verifies and its `sub` **equals the parent grant's `rcp`** (so someone who merely obtained another service's grant cannot use it to mint a child for an identity they control);
 - the parent grant verifies, is unexpired and has not been revoked;
-- the child's `rcp` is the named recipient, its `par` is the parent's `gid`, and its `caps`, resource scope, `cls` and `exp` are each equal to or narrower than the parent's;
+- the child's `eng` **equals the parent's `eng`** (a delegation never moves to another engagement), its `rcp` is the named recipient, its `par` is the parent's `gid`, and its `caps`, resource scope, `cls` and `exp` are each equal to or narrower than the parent's;
 - **depth strictly increases**: `child.depth = parent.depth + 1`, and `child.depth <= parent.depth_max`;
 - **`depth_max` can only stay the same or shrink**: `child.depth_max <= parent.depth_max`, so redelegation can never raise the limit or keep depth flat.
 
 The issuer enforces that attenuation before signing. This removes the need for a hop list that could be truncated or reordered: the issuer-signed `par` and `depth` are the chain.
 
-**Callee validation algorithm.** Reject unless all of these hold: the assertion verifies and its `sub` matches the registry for its `kid`; the grant verifies against an active issuer `kid`; the grant's `rcp` equals the assertion `sub` (so a grant cannot be moved to another caller); `exp` has not passed; `mth`, `tgt` and `req_sha256` match the actual request; the requested capability is in `caps` and the request's `tgt` falls inside that capability's resource scope; `cls` covers the data; `depth` is within `depth_max`; and the effective scope, the **intersection** of the grant, the caller's registry entry and the callee's own policy, still permits the action.
+**Callee validation algorithm.** Reject unless all of these hold: the assertion verifies and its `sub` matches the registry for its `kid`; the grant verifies against an active issuer `kid`; the grant's `rcp` equals the assertion `sub` (so a grant cannot be moved to another caller); the assertion's `eng` **equals the grant's `eng`**, and the resource being accessed belongs to that engagement (checked against the callee's resource-to-engagement mapping, never against a value in the request body); `exp` has not passed; `mth`, `tgt` and `req_sha256` match the actual request; the requested capability is in `caps` and the request's `tgt` falls inside that capability's resource scope; `cls` covers the data; `depth` is within `depth_max`; and the effective scope, the **intersection** of the grant, the caller's registry entry and the callee's own policy, still permits the action.
 
 Rules:
 
@@ -71,7 +71,7 @@ Rules:
 - Only the issuer creates a first-hop grant, only for an authenticated user request and within platform policy for that user's engagement, never on the strength of a model's plan.
 - Both registries and the policy are repository configuration reviewed like `bindings.toml`.
 
-Negative tests: a service key used to claim another `sub`; a service key used to sign a grant; a grant transplanted to a different caller (`rcp` mismatch); resource substitution (a grant scoped to one resource used against another); an expired grant, and a child grant outliving its parent; a redelegation request wider than its parent in capabilities, engagement, classification, resource scope or depth (the issuer refuses); a grant past `depth_max`; a redelegation request whose requester `sub` is not the parent grant's `rcp` (a stolen parent grant); a child with unchanged or lower `depth`, or with a raised `depth_max`; a grant signed by a retired issuer `kid`; a grant whose `par` is unknown to the issuer.
+Negative tests: a service key used to claim another `sub`; a service key used to sign a grant; a grant transplanted to a different caller (`rcp` mismatch); resource substitution (a grant scoped to one resource used against another); an expired grant, and a child grant outliving its parent; a redelegation request wider than its parent in capabilities, engagement, classification, resource scope or depth (the issuer refuses); a grant past `depth_max`; a redelegation request whose requester `sub` is not the parent grant's `rcp` (a stolen parent grant); a child with unchanged or lower `depth`, or with a raised `depth_max`; a child grant naming a different engagement than its parent; an assertion whose `eng` differs from its grant's; a resource that belongs to another engagement than the grant names; a grant signed by a retired issuer `kid`; a grant whose `par` is unknown to the issuer.
 
 ### Runtime-specific rules
 
