@@ -51,7 +51,9 @@ inject them from the platform secret store.
   and `/model` stay open. Follow-ups: `/model`, Pixel, Sage, Research and Security services.
 - `dlg` is optional and ignored; there is no grant, scope, redelegation or engagement/classification
   check (A3, #95, #94). `eng` and `cls` are required but not enforced. The audit claim is "every call
-  is authenticated", not "every call is authorized".
+  to a protected route is authenticated while authentication is enabled", not "every call is
+  authenticated" and not "every call is authorized". Routes left open (see above) and any service
+  with authentication off make no such claim.
 - The AgentCore fallback carrier (`assertion` in the `/invocations` envelope with a JCS body hash)
   is not implemented; the body hash is over the raw bytes received.
 - The replay cache is per process. A callee with several replicas needs shared state (ADR open

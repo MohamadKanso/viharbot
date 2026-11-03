@@ -55,6 +55,7 @@ REGISTRY_GRACE_SECONDS = 15 * 60
 MAX_REPLAY_ENTRIES = 10_000
 MAX_TOKEN_BYTES = 8192
 MAX_JTI_LENGTH = 128
+MAX_JSON_NESTING = 16
 
 ENABLE_ENV = "VIHARBOT_SERVICE_AUTH"
 REGISTRY_ENV = "VIHARBOT_KEY_REGISTRY"
@@ -210,9 +211,15 @@ def parse_registry(text: str) -> dict[str, KeyEntry]:
     Format: ``[[keys]]`` tables with ``kid``, ``sub``, ``public_key`` (base64url, the 32 raw
     Ed25519 bytes) and ``capabilities`` (list of strings). Public keys only.
     """
-    data = tomllib.loads(text)
+    try:
+        data = tomllib.loads(text)
+    except (tomllib.TOMLDecodeError, RecursionError) as exc:
+        raise ValueError("registry is not valid TOML") from exc
+    items = data.get("keys", [])
+    if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
+        raise ValueError("keys must be a list of tables")
     entries: dict[str, KeyEntry] = {}
-    for item in data.get("keys", []):
+    for item in items:
         kid, sub, caps = item.get("kid"), item.get("sub"), item.get("capabilities")
         if not isinstance(kid, str) or not kid or not isinstance(sub, str) or not sub:
             raise ValueError("each key needs a non-empty kid and sub")
@@ -220,7 +227,10 @@ def parse_registry(text: str) -> dict[str, KeyEntry]:
             raise ValueError("duplicate kid")
         if not isinstance(caps, list) or not all(isinstance(c, str) and c for c in caps):
             raise ValueError("capabilities must be a list of strings")
-        raw = b64url_decode(str(item.get("public_key", "")))
+        encoded = item.get("public_key")
+        if not isinstance(encoded, str):
+            raise ValueError("public_key must be a string")
+        raw = b64url_decode(encoded)
         if len(raw) != 32:
             raise ValueError("public_key must be 32 raw Ed25519 bytes")
         entries[kid] = KeyEntry(kid, sub, Ed25519PublicKey.from_public_bytes(raw), frozenset(caps))
@@ -242,7 +252,7 @@ class KeyRegistry:
         self._last_attempt = self._clock()
         try:
             keys = parse_registry(self._path.read_text(encoding="utf-8"))
-        except (OSError, ValueError, tomllib.TOMLDecodeError, UnicodeDecodeError) as exc:
+        except (OSError, ValueError, TypeError, AttributeError, RecursionError) as exc:
             logger.warning(
                 "key registry refresh failed",
                 extra={"agent": "service_auth", "reason": type(exc).__name__},
@@ -289,6 +299,9 @@ class KeyRegistry:
 class ReplayCache:
     """Per-process ``jti`` cache. Entries live until expiry plus skew; the size is bounded.
 
+    A token is valid while ``now <= exp + skew`` (see ``_check_claims``), so an entry is retained
+    and still detects a replay at that same instant and is evicted only strictly after it.
+
     When full of unexpired entries it refuses new tokens (fail closed) rather than evicting one,
     because evicting an unexpired entry would let that token be replayed.
     """
@@ -301,10 +314,11 @@ class ReplayCache:
     def check_and_add(self, sub: str, jti: str, expires_at: float, now: float) -> None:
         with self._lock:
             key = (sub, jti)
-            if self._seen.get(key, 0.0) > now:
+            held_until = self._seen.get(key)
+            if held_until is not None and held_until >= now:
                 raise AuthError(401, "replayed_token")
             if len(self._seen) >= self._max:
-                self._seen = {k: v for k, v in self._seen.items() if v > now}
+                self._seen = {k: v for k, v in self._seen.items() if v >= now}
                 if len(self._seen) >= self._max:
                     raise AuthError(503, "replay_cache_full")
             self._seen[key] = expires_at + CLOCK_SKEW_SECONDS
@@ -314,7 +328,17 @@ class ReplayCache:
 
 
 def _json_object(segment: str) -> dict[str, Any]:
-    value = json.loads(b64url_decode(segment))
+    raw = b64url_decode(segment)
+    depth = deepest = 0
+    for byte in raw:  # cheap bound on nesting before the recursive parser sees it
+        if byte in b"[{":
+            depth += 1
+            deepest = max(deepest, depth)
+        elif byte in b"]}":
+            depth -= 1
+    if deepest > MAX_JSON_NESTING:
+        raise ValueError("nesting too deep")
+    value = json.loads(raw)
     if not isinstance(value, dict):
         raise ValueError("not an object")
     return value
@@ -352,7 +376,7 @@ class ServiceAuthenticator:
             header = _json_object(header_b64)
             signature = b64url_decode(sig_b64)
             claims = _json_object(payload_b64)
-        except (ValueError, TypeError, binascii.Error):
+        except (ValueError, TypeError, binascii.Error, RecursionError, MemoryError):
             raise AuthError(401, "malformed_token") from None
         # jku, x5u, x5c, jwk and every other header are ignored: only alg, typ and kid are read.
         if header.get("alg") != ALGORITHM:

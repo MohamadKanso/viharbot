@@ -769,3 +769,96 @@ def test_no_private_key_material_is_committed():
                 offenders.append(str(path.relative_to(ROOT)))
     assert offenders == []
 
+
+
+# --- review round 1 regressions ---------------------------------------------------------------
+
+
+def test_replay_is_refused_at_the_exact_expiry_plus_skew_boundary(world):
+    boundary = T0 + 60 + sa.CLOCK_SKEW_SECONDS
+    token = mint(world, jti="edge")
+    assert verify(world, token).sub == "web"
+    world.clock.now = boundary - 1
+    denied(world, token, 401, "replayed_token")
+    world.clock.now = boundary  # last instant the token itself is valid: still a replay
+    denied(world, token, 401, "replayed_token")
+    world.clock.now = boundary + 1  # one tick later it is expired, not accepted
+    denied(world, token, 401, "expired")
+
+
+def test_replay_cache_evicts_only_strictly_after_the_boundary():
+    cache = sa.ReplayCache(max_entries=1)
+    held_until = T0 + 30 + sa.CLOCK_SKEW_SECONDS
+    cache.check_and_add("web", "a", T0 + 30, T0)
+    with pytest.raises(sa.AuthError) as full:  # at equality the entry is retained
+        cache.check_and_add("web", "b", T0 + 30, held_until)
+    assert full.value.reason == "replay_cache_full"
+    cache.check_and_add("web", "b", T0 + 30, held_until + 1)  # strictly after: evicted
+
+
+def test_replay_check_does_not_depend_on_a_zero_default():
+    cache = sa.ReplayCache()
+    cache.check_and_add("web", "z", -sa.CLOCK_SKEW_SECONDS, -sa.CLOCK_SKEW_SECONDS)
+    with pytest.raises(sa.AuthError):
+        cache.check_and_add("web", "z", -sa.CLOCK_SKEW_SECONDS, -sa.CLOCK_SKEW_SECONDS)
+
+
+MALFORMED_REGISTRIES = [
+    "keys = 'x'",
+    "keys = 5",
+    "keys = [1, 2]",
+    "keys = ['a']",
+    "[keys]\nkid = 'a'",
+    "[[keys]]\nkid = 5\nsub = 'b'\npublic_key = 'AAAA'\ncapabilities = []",
+    "[[keys]]\nkid = 'a'\nsub = ['b']\npublic_key = 'AAAA'\ncapabilities = []",
+    "[[keys]]\nkid = 'a'\nsub = 'b'\npublic_key = 5\ncapabilities = []",
+    "[[keys]]\nkid = 'a'\nsub = 'b'\ncapabilities = []",
+    "[[keys]]\nkid = 'a'\nsub = 'b'\npublic_key = 'AAAA'\ncapabilities = [1]",
+    "[[keys]]\nkid = 'a'\nsub = 'b'\npublic_key = 'AAAA'\ncapabilities = {x = 1}",
+    "x = " + "[" * 5000 + "]" * 5000,
+]
+
+
+@pytest.mark.parametrize("text", MALFORMED_REGISTRIES)
+def test_structurally_invalid_registry_raises_value_error(text):
+    with pytest.raises(ValueError):
+        sa.parse_registry(text)
+
+
+@pytest.mark.parametrize("text", MALFORMED_REGISTRIES)
+def test_structurally_invalid_registry_refuses_startup(tmp_path, text):
+    path = tmp_path / "r.toml"
+    path.write_text(text)
+    with pytest.raises(sa.ServiceAuthConfigError):
+        sa.KeyRegistry(path, Clock()).load_initial()
+
+
+@pytest.mark.parametrize("text", MALFORMED_REGISTRIES)
+def test_structurally_invalid_refresh_keeps_last_known_good_then_fails_closed(world, text):
+    world.path.write_text(text)
+    world.clock.now += sa.REGISTRY_REFRESH_SECONDS
+    assert verify(world, forge(world.key, good_header(), good_claims(world, jti="a"))).sub == "web"
+    world.clock.now = T0 + sa.REGISTRY_GRACE_SECONDS + 1
+    denied(world, forge(world.key, good_header(), good_claims(world, jti="b")), 503,
+           "key_registry_unavailable")
+
+
+def test_deeply_nested_token_json_is_a_401_not_a_server_error(world):
+    header = sa.b64url_encode(json.dumps(good_header()).encode())
+    for payload in ('{"a":' * 3000 + "1" + "}" * 3000, "[" * 4000 + "]" * 4000):
+        seg = sa.b64url_encode(payload.encode())
+        denied(world, f"{header}.{seg}.AAAA", 401, "malformed_token")
+        denied(world, f"{seg}.{header}.AAAA", 401, "malformed_token")
+
+
+def test_nesting_within_the_bound_still_parses(world):
+    claims = good_claims(world, extra={"a": {"b": [1]}})
+    assert verify(world, forge(world.key, good_header(), claims)).sub == "web"
+
+
+def test_recursion_error_in_the_decoder_is_a_401(world, monkeypatch):
+    def boom(_raw):
+        raise RecursionError
+
+    monkeypatch.setattr(sa.json, "loads", boom)
+    denied(world, mint(world), 401, "malformed_token")
