@@ -165,6 +165,71 @@ def test_auth_refusal_is_marked_and_the_handler_does_not_run():
     assert calls == []
 
 
+def test_framework_level_body_failures_are_marked_and_the_handler_does_not_run(nova):
+    client, built = nova
+    for kwargs in (
+        {"content": b"{not json", "headers": {"content-type": "application/json"}},
+        {"content": b"", "headers": {"content-type": "application/json"}},
+        {"json": ["a", "list"]},
+        {"json": "a string"},
+    ):
+        result = client.post("/invocations", **kwargs)
+        assert result.status_code == 422
+        assert result.headers["X-Nova-Not-Accepted"] == "1"
+    assert built == []
+
+
+def test_dependency_semantics_are_preserved_and_nested_refusals_are_marked():
+    class Body(BaseModel):
+        q: str
+
+    events = []
+
+    def nested_deny() -> None:
+        raise HTTPException(status_code=401, detail="no")
+
+    def outer(_: None = Depends(nested_deny)) -> None:
+        events.append("unreachable")
+
+    def make(dependency):
+        app = FastAPI()
+        agentcore_runtime.add_agentcore_routes(
+            app, Body, lambda b, r, rid: {"ok": b.q}, dependencies=[Depends(dependency)],
+            logical_agent="nova")
+        return TestClient(app)
+
+    result = make(outer).post("/invocations", json={"input": {"q": "x"}})
+    assert result.status_code == 401 and result.headers["X-Nova-Not-Accepted"] == "1"
+    assert events == []
+
+    def generator_dep():  # a yield dependency must still run its setup and cleanup
+        events.append("setup")
+        yield
+        events.append("cleanup")
+
+    assert make(generator_dep).post("/invocations", json={"input": {"q": "x"}}).status_code == 200
+    assert events == ["setup", "cleanup"]
+
+    def generator_deny():
+        raise HTTPException(status_code=403, detail="no")
+        yield  # pragma: no cover
+
+    result = make(generator_deny).post("/invocations", json={"input": {"q": "x"}})
+    assert result.status_code == 403 and result.headers["X-Nova-Not-Accepted"] == "1"
+
+    counts = []
+
+    def uncached() -> None:
+        counts.append(1)
+
+    def twice(a: None = Depends(uncached, use_cache=False),
+              b: None = Depends(uncached, use_cache=False)) -> None:
+        return None
+
+    make(twice).post("/invocations", json={"input": {"q": "x"}})
+    assert len(counts) == 2  # use_cache=False is honored
+
+
 def test_allowed_auth_dependency_and_non_nova_adapters_are_unchanged():
     class Body(BaseModel):
         q: str

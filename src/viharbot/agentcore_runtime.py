@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
-import functools
-import inspect
 import time
 from typing import Any, Callable, Type
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response
+from fastapi import APIRouter, FastAPI, Header, HTTPException, Request, Response
 from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from pydantic import BaseModel, ValidationError
 
 from .nova_contract import (
     INSTANCE_HEADER,
+    NOT_ACCEPTED_HEADER,
     NovaCallContext,
     NovaEnvelope,
     instance_identity,
@@ -22,40 +24,45 @@ from .nova_contract import (
     set_call_context,
 )
 
+_WORK_STARTED = "nova_work_started"
+
 
 def _refusal(status: int, detail: Any, headers: dict[str, str] | None = None) -> HTTPException:
     """A refusal made before any work started, so it carries the not-accepted marker."""
     return HTTPException(status_code=status, detail=detail, headers=not_accepted_headers(headers))
 
 
-def _marked(dependency: Callable[..., Any]) -> Callable[..., Any]:
-    """Wrap an auth dependency so its refusals carry the marker (it runs before the handler)."""
-    if inspect.iscoroutinefunction(dependency):
-        @functools.wraps(dependency)
-        async def awrapper(*args: Any, **kwargs: Any) -> Any:
+class NovaRoute(APIRoute):
+    """Marks every refusal made before the handler started, leaving FastAPI's dependency graph
+    untouched: framework body and parameter validation, authentication dependencies (including
+    nested and generator ones) and the adapter's own checks all run inside this wrapper. Once
+    the endpoint sets the work-started flag, nothing is marked.
+    """
+
+    def get_route_handler(self) -> Callable[[Request], Any]:
+        original = super().get_route_handler()
+
+        async def handler(request: Request) -> Any:
             try:
-                return await dependency(*args, **kwargs)
+                return await original(request)
+            except RequestValidationError as exc:
+                if request.scope.get(_WORK_STARTED):
+                    raise
+                response = await request_validation_exception_handler(request, exc)
+                response.headers[NOT_ACCEPTED_HEADER] = "1"
+                return response
             except HTTPException as exc:
+                if request.scope.get(_WORK_STARTED):
+                    raise
                 raise _refusal(exc.status_code, exc.detail, exc.headers) from exc
-        return awrapper
 
-    @functools.wraps(dependency)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        try:
-            return dependency(*args, **kwargs)
-        except HTTPException as exc:
-            raise _refusal(exc.status_code, exc.detail, exc.headers) from exc
-    return wrapper
-
-
-def _mark_dependencies(dependencies: list[Any]) -> list[Any]:
-    return [Depends(_marked(item.dependency)) for item in dependencies]
+        return handler
 
 
 def _admit(
     envelope: dict[str, Any], logical_agent: str
 ) -> tuple[tuple[str, str], NovaCallContext]:
-    """Identity and envelope checks that run before any work; each refusal is marked."""
+    """Identity and envelope checks that run before any work."""
     try:
         identity = instance_identity()
     except ValueError as exc:  # startup refusal: this instance is misconfigured
@@ -87,17 +94,17 @@ def add_agentcore_routes(
     stamps the instance identity on the response and marks pre-work refusals with
     ``X-Nova-Not-Accepted: 1``. Without it the behavior is unchanged.
     """
-    used = dependencies or []
-    if logical_agent:
-        used = _mark_dependencies(used)
 
     @app.get("/ping", include_in_schema=False)
     def ping() -> dict[str, str]:
         return {"status": "Healthy"}
 
-    @app.post("/invocations", include_in_schema=False, dependencies=used)
+    router = APIRouter(route_class=NovaRoute if logical_agent else APIRoute)
+
+    @router.post("/invocations", include_in_schema=False, dependencies=dependencies or [])
     def invoke(
         envelope: dict[str, Any],
+        request: Request,
         x_request_id: str | None = Header(default=None),
     ) -> JSONResponse:
         payload = envelope.get("input", envelope)
@@ -107,7 +114,7 @@ def add_agentcore_routes(
         if logical_agent:
             identity, context = _admit(envelope, logical_agent)
         try:
-            request = request_model.model_validate(payload)
+            validated = request_model.model_validate(payload)
         except ValidationError as exc:
             if identity:
                 raise _refusal(
@@ -115,12 +122,13 @@ def add_agentcore_routes(
                 ) from exc
             raise HTTPException(status_code=422, detail="Invalid invocation payload") from exc
 
-        # Work starts here: nothing below may carry the not-accepted marker.
+        # Work starts here: nothing from this point may carry the not-accepted marker.
+        request.scope[_WORK_STARTED] = True
         token = set_call_context(context) if context else None
         started = time.perf_counter()
         try:
             response = Response()
-            result = handler(request, response, request_id)
+            result = handler(validated, response, request_id)
         finally:
             if token is not None:
                 reset_call_context(token)
@@ -137,3 +145,5 @@ def add_agentcore_routes(
                 content.setdefault("attempt", context.attempt or 1)
             headers[INSTANCE_HEADER] = identity[0]
         return JSONResponse(content=content, status_code=response.status_code, headers=headers)
+
+    app.include_router(router)
