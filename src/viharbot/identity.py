@@ -34,6 +34,8 @@ class Capability(StrEnum):
     EVIDENCE_DISCOVERY = "evidence_discovery"
     SLIDE_GENERATION = "slide_generation"
     CODE_REVIEW = "code_review"  # advisory repository review; never a chat-delegated capability
+    KNOWLEDGE_CURATION = "knowledge_curation"  # Archie: planned; nothing executes it
+    CURRICULUM_DESIGN = "curriculum_design"  # Ada: planned; nothing executes it
 
 
 class CapabilityStatus(StrEnum):
