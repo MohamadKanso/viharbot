@@ -4,11 +4,37 @@
 
 ## Goal
 
-A small, deterministic, fictional enterprise in AWS where agent access to sensitive data can be tested, with Cyera used to observe only what it is verified to support. Every scenario ends in one of four results: **PASS**, **FAIL**, **NOT-OBSERVABLE** (the detection is unsupported, which is not a failure, per #46), or **NOT-TESTABLE-YET** (a prerequisite does not exist).
+A small, deterministic, fictional enterprise in AWS where agent access to sensitive data can be tested, with Cyera used to observe only what it is verified to support.
+
+### Two separate verdicts per scenario
+
+Whether the security **control** worked and whether the **observer** (Cyera) saw it are different questions and are recorded independently, so an unsupported detection can never hide a real control failure.
+
+| Field | Values | Meaning |
+|---|---|---|
+| `prerequisite_status` | `READY`, `MISSING` | Whether what the scenario needs (for example governed memory or per-agent identity) exists. `MISSING` means the scenario is not run |
+| `control_result` | `PASS`, `FAIL`, `NOT-RUN` | Judged only from ViharBot and AWS evidence: did the platform allow or deny what policy says it should |
+| `observer_result` | `OBSERVED`, `NOT-OBSERVABLE`, `NOT-CHECKED` | Whether Cyera showed the event or its effect; `NOT-OBSERVABLE` means the detection is unsupported, which is not a failure (per #46) |
+
+Precedence rules:
+
+1. **An observed authorization violation is `FAIL` whatever Cyera supports.** If an unauthorized read succeeded and Cyera could not see it, the result is `control_result = FAIL` and `observer_result = NOT-OBSERVABLE`.
+2. **Missing evidence never establishes `PASS`.** A `PASS` needs positive ViharBot or AWS evidence of the expected decision. No evidence is `NOT-RUN`, not `PASS`.
+3. Cyera evidence can raise confidence or reveal a missed violation, but cannot turn a `FAIL` into a `PASS`.
+
+Worked examples: (a) an unauthorized financial read is denied by IAM, CloudTrail shows `AccessDenied`, and Cyera does not support the store: `control_result = PASS`, `observer_result = NOT-OBSERVABLE`. (b) The same read succeeds and Cyera sees nothing: `FAIL` and `NOT-OBSERVABLE`. (c) The same read succeeds and Cyera flags the exposure: `FAIL` and `OBSERVED`. (d) A memory scenario before governed memory exists: `prerequisite_status = MISSING`, `control_result = NOT-RUN`.
 
 ## What is and is not known about Cyera
 
-Verified from public Cyera pages (marketing level; no technical documentation was found): Cyera lists S3, RDS and Redshift among scanned AWS stores, plus databases and file servers on EC2; it describes "who can access it" analysis overlaid on AWS access findings and automated remediation such as revoking public S3 access; it lists AWS AI services (SageMaker, Bedrock, Amazon Q) without stating depth; and Agent Guardian (announced 2026-08-03) maps agent identities, configurations, tools and data connections. A third-party connector page describes an `api.cyera.io` API with client credentials and objects for classifications, issues and identities; no official API reference was found.
+Evidence levels, from weakest to strongest: **publicly advertised** (a vendor marketing statement), **third-party reported**, **vendor-confirmed** (an answer from the Cyera product team, dated), **lab-observed** (a documented test in this lab). Nothing below is higher than publicly advertised or third-party reported until a vendor answer or a test exists. Sources, retrieved 2026-11-02 by a read-only assessment and summarised here rather than quoted (the specific passages were not re-captured):
+
+| Claim | Publisher and URL | Level |
+|---|---|---|
+| Scans S3, RDS, Redshift, and databases and file servers on EC2; "who can access it" analysis; overlay on AWS Access Analyzer and Security Hub findings; automated remediation such as revoking public S3 access; coverage of SageMaker, Bedrock and Amazon Q (depth not stated) | Cyera, https://www.cyera.com/partnership/aws and https://cyera.io/partnership/aws | Publicly advertised |
+| Agent Guardian: agent inventory and graph of identities, configurations, models, tools and data connections; posture, inline protection and red-team features; announced 2026-08-03; the post does not name Bedrock or AgentCore and does not say whether it is generally available | Cyera, https://www.cyera.com/blog/introducing-cyera-agent-guardian-secure-everything-ai-can-see-and-do | Publicly advertised |
+| An `api.cyera.io` API using client credentials, with classification, issue and identity objects | Atlan connector documentation, https://docs.atlan.com/apps/connectors/privacy/cyera/how-tos/set-up-cyera.md | Third-party reported; no official API reference found |
+
+In prose, the same sources say: Cyera lists S3, RDS and Redshift among scanned AWS stores, plus databases and file servers on EC2; it describes "who can access it" analysis overlaid on AWS access findings and automated remediation such as revoking public S3 access; it lists AWS AI services (SageMaker, Bedrock, Amazon Q) without stating depth; and Agent Guardian (announced 2026-08-03) maps agent identities, configurations, tools and data connections. The third-party connector page above describes an `api.cyera.io` API; no official API reference was found.
 
 **Unverified; do not assume any of these:** DynamoDB, Aurora, OpenSearch, Bedrock Knowledge Bases or vector stores as scan targets; whether Cyera sees application-level memory requests (it likely sees stored data only if the store is supported, never the API calls); whether Agent Guardian discovers agents on AgentCore or Fargate; the depth of effective-access analysis (role chains, session and resource policies, permission boundaries); classification of structured JSON versus prose; whether synthetic PII is treated like real PII; whether access activity for agent identities is available; the licensing needed. These ten items should be put to the Cyera product team and any answer recorded as vendor-verified, with a date, before a scenario is counted as Cyera evidence.
 
@@ -44,7 +70,7 @@ S3 first. One small relational instance only if needed. DynamoDB for memory (ADR
 
 ## Scenario matrix
 
-Evidence sources: **VB** ViharBot logs, **CT** AWS CloudTrail (S3 and DynamoDB data events must be enabled explicitly) and IAM Access Analyzer, **DO** DigitalOcean logs, **CY** Cyera only where verified.
+The scenario results below use the `control_result` and `observer_result` fields defined above. Evidence sources: **VB** ViharBot logs, **CT** AWS CloudTrail (S3 and DynamoDB data events must be enabled explicitly) and IAM Access Analyzer, **DO** DigitalOcean logs, **CY** Cyera only where verified.
 
 | # | Scenario | Expected | Notes |
 |---|---|---|---|
@@ -63,7 +89,7 @@ The advanced experiment comparing Nova's AgentCore and Fargate data permissions 
 
 ## Evidence record
 
-One JSON line per observation: `evidence_id`, `run_id`, `scenario_id`, `step`, `ts_utc`, `source` (viharbot, cloudtrail, do, litellm, cyera, manual), `source_status` (VERIFIED, UNVERIFIED, NOT_AVAILABLE), `principal{agent, runtime, role_arn}`, `engagement_id`, `request_id`, `correlation_id`, `resource{store, key, gt_id, gt_class}`, `action`, `expected{decision, reason}`, `observed{decision, reason, error_code}`, `canary_leaked`, `classification_observed`, `classification_match`, `raw_ref` (a pointer, never content), `redaction_applied`, `collected_by`, `hash_sha256`, `notes`. Raw prompts and payloads are not stored. A Cyera row carries its `source_status`, so unverified items cannot be counted as evidence. The four identities stay separate: logical agent, runtime workload, data resource, and effective access.
+One JSON line per observation: `evidence_id`, `run_id`, `scenario_id`, `step`, `ts_utc`, `source` (viharbot, cloudtrail, do, litellm, cyera, manual), `source_status` (VERIFIED, UNVERIFIED, NOT_AVAILABLE), `evidence_level` (publicly_advertised, third_party, vendor_confirmed, lab_observed, not_applicable), `principal{agent, runtime, role_arn}`, `engagement_id`, `request_id`, `correlation_id`, `resource{store, key, gt_id, gt_class}`, `action`, `expected{decision, reason}`, `observed{decision, reason, error_code}`, `prerequisite_status`, `control_result`, `observer_result`, `canary_leaked`, `classification_observed`, `classification_match`, `raw_ref` (a pointer, never content), `redaction_applied`, `collected_by`, `hash_sha256`, `notes`. Raw prompts and payloads are not stored. A Cyera row carries its `source_status`, so unverified items cannot be counted as evidence. The four identities stay separate: logical agent, runtime workload, data resource, and effective access.
 
 ## Cost drivers (estimates)
 
