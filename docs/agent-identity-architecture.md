@@ -45,6 +45,13 @@ An identity file cannot contain runtime fields; unknown keys are rejected. A run
 | `scout` | Scout | Director of Intelligence & Discovery | evidence_discovery, source_quality, fact_check | Gemini Pro family |
 | `orbit` | Orbit | Chief Automation & Engineering Officer | automation_engineering | Claude Sonnet family |
 
+Two further identities were added for the education agents. They are declarative only; see [Education agents](education-agents.md).
+
+| ID | Name | Title | Capabilities | Preferred model family |
+|---|---|---|---|---|
+| `archie` | Professor Archibald | Chief Knowledge & Learning Officer | knowledge_curation | Claude Opus family |
+| `ada` | Ada | Director of Curriculum & Learning Experience | curriculum_design | Claude Sonnet family |
+
 These are configuration objects, not deployed services. Each identity's "intended future role" appears in its `description`.
 
 ## Declared versus implemented capabilities
@@ -52,7 +59,7 @@ These are configuration objects, not deployed services. Each identity's "intende
 Every identity declares capabilities. Separately, `CAPABILITY_STATUS` in `identity.py` records whether an operational service already performs each capability:
 
 - **implemented**: `research`, `fact_check`, `source_quality`, `security_assessment`, `privacy_review`, `synthesis`. These match the six existing services.
-- **planned**: `creative_design`, `philosophical_analysis`, `logistics_planning`, `automation_engineering`, `evidence_discovery`. Nothing executes these.
+- **planned**: `knowledge_curation`, `curriculum_design`, `creative_design`, `philosophical_analysis`, `logistics_planning`, `automation_engineering`, `evidence_discovery`. Nothing executes these.
 
 "Implemented" describes the capability, not the identity. For example, Cipher declares `security_assessment`, but the Security service does not run as Cipher. No identity is connected to execution yet.
 

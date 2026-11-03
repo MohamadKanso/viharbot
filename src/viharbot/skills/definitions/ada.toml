@@ -1,0 +1,106 @@
+# Ada: Curriculum and Learning Experience. Declarative skills proposed in the education-agents specification.
+# Every skill here is `proposed`: declared only, with no execution contract. Listing a
+# skill grants no tool, scope or data access and does not make it executable.
+
+[[skill]]
+skill_id = "education.curriculum_design"
+version = "0.1.0"
+name = "Curriculum design"
+description = "Curriculum design. Expected deliverable: curriculum structure."
+owner = "ada"
+eligible_agents = ["archie"]
+category = "education"
+outputs = ["Curriculum structure"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.lesson_authoring"
+version = "0.1.0"
+name = "Lesson authoring"
+description = "Lesson authoring. Expected deliverable: lesson."
+owner = "ada"
+category = "education"
+outputs = ["Lesson"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.learning_objectives"
+version = "0.1.0"
+name = "Learning objectives"
+description = "Learning objectives. Expected deliverable: learning objectives."
+owner = "ada"
+eligible_agents = ["archie"]
+category = "education"
+outputs = ["Learning objectives"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.prerequisite_mapping"
+version = "0.1.0"
+name = "Prerequisite mapping"
+description = "Prerequisite mapping. Expected deliverable: prerequisite map."
+owner = "ada"
+eligible_agents = ["archie"]
+category = "education"
+outputs = ["Prerequisite map"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.exercise_generation"
+version = "0.1.0"
+name = "Exercise generation"
+description = "Exercise generation. Expected deliverable: exercise set."
+owner = "ada"
+category = "education"
+outputs = ["Exercise set"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.assessment_design"
+version = "0.1.0"
+name = "Assessment design"
+description = "Assessment design. Expected deliverable: assessment."
+owner = "ada"
+category = "education"
+outputs = ["Assessment"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.curriculum_versioning"
+version = "0.1.0"
+name = "Curriculum versioning"
+description = "Curriculum versioning. Expected deliverable: curriculum change record."
+owner = "ada"
+category = "education"
+outputs = ["Curriculum change record"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.learning_progression"
+version = "0.1.0"
+name = "Learning progression"
+description = "Learning progression. Expected deliverable: progression plan."
+owner = "ada"
+category = "education"
+outputs = ["Progression plan"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.student_feedback"
+version = "0.1.0"
+name = "Student feedback"
+description = "Student feedback. Expected deliverable: feedback on learner responses."
+owner = "ada"
+category = "education"
+outputs = ["Feedback on learner responses"]
+status = "proposed"
+
+[[skill]]
+skill_id = "education.learning_analytics"
+version = "0.1.0"
+name = "Learning analytics"
+description = "Learning analytics. Expected deliverable: learning gap report."
+owner = "ada"
+category = "education"
+outputs = ["Learning gap report"]
+status = "proposed"

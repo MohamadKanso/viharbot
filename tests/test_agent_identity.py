@@ -25,7 +25,8 @@ from viharbot.identity_registry import (
     load_registry,
 )
 
-EXPECTED_IDS = {"charlie", "nova", "atlas", "pixel", "sage", "cipher", "scout", "orbit"}
+ORIGINAL_IDS = {"charlie", "nova", "atlas", "pixel", "sage", "cipher", "scout", "orbit"}
+EXPECTED_IDS = ORIGINAL_IDS | {"archie", "ada"}
 EXPECTED_CAPABILITIES = {
     "charlie": {"synthesis", "research"},
     "nova": {"research", "evidence_discovery"},
@@ -35,6 +36,8 @@ EXPECTED_CAPABILITIES = {
     "cipher": {"security_assessment", "privacy_review"},
     "scout": {"evidence_discovery", "source_quality", "fact_check"},
     "orbit": {"automation_engineering"},
+    "archie": {"knowledge_curation"},
+    "ada": {"curriculum_design"},
 }
 EXPECTED_FAMILIES = {
     "charlie": "GPT-6 family",
@@ -45,6 +48,8 @@ EXPECTED_FAMILIES = {
     "cipher": "GPT-6 family",
     "scout": "Gemini Pro family",
     "orbit": "Claude Sonnet family",
+    "archie": "Claude Opus family",
+    "ada": "Claude Sonnet family",
 }
 
 
@@ -66,11 +71,30 @@ def identity_kwargs(**overrides):
 
 
 # 1, 2, 7, 8: loading, uniqueness, lookup, listing
-def test_all_eight_identities_load_with_unique_ids():
+def test_all_ten_identities_load_with_unique_ids():
     registry = load_registry()
     ids = [identity.id for identity in registry.list()]
-    assert len(registry) == 8 and len(ids) == 8
-    assert set(ids) == EXPECTED_IDS and len(set(ids)) == 8
+    assert len(registry) == 10 and len(ids) == 10
+    assert set(ids) == EXPECTED_IDS and len(set(ids)) == 10
+
+
+def test_the_eight_original_identities_keep_their_stable_ids_and_names():
+    registry = load_registry()
+    assert ORIGINAL_IDS <= {i.id for i in registry.list()}
+    assert registry.get("charlie").name == "Charlie Chatwin"
+    assert registry.get("archie").title == "Chief Knowledge & Learning Officer"
+    assert registry.get("ada").title == "Director of Curriculum & Learning Experience"
+    assert registry.get("archie").system_prompt != registry.get("ada").system_prompt
+
+
+def test_education_identities_are_not_connected_to_execution():
+    from viharbot.execution_bindings import default_bindings
+
+    bound = {b.identity_id for b in default_bindings().bindings}
+    assert not bound & {"archie", "ada"}
+    for agent in ("archie", "ada"):
+        (capability,) = load_registry().get(agent).capabilities
+        assert capability_status(capability) is CapabilityStatus.PLANNED
 
 
 def test_lookup_and_membership():
@@ -226,7 +250,7 @@ def test_loading_makes_no_network_calls(monkeypatch):
     monkeypatch.setattr(socket, "socket", blocked)
     monkeypatch.setattr(socket, "create_connection", blocked)
     monkeypatch.setattr(socket, "getaddrinfo", blocked)
-    assert len(load_registry()) == 8
+    assert len(load_registry()) == 10
 
 
 def test_loading_does_not_import_inference_or_cloud_clients():
@@ -260,7 +284,7 @@ CREDENTIAL_PATTERNS = [
 
 def test_identity_files_and_prompts_contain_no_credentials_or_endpoints():
     files = list(IDENTITY_DIR.glob("*.toml")) + list((IDENTITY_DIR / "prompts").glob("*.md"))
-    assert len(files) == 16
+    assert len(files) == 20
     for path in files:
         text = path.read_text(encoding="utf-8")
         for pattern in CREDENTIAL_PATTERNS:
@@ -298,6 +322,7 @@ def test_capability_vocabulary_and_status():
         "research", "fact_check", "source_quality", "security_assessment", "privacy_review",
         "synthesis", "creative_design", "philosophical_analysis", "logistics_planning",
         "automation_engineering", "evidence_discovery", "slide_generation", "code_review",
+        "knowledge_curation", "curriculum_design",
     }
     implemented = {c for c in Capability if capability_status(c) is CapabilityStatus.IMPLEMENTED}
     assert {c.value for c in implemented} == {
