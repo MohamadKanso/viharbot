@@ -1,6 +1,6 @@
 # Education agents: Archie and Ada
 
-**Status:** Phase 1 (identity and registry) is implemented. Everything else here is proposed.
+**Status:** Phase 1 (identity and registry) and Phase 2 (GitHub learning, below) are implemented. Everything else here is proposed.
 
 ViharBot adds two identities that will turn its verified engineering history into teaching material:
 
@@ -14,9 +14,25 @@ ViharBot adds two identities that will turn its verified engineering history int
 - 20 declarative skills (10 each, domain `education`), all `proposed`.
 - No execution binding, endpoint, service, GitHub access, memory access or model alias. The team page gains a coming-soon section with their portrait; the chat sidebar and every execution path are unchanged. Neither agent can be reached by orchestration or chat.
 
+## Phase 2: GitHub learning (implemented)
+
+`src/viharbot/learning/` reads one merged ViharBot pull request as untrusted data and turns it into a provenance-labelled learning artifact. It is run from `scripts/archie_learn.py`, not from chat or orchestration, and there is still no execution binding for Archie or Ada.
+
+- **Retrieval:** `SourceReader` is read-only and limited to the configured source repo. It keeps changed paths and counts, commit subjects, the description and bounded comments, never patches.
+- **Extraction:** deterministic code, no model call. Each of the ten questions in the spec is answered from the description's own sections (author statement) or from changed files (verified in the diff). Anything else is reported as "Not stated in the evidence", never invented. Quoted text sits in fenced blocks labelled as data.
+- **Artifact:** id, topic, draft objectives, source repo, PR, commit, references, extraction date, software version (from `pyproject.toml` at the merge commit), verification status, prerequisites and curriculum placement. Status starts as `unverified`; only a human merge of the instructor PR is meant to raise it.
+- **Idempotency:** one JSON record per (repository, PR, merge commit) in `LEARNING_STORE_DIR` (default `data/learning`, git-ignored). Reprocessing finds the record, so nothing is created twice; an existing open PR or branch is reused. Failures store only the exception class and are retried, up to five attempts.
+- **Proposal:** `InstructorProposer` can create a branch, add one file under `knowledge/pr-case-studies/` and open a pull request on the instructor repo only. No call merges, approves or deletes. `--propose` is required; the default is a dry run.
+- **Triggers:** `ingest --pr N` and `reconcile` (the scheduled catch-up). `verify_signature` checks a GitHub webhook signature, but **no webhook endpoint exists yet**; adding one is a separate reviewed change.
+- **Credentials:** `ARCHIE_SOURCE_TOKEN` (read-only on the source repo) and `ARCHIE_INSTRUCTOR_TOKEN` (contents and pull-request write on the instructor repo only). Create them as fine-grained tokens; this change creates none.
+
+### Not yet done in Phase 2
+
+Model-assisted enrichment (objectives, rationale synthesis) through LiteLLM, `learning.*` activity events, and a webhook endpoint. The instructor repo has no `knowledge/` directory yet; the first proposal creates it. Human review of the artifact format is needed before any are merged.
+
 ## What is not implemented
 
-Pull request ingestion, learning artifacts, institutional memory, curriculum generation, learner records, lessons, assessments, `learning.*`/`curriculum.*`/`lesson.*` events and repository credentials. These are phases 2 to 6 of the specification and each needs its own reviewed change.
+Institutional memory, curriculum generation, learner records, lessons, assessments, `learning.*`/`curriculum.*`/`lesson.*` events and repository credentials. These are phases 2 to 6 of the specification and each needs its own reviewed change.
 
 ## Findings that shape later phases
 
