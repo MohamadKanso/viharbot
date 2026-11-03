@@ -53,7 +53,7 @@ def parse_claim(key: bytes, env: dict[str, str]) -> Claim | None:
         data = json.loads(env[CLAIM_KEY])
         mac = data.pop("mac")
         claim = Claim(**data)
-        if not isinstance(mac, str) or not hmac.compare_digest(mac, _mac(key, "claim", claim)):
+        if not isinstance(mac, str) or not hmac.compare_digest(mac.encode("utf-8", "replace"), _mac(key, "claim", claim).encode()):
             return None
         return claim
     except (KeyError, TypeError, ValueError, AttributeError):
@@ -68,7 +68,7 @@ def verified_bound(key: bytes, app: ProviderApp, team_id: str) -> Claim | None:
     presented = app.env.get(BOUND_KEY)
     if not isinstance(presented, str):
         return None
-    if not hmac.compare_digest(presented, bound_entry(key, claim, app.app_id)):
+    if not hmac.compare_digest(presented.encode("utf-8", "replace"), bound_entry(key, claim, app.app_id).encode()):
         return None
     return claim
 

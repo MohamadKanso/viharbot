@@ -507,6 +507,19 @@ def test_restart_classifies_valid_expired_missing_foreign_and_tampered(world):
     assert [d["expires_at"] for d in adopted if d["app_id"] == live["app_id"]] == [int(T0) + 3600]
 
 
+def test_non_ascii_marker_values_are_unowned_and_do_not_abort_reconciliation(world):
+    dep = run_all(world.ctrl, payload())
+    odd = world.provider.add_foreign("orbit-odd")
+    world.provider.copy_markers(dep["app_id"], odd.app_id, (markers.CLAIM_KEY,))
+    odd.spec["env"][markers.BOUND_KEY] = "caf\u00e9"
+    garbled = json.loads(odd.spec["env"][markers.CLAIM_KEY])
+    garbled["mac"] = "\u00e9"
+    other = world.provider.add_foreign("orbit-odd2", {markers.CLAIM_KEY: json.dumps(garbled)})
+    results = {r["app_id"]: r["action"] for r in world.ctrl.reconcile()}
+    assert results[odd.app_id] == "alert" and results[other.app_id] == "alert"
+    assert results[dep["app_id"]] == "adopted"
+
+
 def test_foreign_orbit_resources_are_never_destroyed_however_late(world):
     apps = [world.provider.add_foreign(f"orbit-f{i}") for i in range(2)]
     foreign_marker(world, apps[1], team="team-1", expires=T0 - 10)
