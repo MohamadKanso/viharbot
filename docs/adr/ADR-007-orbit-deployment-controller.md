@@ -11,7 +11,7 @@ Verified in the repository:
 - Orbit declares only `automation_engineering`, which is a **planned** capability, and its prompt says it has no infrastructure access and never handles credentials. `execution_bindings.py` refuses a binding for a planned capability and requires one service per capability.
 - Controlled delegation treats model output as untrusted and only allows allowlisted workflows (`docs/controlled-delegation.md`).
 
-Verified in DigitalOcean documentation: App Platform specs accept image sources from DOCR, Docker Hub or GHCR, and a `digest` mutually exclusive with `tag`; billing is per second; API token scopes use `resource:action` names such as `app:create`, `app:read`, `app:update`, `app:delete`. **Not verified:** whether scopes can be restricted to specific apps or tags (the page says nothing, so none is assumed), which endpoint needs which scope, and any stop or scale-to-zero operation (none is documented).
+**Documented** (summarised from the pages listed under "Sources", retrieved 2026-11-02; passages not re-captured here): App Platform specs accept image sources from DOCR, Docker Hub or GHCR, and a `digest` mutually exclusive with `tag`; App Platform billing is per second; API token scopes use `resource:action` names such as `app:create`, `app:read`, `app:update`, `app:delete`. **Not documented on those pages:** whether scopes can be restricted to specific apps or tags, which endpoint needs which scope, and any stop or scale-to-zero operation. Not documented is not evidence that a capability is unsupported; it means this ADR assumes it is unavailable until confirmed in the live test. Everything else about provider behavior in this ADR is **assumed** until then.
 
 ## Decision
 
@@ -35,9 +35,17 @@ Verified in DigitalOcean documentation: App Platform specs accept image sources 
 7. **Human approval is a contract, not a gesture.** A request stays `pending` until a person approves it, consistent with the repository's promotion rule; Orbit can ask, never cause a deployment alone. An approval:
    - is an authenticated decision by a principal named in controller policy as an approver (the channel or interface is deliberately left open);
    - is **bound to the exact request**: it stores a hash of the complete canonical request, namely the image digest, size, region, port, name, TTL, the **full environment mapping of keys and values** (every value is non-secret and allowlisted), and the identifier and version of the controller's spec template that will build the app. If a value is instead controller-owned, the approval binds the resolved value or its immutable version. Any change to any of these invalidates the approval;
-   - **expires** (default 30 minutes) and is **single use**: once a deployment is created from it, it cannot authorize another;
+   - **expires** (default 30 minutes) and is **single use** under the reserve-then-execute protocol below, which also covers provider timeouts and loss of controller state;
    - records the approver, the approved request hash, the time and the resulting deployment ID in the audit event.
-   Required tests: changing an environment value after approval invalidates it; an unauthorized approver is refused; an expired approval is refused; an approval replayed for a second deployment is refused; a request changed after approval is refused; Orbit cannot approve its own request.
+
+   **Reserve-then-execute (applies to creates and to replacements alike).** Approval states are `pending -> reserved(claim_id) -> executed | expired`. A reservation is a one-way step.
+   1. **Reserve.** The controller checks the approval is `pending`, unexpired and matches the request hash, then generates a `claim_id` and **durably records** `reserved(claim_id)` (written and flushed) **before any provider call**. If the write fails, no provider call is made.
+   2. **Execute.** The app name or claim marker is derived deterministically from the `claim_id` (the claim marker in "Ownership and recovery" is this same `claim_id`), so the operation is detectable and a retry is idempotent. For a replacement, the same `claim_id` is written into the replacement spec so the controller can tell whether that update landed.
+   3. **Complete.** On a confirmed result the controller records `executed` with the app ID. A `reserved` approval is never returned to `pending`, and a second reservation under the same approval is refused.
+   4. **Timeout means UNKNOWN.** A provider timeout or transport error is not a failure. The outcome is unknown, and the controller must first **reconcile**: look for an app (or, for a replacement, a spec) carrying that `claim_id`. If found, record `executed` and continue with the normal bind. If not found after the reconciliation window, the approval stays `reserved`, the request is marked failed-uncertain, and a person is alerted. The controller **never issues a second create under the same approval**; further work needs a new approval, which may be issued after a person confirms nothing was created.
+   5. **Lost state fails closed.** If controller state is lost after reservation (a redeploy wipes the JSON store), the approval is treated as **consumed** and a new approval is needed. A missing reservation record is never read as `pending`. For this to hold across a wipe, approvals must not be re-presentable from outside the store: an approval is accepted only if the store holds it as `pending`, so a store that was wiped holds no `pending` approvals and any older approval is refused. (How approvals are persisted before and after a wipe, and whether stored approvals need to be re-issued after a redeploy, is an implementation question to settle; the requirement here is the fail-closed outcome.) An app created by an unrecorded reservation is handled as an interrupted creation under "Ownership and recovery": alerted, never adopted or deleted by the controller.
+
+   Required tests: changing an environment value after approval invalidates it; an unauthorized approver is refused; an expired approval is refused; an approval replayed for a second deployment is refused; a request changed after approval is refused; Orbit cannot approve its own request. Crash and timeout tests with a mocked provider: **timeout after the provider created the app** (reconciliation finds the claim marker, records `executed`, no second create); **timeout before the provider created the app** (reconciliation finds nothing, state stays `reserved`, no second create, a person is alerted); **crash between reservation and create** (restart finds `reserved` with no app, no automatic create, a person is alerted); **lost state** (store wiped after reservation, the old approval is refused and no create happens); **replay of a consumed approval** (a `reserved` or `executed` approval is refused). Each case is run for a create and for a replacement.
 8. **Audit:** a structured event per request with timestamp, `request_id`, caller, action, decision, deny reason, deployment and app IDs, image digest, size, region, TTL, provider status, duration and error. Never the token, environment values or full bodies.
 
 ## Ownership and recovery
@@ -45,7 +53,7 @@ Verified in DigitalOcean documentation: App Platform specs accept image sources 
 A name prefix is not proof of ownership, and the record store (a small JSON file) is lost on redeploy. So ownership and expiry must be recoverable from the provider, and ambiguity must never lead to deletion.
 
 - **Two-phase signed ownership marker, bound to the immutable app.** A marker copied from one app to another must never authorize anything, so ownership is tied to the provider's app ID and team, which cannot be forged by copying text.
-  1. **Claim.** Before creating the app, the controller generates a `claim_id` and writes it to its record store. It creates the app with a claim marker in the spec (non-secret environment entries): `claim_id`, controller instance ID, team ID, `created_at`, `expires_at`, the approved request hash, and an HMAC over those fields made with a key only the controller holds.
+  1. **Claim.** The `claim_id` is the one generated when the approval was reserved (decision 7), recorded durably before any provider call. It creates the app with a claim marker in the spec (non-secret environment entries): `claim_id`, controller instance ID, team ID, `created_at`, `expires_at`, the approved request hash, and an HMAC over those fields made with a key only the controller holds.
   2. **Bind.** As soon as the provider returns the immutable `app_id`, the controller updates the spec with a bound marker: an HMAC over the claim fields **and** the `app_id`.
 - Only a bound marker whose HMAC verifies for **this** `app_id` and **this** team is ownership evidence. Whether DigitalOcean returns these markers on read, and whether an app's own ID is stable across spec updates, are assumptions to confirm in the live test.
 - **Interrupted creation (a claim marker with no bound marker).** If the record store still holds that `claim_id`, the controller completes the bind. If the store was lost, the app is **never adopted and never deleted by the controller**: it raises an alert for a person, and the claim marker's `expires_at` bounds how long the person has before the cost matters. A claim marker alone never authorizes deletion.
@@ -74,7 +82,7 @@ The controller becomes a trust anchor: a compromise can destroy the apps it crea
 2. Contract tests using fixtures captured from the first real responses. Do not invent DigitalOcean response shapes.
 3. Minimal live test, **after explicit approval**, in a throwaway team: create one 512 MiB app from a tiny image by digest, inspect it, read logs, destroy it, confirm billing stops. This also establishes the real scope-to-endpoint mapping and stop behavior.
 4. Negative live test, an acceptance criterion: confirm the token cannot touch `viharbot-stage`.
-5. Restart and recovery tests from "Ownership and recovery", and the approval tests from decision 7.
+5. Restart and recovery tests from "Ownership and recovery", and the approval and reserve-then-execute tests from decision 7.
 
 ## Cost
 
@@ -83,6 +91,18 @@ Estimates, not commitments: the controller is one shared 512 MiB component at ab
 ## Open questions
 
 Which repositories may the image allowlist name? What concurrency cap? Where does the human approval happen? Which scope does the logs endpoint need, how large may logs be, and can deployed apps leak secrets into logs? Should AWS be considered for staging instead?
+
+## Sources
+
+Retrieved 2026-11-02; pages summarised, passages not re-captured. "Documented" means the page states it; "not documented" is not evidence of unsupported.
+
+- App spec reference, https://docs.digitalocean.com/products/app-platform/reference/app-spec/ : documented image sources (DOCR, Docker Hub, GHCR) and `digest` versus `tag`. Not documented there: how markers or environment entries are returned on read.
+- API scopes, https://docs.digitalocean.com/reference/api/scopes/ : documented `resource:action` scope names such as `app:create`, `app:read`, `app:update`, `app:delete`. Not documented there: restriction of a scope to specific apps or tags, or an endpoint-to-scope mapping.
+- App Platform pricing, https://docs.digitalocean.com/products/app-platform/details/pricing/ : documented per-second billing. The dollar figures in "Cost" are estimates still to be confirmed against this page.
+- Container Registry pricing, https://docs.digitalocean.com/products/container-registry/details/pricing/ : basis for the "free (starter) or $5" registry estimate, to be confirmed before approval.
+- Internal routing, https://docs.digitalocean.com/products/app-platform/how-to/manage-internal-routing/ : basis for private component-to-component calls on internal ports.
+
+Provider behavior on provider timeouts (whether a create can succeed after the client times out) is **assumed** possible, which is why the protocol treats it as unknown.
 
 ## Related
 
