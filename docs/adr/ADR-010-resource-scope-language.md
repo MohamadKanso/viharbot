@@ -32,7 +32,12 @@ A scope is a plain ASCII string. There are exactly **two forms and no other wild
 
 ### Query parameters
 
-**A scope names a path only; any query string is allowed.** Reasons: the canonical query is order-sensitive, so pinning pairs would need its own ordering, repetition and encoding rules (more surface for disagreement); and ADR-006 already says authorization must not rest on request-supplied values (the resource's engagement comes from the callee's resource mapping). Rule that follows: **a route whose resource identity is carried in the query is not scopable.** It must move the identifier into the path before its capability can carry a meaningful resource scope. A3 should register, per route, the path template that identifies the resource.
+**A scope names a path only; any query string is allowed.** Reasons: the canonical query is order-sensitive, so pinning pairs would need its own ordering, repetition and encoding rules (more surface for disagreement); and ADR-006 already says authorization must not rest on request-supplied values (the resource's engagement comes from the callee's resource mapping). Rule that follows: **a route whose resource identity is carried in the query is not scopable.** It must move the identifier into the path before its capability can carry a meaningful resource scope. This is enforced, not advisory, by a mandatory fail-closed eligibility rule:
+
+- A route that carries resource identity (or any security-relevant selector) in its query string **must** be declared `scopable: false` in a route-eligibility registry, or be absent from the scopable set. The default for any route not declared is **not scopable** (deny by default).
+- The issuer **must** refuse to mint a grant that carries a scope for a capability unless all of that capability's routes are declared scopable. The callee **must** refuse (403) a request when the grant carries a scope for the request's capability and that route is not declared scopable.
+- A scope can therefore never silently permit a query-identified resource.
+- The registry is repository configuration reviewed like `bindings.toml`, not a runtime flag.
 
 ### Percent-encoding
 
@@ -66,7 +71,7 @@ The whole grant (not only the offending scope) is **denied** and the decision lo
 
 ### Limits
 
-At most **16** scopes per capability, each at most **256** bytes and **16** segments, and at most **2048** bytes of scope text across a whole grant. These bound intersection work (16 x 16 pairs) and grant size. The numbers are an assumption to check against real route templates in A3; they may be changed by amendment, never silently ignored.
+At most **16** scopes per capability, each at most **256** bytes and **16** segments, and at most **2048** bytes of scope text across a whole grant. The trailing `/*` of a subtree scope does not count toward the 16 segments (only the base does), but it does count toward the 256 bytes and the 2048 total. These bound intersection work (16 x 16 pairs) and grant size. The numbers are an assumption to check against real route templates in A3; they may be changed by amendment, never silently ignored.
 
 ## Test vectors
 
@@ -98,7 +103,14 @@ At most **16** scopes per capability, each at most **256** bytes and **16** segm
 | 24 | `decks/a` | any | deny, malformed scope | not absolute |
 | 25 | `/decks/a?x=1` | any | deny, malformed scope | query inside a scope |
 | 26 | `/decks/../a` | any | deny, malformed scope | dot segment |
-| 27 | 17 scopes, or one of 257 bytes | any | deny, oversized | limit |
+| 27a | 16 scopes in one capability | any | accepted | count at limit |
+| 27b | 17 scopes in one capability | any | deny, oversized | count over limit |
+| 27c | one scope of exactly 256 bytes | matching path | allow | length at limit |
+| 27d | one scope of 257 bytes | any | deny, oversized | length over limit |
+| 27e | exact scope of 16 segments; subtree scope with a 16-segment base plus `/*` | matching path | allow | segments at limit; `/*` not counted |
+| 27f | exact scope of 17 segments; subtree scope with a 17-segment base plus `/*` | any | deny, oversized | segments over limit |
+| 27g | whole grant totalling exactly 2048 bytes of scope text across several capabilities | matching path | allow | grant total at limit |
+| 27h | the same grant at 2049 bytes | any | deny, oversized | grant total over limit |
 | 28 | `["/decks/a","/decks/a"]` | any | deny, malformed | duplicate |
 | 29 | `["/decks/a", "/bad*"]` | `/decks/a` | deny | one bad scope denies the whole grant |
 
@@ -126,6 +138,7 @@ Intersection and attenuation vectors:
 - A property test over generated scope lists: each intersection result is covered by both operands, and every path allowed by the result is allowed by each input.
 - A refused attenuation never produces a signed grant; a narrowed grant never allows a path its parent denies.
 - `canonical_target` output is accepted by the matcher unchanged, and a request whose path is not canonical never reaches the matcher.
+- Route eligibility: a grant scoping a query-identified (`scopable: false`) route is refused at issue time; the callee refuses (403) a scoped grant on a route not declared scopable; a route newly added without a registry entry defaults to not scopable.
 - A malformed scope is logged with a bounded prefix, not the full scope text, and denies even requests that the valid scopes would allow.
 
 ## Not decided
@@ -134,7 +147,7 @@ Intersection and attenuation vectors:
 - Non-HTTP resources (memory keys, model-call sites) and their naming.
 - Whether registry entries and callee policy use this same language. It is assumed, so that intersection is defined; A3 confirms.
 - Gateway mount prefixes or path rewriting between caller and callee (the scope is compared with the `tgt` the callee verified).
-- Pinning query parameters, and the per-route template registration that makes "identity in the path" enforceable.
+- Pinning query parameters, and the per-route path template that says which segment identifies the resource (route eligibility itself is decided above).
 - Case-insensitive resources; ids differing only by case are different scopes.
 
 **Dependency:** A3 (#38) implements this language; it is the only stage that evaluates scopes, and ADR-006 already states A3 depends on #94.
