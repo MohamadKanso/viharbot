@@ -11,6 +11,7 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from pydantic import BaseModel, Field
 
+from .body_limit import BodySizeLimitMiddleware, max_body_bytes_from_environment
 from .contracts import SpecialistResponse
 from .fact_check_guard import guard_fact_check
 from .inference_config import effective_inference, legacy_inference
@@ -133,6 +134,15 @@ app = FastAPI(title=definition.title, version="1.0")
 SPECIALIST_CAPABILITY = "specialist.process"
 _authenticator = authenticator_from_environment(AGENT_KIND)
 _auth_dependencies = [Depends(require_assertion(_authenticator, SPECIALIST_CAPABILITY))] if _authenticator else []
+if _authenticator:
+    # Refuse an oversized body with 413 before the assertion check reads it (issue #101). Only the
+    # protected routes are capped; with authentication off nothing is added.
+    app.add_middleware(
+        BodySizeLimitMiddleware,
+        max_bytes=max_body_bytes_from_environment(),
+        paths=frozenset({"/process", "/invocations"}),
+        agent=AGENT_KIND,
+    )
 
 
 def _make_prompt(body: SpecialistRequest) -> str:
