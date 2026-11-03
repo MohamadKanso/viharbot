@@ -42,13 +42,42 @@ The memory service filters before anything is returned. Prompts never enforce ac
 5. Only `validated` items are served from the institutional tier.
 6. Every read and write is audited. Logs carry identifiers, never content.
 
+### Write-side authorization
+
+Retrieval filtering alone does not stop an authorized writer from assigning another engagement, widening access or forging validation. Every mutating operation is **deny by default** and checked by the service from the verified token and policy, never from caller-supplied fields.
+
+| Operation | Rule |
+|---|---|
+| Create or update a record | Allowed only inside the caller's own scope. `owner`, `agent_scope` and `engagement_scope` are **derived server-side** from the token. A request that names a different scope or owner is refused. |
+| `classification` | The caller may set it only at or below its classification ceiling, and may raise it freely but never lower it. Lowering needs the owner or a policy-named reviewer. |
+| `authorized_principals` | Defaults from policy for the scope. Widening it needs a principal named in policy as allowed to grant access to that scope; a writer cannot add itself or a peer. |
+| Validation fields (`status`, `validated_at`, `validated_by`) | Settable only by the promotion operation. A normal write that supplies them is refused. |
+| Promotion (`observed` or `proposed` to `validated`) | Needs a principal named in a **reviewer policy** for that tier and type, who is not the writer. Being a different principal is necessary, not sufficient. Reviewer eligibility is configuration reviewed in the repository, never inferred. |
+| Supersede, retire, delete | Owner or a policy-named principal only; each is audited. |
+
+Required negative tests: forged scope, owner or engagement; classification lowered by a writer; ACL widened by a non-authorized writer; validation fields in an ordinary write; promotion by the writer, by an ineligible principal, and by a reviewer of the wrong tier; deletion by an unrelated principal.
+
+### Retention and deletion
+
+`retention_until` and engagement closure are enforced **at read time**, independent of DynamoDB's asynchronous TTL (which only reclaims storage some time after expiry, so an expired record can remain queryable). The service refuses to return an expired record or any record of a closed engagement. Deleting or retiring a record also deletes its S3 body and every version's body through an idempotent delete job with retries, and an orphan sweep finds bodies with no live record. Whether backups and point-in-time recovery are enabled, and for how long, is an open decision; until it is made they are off and the gap is stated. Tests: an expired-but-present record is not returned; a closed engagement's records are not returned; a deleted record's body is removed; an orphaned body is found by the sweep.
+
 ### Consistency rules
 
-- **Concurrent writes:** a conditional write on `version = expected`; on conflict the caller re-reads and retries.
-- **Retry duplicates:** each write carries an `idempotency_key` such as `request_id#kind`; a conditional put on `attribute_not_exists` makes a repeat a no-op.
-- **Supersession:** never overwrite; write version N+1, mark the old record `superseded` and keep a back-pointer.
+A write is one atomic DynamoDB transaction, so version checks, supersession and de-duplication cannot be partly applied. Layout, per logical record `pk = <scope>#<record_id>`:
+
+| Item (`sk`) | Contents |
+|---|---|
+| `v#<n>` | An immutable version: body or `body_ref`, metadata, `status` |
+| `current` | A pointer holding the current version number and its `status` |
+| `idem#<key>` | The result of an earlier write with this idempotency key (the version it created); the key is scoped to the principal and the record, for example `request_id#kind` |
+
+- **Write path:** `TransactWriteItems` with a condition that `current.version` equals the version the caller read, a put of `v#<n+1>`, an update of `current` to `n+1`, an update of `v#<n>` to `superseded`, and a put of `idem#<key>` with `attribute_not_exists`. Either all of it commits or none does, so there is never more than one current version and the history is never inconsistent.
+- **Racing writers:** exactly one transaction passes the version condition; the other fails, re-reads and retries or reports a conflict.
+- **Retry after a committed write whose response was lost:** the retry's `idem#<key>` put fails its condition, so nothing is written twice; the service reads that item and returns the original result.
+- **Supersession:** never overwrite; old versions stay readable by authorized principals for history until retention ends.
 - **Promotion:** `observed` or `proposed` to `validated` needs a reviewer principal different from the writer. No code path promotes automatically (constitution 8.3).
 - **Failover:** state is keyed by the logical agent and engagement, never by instance.
+- **Tests:** two racing writers; a retry after a committed write with a lost response; a retry before commit; an idempotency key reused by a different principal (refused); a simulated partial failure leaves the old current version unchanged.
 
 ### Cross-cloud access
 
@@ -77,7 +106,7 @@ A new service and a table to operate. Recall is by key and tag until semantic se
 
 ## Test plan (no live inference; DynamoDB Local and fixtures)
 
-Isolation across agents and engagements; a benign poisoned instruction is returned only as data; unauthorized read and write refused; a stale or unvalidated item is never served as institutional; concurrent-write conflict and idempotent retry; supersession keeps history; retention and deletion; failover reads the same record; logs contain no memory content.
+Isolation across agents and engagements; a benign poisoned instruction is returned only as data; unauthorized read and write refused; the write-authorization, retention and consistency tests above; a stale or unvalidated item is never served as institutional; concurrent-write conflict and idempotent retry; supersession keeps history; retention and deletion; failover reads the same record; logs contain no memory content.
 
 ## Cost
 
