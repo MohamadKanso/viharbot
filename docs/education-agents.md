@@ -35,13 +35,13 @@ Model-assisted enrichment (objectives, rationale synthesis) through LiteLLM, `le
 `src/viharbot/curriculum/` holds typed records and checks only. `web_app` does not import it.
 
 - **Models:** `Lesson` with the 14 specified fields, `Exercise` (required `mode`: `simulated` or `live_system`; a live exercise needs an explicit `authorization_note` and a non-production target, and no exercise may target production), seven assessment kinds, and `Track`/`Curriculum`.
-- **Tracks:** eight tracks exist as data, all marked `proposed` and empty. The specification text is not in this repository, so the titles were derived from Phase 2's topic areas and must be reconciled with the specification and the onboarding repositories by a human.
+- **Tracks:** the eight tracks and their topics from the founder's specification exist as data, all marked `proposed` and empty (no lessons). Track 8 is ViharBot Engineering History, consistent with Phase 2's curriculum placement. The existing onboarding content has not yet been mapped onto them.
 - **Loader:** parses one lesson from Markdown with TOML (`+++`) front matter and fixed `##` sections. The onboarding repositories' lessons have no front matter, so existing lessons would need conversion. Lesson text is stored as strings and never interpreted.
 - **Validation:** `validate_traceability` fails when a lesson cites an instructor artifact that is missing, not `approved`, or at a different commit or version, and reports lessons with no instructor reference. `validate_prerequisites` reports unknown ids, self-references, duplicates and cycles.
 
 ### Not done in Phase 4 groundwork
 
-No lesson generation, no model call, no GitHub access, no pull requests for curriculum, no writes to any repository, and no source of approved instructor artifacts (callers must supply one). Ada is still inactive: no execution binding, endpoint or model alias. The track list is unapproved, and founder approval to start Phase 4 is not recorded.
+No lesson generation, no model call, no GitHub access, no pull requests for curriculum, no writes to any repository, and no source of approved instructor artifacts (callers must supply one). Ada is still inactive: no execution binding, endpoint or model alias. Founder approval to start Phase 4 is not recorded.
 
 ## What is not implemented
 

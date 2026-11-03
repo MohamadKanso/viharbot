@@ -107,6 +107,7 @@ class Track(_Frozen):
     track_id: LessonId
     title: Short
     status: Literal["proposed"] = "proposed"
+    topics: tuple[Short, ...] = ()
     lesson_ids: tuple[LessonId, ...] = ()
 
 
@@ -116,21 +117,34 @@ class Curriculum(_Frozen):
     tracks: tuple[Track, ...]
 
 
-# PROPOSED, NOT APPROVED. The specification text with the eight tracks is not in this repository,
-# so these titles are drawn from the topic areas Phase 2 already extracts (learning/extract.py)
-# plus the existing Git-fundamentals lesson. A human must reconcile them with the spec and with
-# the two onboarding repositories before any lesson is written. They hold no lessons.
-PROPOSED_TRACKS: tuple[Track, ...] = tuple(
-    Track(track_id=tid, title=title)
-    for tid, title in (
-        ("git-and-contribution", "Git and the contribution workflow"),
-        ("architecture-decisions", "Architecture and decision records"),
-        ("agent-identity-governance", "Agent identity and governance"),
-        ("inference-and-litellm", "Model inference through LiteLLM"),
-        ("orchestration", "Orchestration and delegation"),
-        ("security-privacy", "Security and privacy"),
-        ("observability-deployment", "Observability and deployment"),
-        ("testing-quality", "Testing and quality assurance"),
-    )
+# PROPOSED, NOT APPROVED. The eight tracks and their topics follow the founder's specification
+# (track 8 matches Phase 2's "Track 8: ViharBot Engineering History"). They hold no lessons yet.
+_TRACK_SPEC: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("viharbot-foundations", "ViharBot Foundations", (
+        "What ViharBot is", "Multi-agent systems", "Agent identities and roles",
+        "Capabilities and skills", "Basic orchestration")),
+    ("architecture", "Architecture", (
+        "FastAPI services", "Container architecture", "Inter-agent communication",
+        "Execution bindings", "Runtime independence")),
+    ("ai-inference", "AI Inference", (
+        "LLM fundamentals", "Strands Agents", "LiteLLM architecture", "Model routing",
+        "Model configuration and governance")),
+    ("agent-memory", "Agent Memory", (
+        "Short-term task context", "Agent-specific memory", "Shared institutional knowledge",
+        "Memory retrieval", "Knowledge provenance")),
+    ("security", "Security", (
+        "Agent authorization", "Trust boundaries", "Tool permissions", "Prompt injection",
+        "Data isolation", "Auditability")),
+    ("software-engineering", "Software Engineering", (
+        "Repository organization", "Git workflows", "Pull requests", "Testing", "CI/CD",
+        "Deployment")),
+    ("advanced-orchestration", "Advanced Orchestration", (
+        "Multi-step planning", "Delegation", "Dependencies", "Execution budgets",
+        "Failure recovery", "Distributed agents")),
+    ("viharbot-engineering-history", "ViharBot Engineering History", (
+        "Major PRs", "Architectural evolution", "Engineering challenges", "Lessons learned",
+        "Design alternatives")),
 )
+PROPOSED_TRACKS: tuple[Track, ...] = tuple(
+    Track(track_id=tid, title=title, topics=topics) for tid, title, topics in _TRACK_SPEC)
 PROPOSED_CURRICULUM = Curriculum(version="0.0.0-proposed", tracks=PROPOSED_TRACKS)
