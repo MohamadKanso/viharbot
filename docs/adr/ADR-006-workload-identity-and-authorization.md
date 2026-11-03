@@ -18,7 +18,7 @@ The platform will soon span DigitalOcean containers, Amazon Bedrock AgentCore, a
 ## Decision
 
 1. **Every call between ViharBot services carries a short-lived signed token, and every callee verifies it itself.** The callee never trusts a caller, a network position, or a claim in the request body.
-2. **Token format: a signed JWT** (`Authorization: Bearer`). Claims: `iss`, `sub` (caller identity), `aud` (target service), `exp` (60 seconds or less), `iat`, `jti`, `cap` (capability), `eng` (engagement), `cls` (data-classification ceiling), `dlg` (the issuer-signed delegation grant, see below), `mth` (HTTP method), `tgt` (canonical request target: path plus the sorted query string), `req_sha256` (hash of the body, including the empty body).
+2. **Token format: a signed JWT carried in the `X-Viharbot-Assertion` header** (not `Authorization`, which SigV4 and load balancers use, so the two never collide). Claims: `iss`, `sub` (caller identity), `aud` (target service), `exp` (60 seconds or less), `iat`, `jti`, `cap` (capability), `eng` (engagement), `cls` (data-classification ceiling), `dlg` (the issuer-signed delegation grant, see below), `mth` (HTTP method), `tgt` (canonical request target: path plus the sorted query string), `req_sha256` (hash of the body bytes as the callee receives them, including the empty body).
    - `sub` and every other identity claim come from the verified token. A value in the body or in an `X-Agent` header is ignored.
    - **Request binding.** The callee recomputes `mth`, `tgt` and `req_sha256` from the request it actually received and rejects any mismatch. A token minted for one route, artifact ID, method or security-relevant query parameter is therefore unusable for another, even when the body is empty (for example two deck downloads).
 3. **Authorization tuple, enforced by the callee independently of Charlie:** caller identity, target service, capability, resource, engagement, data classification, delegation context. The callee compares `cap` with its own fixed capability and computes the effective scope as the intersection of the issuer-signed grant, the caller's registry entry and its own policy (see "Key authority"). Charlie's existing checks remain a first pass, not the authority.
@@ -37,22 +37,38 @@ Verifying a signature proves who signed, not that the signer may assert a given 
 
 | Token | Signed by | May assert |
 |---|---|---|
-| **Caller assertion** (the bearer token on a call) | The calling service's own key | Only that service's fixed identity. Each callee holds a registry mapping `kid` to one `sub` and the capabilities that identity may ever request. A token whose `sub` differs from the registry entry for its `kid` is rejected. |
-| **Delegation grant** (`dlg`, embedded in the assertion) | The issuer key only (the web process or the internal signer, option A or B below) | The engagement, the permitted capabilities and the data-classification ceiling for this delegation, and its depth. |
+| **Caller assertion** (the `X-Viharbot-Assertion` token on a call) | The calling service's own key | Only that service's fixed identity. Each callee holds a registry mapping `kid` to one `sub` and the capabilities that identity may ever request. A token whose `sub` differs from the registry entry for its `kid` is rejected. |
+| **Delegation grant** (`dlg`, embedded in the assertion) | The issuer key only (the web process or the internal signer, option A or B below) | The scope of one delegation to one recipient, per the schema below. |
+
+**Delegation grant schema (normative).** Every field is covered by the issuer's signature.
+
+| Field | Meaning |
+|---|---|
+| `gid` | Unique grant ID |
+| `rcp` | The one recipient `sub` this grant was issued to |
+| `par` | The `gid` of the grant it narrows, or the ID of the authenticated user request for a first-hop grant (the originating authorization) |
+| `depth` and `depth_max` | Hops from the user request, and the maximum allowed |
+| `eng` | Engagement |
+| `caps` | Capabilities permitted, each with an optional resource scope (path or resource patterns the capability may touch) |
+| `cls` | Data-classification ceiling |
+| `exp` | Expiry; never later than the parent's expiry |
+
+**Redelegation is issuer-mediated. Services never forward or re-sign grants.** When a service needs another service to act, it asks the issuer for a new grant whose `rcp` is that other service, whose `par` is the grant it holds, and whose `caps`, resource scope, `cls`, `exp` and `depth` are each equal to or narrower than the parent's. The issuer enforces that attenuation before signing. This removes the need for a hop list that could be truncated or reordered: the issuer-signed `par` and `depth` are the chain.
+
+**Callee validation algorithm.** Reject unless all of these hold: the assertion verifies and its `sub` matches the registry for its `kid`; the grant verifies against an active issuer `kid`; the grant's `rcp` equals the assertion `sub` (so a grant cannot be moved to another caller); `exp` has not passed; `mth`, `tgt` and `req_sha256` match the actual request; the requested capability is in `caps` and the request's `tgt` falls inside that capability's resource scope; `cls` covers the data; `depth` is within `depth_max`; and the effective scope, the **intersection** of the grant, the caller's registry entry and the callee's own policy, still permits the action.
 
 Rules:
 
-- A service key can never sign a grant, so a compromised specialist cannot forge another subject or widen the scope it was granted. At most it can forward a grant, narrower or the same, never wider.
-- The callee computes the effective scope as the **intersection** of the grant, the caller's registry permissions and the callee's own policy. The delegation chain is validated by verifying the grant signature and its recorded hops against the maximum depth.
-- Only the issuer can create a first-hop grant, and the issuer does so only for an authenticated user request and only within the platform's policy for that user's engagement, not on the strength of a model's plan.
+- A service key can never sign a grant, and a service cannot hand its grant to a peer, so a compromised specialist can neither forge another subject nor reuse a grant meant for someone else.
+- Only the issuer creates a first-hop grant, only for an authenticated user request and within platform policy for that user's engagement, never on the strength of a model's plan.
 - Both registries and the policy are repository configuration reviewed like `bindings.toml`.
 
-Negative tests: a service key used to claim another `sub`; a service key used to sign a grant; a forwarded grant with widened capabilities, engagement or classification; a grant past the depth limit; a grant signed by a retired issuer `kid`.
+Negative tests: a service key used to claim another `sub`; a service key used to sign a grant; a grant transplanted to a different caller (`rcp` mismatch); resource substitution (a grant scoped to one resource used against another); an expired grant, and a child grant outliving its parent; a redelegation request wider than its parent in capabilities, engagement, classification, resource scope or depth (the issuer refuses); a grant past `depth_max`; a grant signed by a retired issuer `kid`; a grant whose `par` is unknown to the issuer.
 
 ### Runtime-specific rules
 
 - **DigitalOcean:** private service-to-service traffic plus the token. The verified DigitalOcean internal-routing documentation says nothing about authentication or encryption, so the token is the control, not the network. No DigitalOcean workload identity offering was found; none is assumed.
-- **Amazon Bedrock AgentCore:** a runtime accepts IAM SigV4 or a custom JWT authorizer, not both (verified, AWS docs). Keep SigV4 for coordinator to runtime, which `agentcore_client.py` already uses, and **also** verify the same token inside the container, so one verifier serves every runtime. Do **not** depend on the JWT authorizer accepting a self-hosted issuer: the AWS example shows only Cognito, so that is unverified.
+- **Amazon Bedrock AgentCore:** a runtime accepts IAM SigV4 or a custom JWT authorizer, not both (verified, AWS docs). Keep SigV4 for coordinator to runtime, which `agentcore_client.py` already uses, and **also** verify the application assertion inside the container, so one verifier serves every runtime. Two credentials, two carriers: the **outer** SigV4 signature authenticates the coordinator's AWS principal to the AgentCore service, and the **inner** assertion travels in `X-Viharbot-Assertion` (never `Authorization`), which requires adding that header to the runtime's request-header allowlist. Whether the invocation path forwards arbitrary headers, and under what naming rule, is **not yet verified**. If it does not, the fallback carrier is an `assertion` field in the `/invocations` envelope, and the token then binds `POST`, the target `/invocations`, and the canonical JSON of the `input` object, exactly the representation the container receives. An offline adapter test must prove that the container sees and validates the assertion for whichever carrier is used; live compatibility is an explicit verification gate before AgentCore is relied on. Do **not** depend on the JWT authorizer accepting a self-hosted issuer: the AWS example shows only Cognito, so that is unverified.
 - **ECS/Fargate:** an Application Load Balancer cannot verify SigV4, so the in-app token check is mandatory there.
 - **LiteLLM:** unchanged. Each model-using service keeps its own key and alias, and per-agent keys depend on how the external gateway is configured, which ViharBot does not manage.
 
