@@ -42,7 +42,11 @@ Completing onboarding does not grant access by itself. The founder decides, and 
 
 Trusted contributors branch from current `main` in this repository, push to a feature branch and open a pull request. They do not push directly to `main`.
 
-Both paths follow the same rule: **never push directly to `main`.** At the time of writing, GitHub branch protection is not enabled on `main`, so this is a rule you follow, not one the platform enforces.
+Both paths follow the same rule: **never push directly to `main`.**
+
+The protection for `main` is defined in [`.github/rulesets/protect-main.json`](.github/rulesets/protect-main.json). It blocks deletion and force pushes, requires a pull request with one approval and resolved conversations, and requires the `CI result`, `Contributor registry` and `Dependency review` checks to pass. A repository admin may merge their own pull request once those checks pass (bypass mode `pull_request`), but cannot push to `main` directly. The Sage review is advisory and is deliberately **not** a required check.
+
+That file is only a definition. GitHub enforces it after the founder imports it under **Settings → Rules → Rulesets → New ruleset → Import a ruleset**. Until the founder records that the ruleset is active, treat the rule above as one you follow rather than one the platform enforces. When the ruleset is active, change this paragraph to say so.
 
 ### Branches, commits and pull requests
 

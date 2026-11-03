@@ -43,6 +43,10 @@ class JsonFormatter(logging.Formatter):
         }
         for key in (
             "identity_id",
+            "caller",
+            "decision",
+            "reason",
+            "target",
             "capability",
             "personality_mode",
             "planner_identity",
