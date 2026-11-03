@@ -44,9 +44,7 @@ Trusted contributors branch from current `main` in this repository, push to a fe
 
 Both paths follow the same rule: **never push directly to `main`.**
 
-The protection for `main` is defined in [`.github/rulesets/protect-main.json`](.github/rulesets/protect-main.json). It blocks deletion and force pushes, requires a pull request with one approval and resolved conversations, and requires the `CI result`, `Contributor registry` and `Dependency review` checks to pass. A repository admin may merge their own pull request once those checks pass (bypass mode `pull_request`), but cannot push to `main` directly. The Sage review is advisory and is deliberately **not** a required check.
-
-That file is only a definition. GitHub enforces it after the founder imports it under **Settings → Rules → Rulesets → New ruleset → Import a ruleset**. Until the founder records that the ruleset is active, treat the rule above as one you follow rather than one the platform enforces. When the ruleset is active, change this paragraph to say so.
+The `protect-main` ruleset is **active** on `main`. It is defined in [`.github/rulesets/protect-main.json`](.github/rulesets/protect-main.json). GitHub enforces it: it blocks deletion and force pushes, requires a pull request with one approval and resolved conversations, and requires the `CI result`, `Contributor registry` and `Dependency review` checks to pass. A repository admin may merge their own pull request once those checks pass (bypass mode `pull_request`), but cannot push to `main` directly. The Sage review is advisory and is deliberately **not** a required check.
 
 ### Branches, commits and pull requests
 
