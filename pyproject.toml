@@ -13,6 +13,9 @@ dependencies = [
   "uvicorn[standard]>=0.30.0",
   "strands-agents[litellm]>=1.0.0",
   "boto3>=1.42.0",
+  # Ed25519 verification and signing for service authentication (ADR-006 A2). Already installed
+  # transitively in a clean install (PyJWT[crypto], required by mcp); declared so it is explicit.
+  "cryptography>=43.0.0",
 ]
 
 [project.optional-dependencies]
