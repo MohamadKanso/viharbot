@@ -27,7 +27,12 @@ The platform will soon span DigitalOcean containers, Amazon Bedrock AgentCore, a
      - **Time:** `exp`, `iat` and not-before are checked with at most 10 seconds of clock skew.
      - **Required claims by type.** An assertion must carry `iss`, `sub`, `aud`, `exp`, `iat`, `jti`, `cap`, `eng`, `cls`, `dlg`, `mth`, `tgt` and `req_sha256`. A grant must carry exactly the grant-schema fields below (`gid`, `rcp`, `par`, `depth`, `depth_max`, `eng`, `caps`, `cls`, `exp`) plus `iss` and `iat`; it carries no request-binding claims and no embedded `dlg`. Unknown claims are ignored, but every required claim must be present and well-typed.
    - `sub` and every other identity claim come from the verified token. A value in the body or in an `X-Agent` header is ignored.
-   - **Request binding.** The callee recomputes `mth`, `tgt` and `req_sha256` from the request it actually received and rejects any mismatch. A token minted for one route, artifact ID, method or security-relevant query parameter is therefore unusable for another, even when the body is empty (for example two deck downloads).
+   - **Request binding.** The callee recomputes `mth`, `tgt` and `req_sha256` from the request it actually received, using the canonical form below, and rejects any mismatch. A token minted for one route, artifact ID, method or security-relevant query parameter is therefore unusable for another, even when the body is empty (for example two deck downloads).
+   - **Canonical request target (`tgt`), normative.** Issuers and callees must produce identical bytes, and the callee derives them from the raw request target exactly as its application receives it (a proxy that rewrites the target must be configured to preserve it, or requests fail the match). `mth` is the upper-case method.
+     - **Path:** used as received, with **no normalization**. The callee rejects the request (400) if the path contains an empty segment (`//`), a `.` or `..` segment, a percent-encoded `.`, `/`, `\` or NUL (`%2e`, `%2f`, `%5c`, `%00`, in any case), a non-canonical percent-encoding (lower-case hex digits, or an encoded unreserved character), or any byte outside printable ASCII. An issuer never produces such a path.
+     - **Query:** split on `&` into pairs; each pair is `name` or `name=value`, with the name and value percent-encoded canonically (upper-case hex, every byte encoded except the unreserved characters `A-Z a-z 0-9 - . _ ~`). **Duplicate names are kept**, not merged. Pairs are sorted by name and then by value, bytewise on the encoded forms, and joined with `&`. A bare `name` and `name=` are different and stay different. A query string with an empty pair, or `;` as a separator, is rejected.
+     - **Result:** `tgt` is the path, followed by `?` and the sorted query only when a query exists. Fragments are never sent and are never part of it.
+     - **Test vectors** (both sides must agree): `/decks/abc.pptx` gives `/decks/abc.pptx`; `/x?b=2&a=1&a=0` gives `/x?a=0&a=1&b=2`; `/x?q=a%20b` and `/x?q=a+b` are different targets; `/x?a` and `/x?a=` are different targets; `/a//b`, `/a/../b`, `/a/%2e%2e/b` and `/a/b%2Fc` are all rejected; `/x?q=%7e` (an encoded unreserved character) is rejected.
 3. **Authorization tuple, enforced by the callee independently of Charlie:** caller identity, target service, capability, resource, engagement, data classification, delegation context. The callee compares `cap` with its own fixed capability and computes the effective scope as the intersection of the issuer-signed grant, the caller's registry entry and its own policy (see "Key authority"). Charlie's existing checks remain a first pass, not the authority.
 4. **Policy lives in versioned repository configuration**, in the style of `bindings.toml`, not in prompts. Models never decide authorization.
 5. **Transport.** A token is not confidentiality: it does not stop an observer on the path from reading prompts, artifacts or the bearer token, and it does not stop an intercepted request from being replayed once before the original arrives. Therefore:
@@ -101,6 +106,15 @@ Negative tests: a service key used to claim another `sub`; a service key used to
 
 Recommendation: implement A first behind an interface, and move to B before any agent is reachable from outside the private network or deployed to AWS.
 
+**First-hop grant contract for the separate signer (option B).** A separate signer reduces the blast radius only if it does not simply believe the web process. The signer therefore decides first-hop grants from **its own policy**, not from claims the web process makes:
+
+- The web process may present only: an identifier for the authenticated user session, the engagement the user selected, and the capabilities the request needs. It never states what the user is allowed to do.
+- The signer holds a repository-configured **policy** mapping (user or session class, engagement) to the capabilities, resource scopes and classification ceiling that may ever be granted. It issues a first-hop grant for the **intersection** of the request and that policy, never more.
+- The signer verifies that the session identifier is a live session **that the signer itself issued or can verify** at login, and that the user belongs to the engagement. Until the web tier has per-user identity (today there is one shared login), sessions are all one class, and the policy for that class is the ceiling.
+- First-hop grants are rate-limited per session and per engagement, short-lived (the 5-minute cap above), and every issuance is audited with the session, engagement and resulting grant ID.
+- **Residual risk, stated plainly:** a fully compromised web process can still obtain every grant that policy allows for any live session it can name, up to the rate limit, because it holds the session credentials. Option B bounds the damage to the policy ceiling and to the sessions that exist, and makes mass minting visible through rate limits and audit; it does not make the web tier trustworthy. Per-user identity and a signer-controlled login (so the web process never holds a reusable session credential) are the way to shrink this further and are tracked as an open question.
+- Tests: a request naming capabilities beyond policy receives only the intersection; an unknown or expired session receives nothing; a session not in the engagement receives nothing; the rate limit stops mass issuance and is audited; the signer never issues a first-hop grant when the web process asserts permissions the policy does not give.
+
 ## Alternatives considered
 
 - **mTLS with a private CA.** Rejected for now: the way App Platform terminates internal traffic is undocumented, a certificate authority is a new system to operate, and AgentCore's data plane is not known to pass client certificates to the container.
@@ -128,7 +142,7 @@ No token, malformed token, unknown `kid`; expired and not-yet-valid token with a
 
 1. Does AgentCore's JWT authorizer accept a non-Cognito issuer? (Verify before relying on it.)
 2. Does DigitalOcean offer workload identity or internal encryption? (None found.)
-3. Where does the issuer key live, and who rotates it? (Option A or B above.)
+3. Where does the issuer key live, and who rotates it? (Option A or B above.) For option B, how does login become signer-controlled so the web process never holds a reusable session credential?
 4. How are engagement and classification established when the web tier has one shared user?
 5. How many replicas does each agent run, given the in-memory replay cache?
 6. Which signing library is acceptable as a dependency?
