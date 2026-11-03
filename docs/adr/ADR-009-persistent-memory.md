@@ -57,13 +57,21 @@ Retrieval filtering alone does not stop an authorized writer from assigning anot
 
 Required negative tests: forged scope, owner or engagement; classification lowered by a writer; ACL widened by a non-authorized writer; validation fields in an ordinary write; promotion by the writer, by an ineligible principal, and by a reviewer of the wrong tier; deletion by an unrelated principal.
 
+### Historical versions follow the record's current access policy
+
+Authorization for a record is decided from the record-level `current` item, **never from the access metadata stored on an older version**. Revoking a principal, raising `classification` or closing an engagement applies at once to every version and every body of that record. Old versions are readable only by principals the current policy allows, and a body object is never reachable except through the service: S3 buckets are private, there are no presigned URLs and no direct object access for agents. Tests: after access is revoked, an older version and its S3 body are refused; after classification is raised, an older, lower-classified version is refused to a principal below the new ceiling.
+
+### Promotion across scopes is deferred and denied
+
+Promotion in the table above moves a record's status inside the scope it already lives in. **Moving engagement-derived content into institutional memory is a different, cross-scope operation, and this ADR does not define it.** Until a follow-up ADR does, any attempt to publish engagement or agent content into the institutional tier is denied. That follow-up would need authorized source and destination scopes, a confidentiality review or redaction step before publication (constitution 8.4 forbids confidential client details entering global memory), destination ACL checks, and preserved provenance. Required negative test: engagement content marked confidential cannot enter institutional memory by any operation.
+
 ### Retention and deletion
 
 `retention_until` and engagement closure are enforced **at read time**, independent of DynamoDB's asynchronous TTL (which only reclaims storage some time after expiry, so an expired record can remain queryable). The service refuses to return an expired record or any record of a closed engagement. Deleting or retiring a record also deletes its S3 body and every version's body through an idempotent delete job with retries, and an orphan sweep finds bodies with no live record. Whether backups and point-in-time recovery are enabled, and for how long, is an open decision; until it is made they are off and the gap is stated. Tests: an expired-but-present record is not returned; a closed engagement's records are not returned; a deleted record's body is removed; an orphaned body is found by the sweep.
 
 ### Consistency rules
 
-A write is one atomic DynamoDB transaction, so version checks, supersession and de-duplication cannot be partly applied. Layout, per logical record `pk = <scope>#<record_id>`:
+A write is one atomic **DynamoDB** transaction, so version checks, supersession and de-duplication of the metadata cannot be partly applied. The atomicity claim covers DynamoDB only; S3 bodies follow the ordering below. Layout, per logical record `pk = <scope>#<record_id>`:
 
 | Item (`sk`) | Contents |
 |---|---|
@@ -72,12 +80,13 @@ A write is one atomic DynamoDB transaction, so version checks, supersession and 
 | `idem#<key>` | The result of an earlier write with this idempotency key (the version it created); the key is scoped to the principal and the record, for example `request_id#kind` |
 
 - **Write path:** `TransactWriteItems` with a condition that `current.version` equals the version the caller read, a put of `v#<n+1>`, an update of `current` to `n+1`, an update of `v#<n>` to `superseded`, and a put of `idem#<key>` with `attribute_not_exists`. Either all of it commits or none does, so there is never more than one current version and the history is never inconsistent.
+- **Bodies in S3 are immutable and uploaded first.** The service uploads the body to a deterministic key `bodies/<record>/<hash of the idempotency key>` with server-side encryption and no overwrite, and only then runs the transaction that publishes `body_ref`. A retry after a lost response reuses the same key, so it neither duplicates nor overwrites the object. If the upload succeeds but the transaction fails, the object is an unreferenced orphan; the orphan sweep removes unreferenced bodies after a grace period longer than the maximum write time. A `body_ref` is never committed before its object exists.
 - **Racing writers:** exactly one transaction passes the version condition; the other fails, re-reads and retries or reports a conflict.
 - **Retry after a committed write whose response was lost:** the retry's `idem#<key>` put fails its condition, so nothing is written twice; the service reads that item and returns the original result.
 - **Supersession:** never overwrite; old versions stay readable by authorized principals for history until retention ends.
 - **Promotion:** `observed` or `proposed` to `validated` needs a reviewer principal different from the writer. No code path promotes automatically (constitution 8.3).
 - **Failover:** state is keyed by the logical agent and engagement, never by instance.
-- **Tests:** two racing writers; a retry after a committed write with a lost response; a retry before commit; an idempotency key reused by a different principal (refused); a simulated partial failure leaves the old current version unchanged.
+- **Tests:** an upload that succeeds followed by a failed transaction (orphan swept, current version unchanged); a retry after a lost response reusing the same object; a transaction never committing a `body_ref` whose object is absent; two racing writers; a retry after a committed write with a lost response; a retry before commit; an idempotency key reused by a different principal (refused); a simulated partial failure leaves the old current version unchanged.
 
 ### Cross-cloud access
 
