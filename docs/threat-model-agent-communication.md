@@ -27,7 +27,7 @@ The web tier holds the planner key when the live team is enabled, so it is both 
 |---|---|---|
 | **Impersonation:** any workload on the network calls any agent | Callee verifies a signed token; each key is bound to one subject; `sub` comes only from the token | Compromise of the issuer key |
 | **Interception of traffic** (prompts, artifacts, bearer token) | TLS across platform or cloud boundaries; request binding and short expiry limit a stolen token | Plaintext between containers on one private network is an accepted risk, not a control |
-| **Unauthorized invocation** of `/process`, `/model`, deck downloads | Token required on all but `/health`; capability check at the callee | A misconfigured route left open; covered by a route-enumeration test |
+| **Unauthorized invocation** of agent endpoints and artifact routes | Token required on all but `/health`; capability check at the callee | A misconfigured route left open; covered by a route-enumeration test |
 | **Credential compromise** | Short expiry, per-service keys, `kid` rotation and revocation, secrets from the platform store | A stolen key is valid until revoked |
 | **Replay** | `exp` of 60 s or less, `jti` cache, audience and body-hash binding | Multi-replica callees need shared replay state |
 | **Lateral movement** from one compromised agent | Callee-side allowlist of caller to capability; internal ports only; per-agent keys | Agents that legitimately call each other |
