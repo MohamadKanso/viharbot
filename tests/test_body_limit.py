@@ -97,6 +97,13 @@ def test_other_paths_and_methods_and_scopes_are_not_capped():
     assert seen == ["lifespan"]
 
 
+def test_absurdly_long_content_length_is_refused_without_conversion_error():
+    status, _, reads, app_called = drive(
+        headers=[("content-length", "9" * 5000)], chunks=[b"x"]
+    )
+    assert status == 413 and reads == 0 and not app_called
+
+
 def test_invalid_content_length_falls_back_to_the_stream_count():
     assert drive(headers=[("content-length", "abc")], chunks=[b"x" * 10])[0] == 200
 
@@ -128,7 +135,7 @@ def test_limit_configuration():
             bl.max_body_bytes_from_environment({bl.LIMIT_ENV: bad})
 
 
-def test_default_limit_covers_the_largest_legitimate_request():
+def test_default_limit_budget_sanity_check():
     # question cap 6000 chars (up to 4 bytes each) plus ample room for structured results.
     assert bl.DEFAULT_MAX_BODY_BYTES >= 6000 * 4 + 200_000
 

@@ -121,5 +121,9 @@ def _declared_length(scope: Scope) -> int | None:
     for name, value in scope["headers"]:
         if name == b"content-length":
             text = value.strip()
-            return int(text) if text.isdigit() else None
+            if not text.isdigit():
+                return None
+            # A very long digit string is oversized by definition; never convert it (Python caps
+            # int-from-string length and raises ValueError).
+            return int(text) if len(text) <= 18 else 10**18
     return None
