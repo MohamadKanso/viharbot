@@ -12,7 +12,7 @@ Verified in the repository:
 - Nova's inference already goes through LiteLLM (`model_agent.build_agent`); the audit found no provider SDK imports.
 - ECS/Fargate does not appear in the repository.
 
-Verified in AWS documentation (sources and dates in "Sources" below): the AgentCore container contract is an ARM64 image serving `POST /invocations` and `GET /ping` on port 8080; a runtime accepts IAM SigV4 or a custom JWT authorizer but not both; the default network mode is public, which allows outbound internet access to an external HTTPS endpoint with no VPC or NAT; synchronous requests time out at 15 minutes; `runtimeSessionId` must be at least 33 characters; sessions are ephemeral microVMs; billing is per second and CPU is not billed during I/O wait. **Unverified:** whether a non-Cognito issuer works with the JWT authorizer, and native secrets injection for AgentCore.
+Verified in AWS documentation (sources and dates in "Sources" below): the AgentCore container contract is an ARM64 image serving `POST /invocations` and `GET /ping` on port 8080; a runtime accepts IAM SigV4 or a custom JWT authorizer but not both;  synchronous requests time out at 15 minutes; `runtimeSessionId` must be at least 33 characters; sessions are ephemeral microVMs; billing is per second and CPU is not billed during I/O wait. **Unverified, and treated as assumptions until a source or an approved smoke test establishes them:** whether the default public network mode gives a runtime outbound access to an external HTTPS endpoint such as LiteLLM with no VPC or NAT (the AWS VPC page says a VPC runtime has no internet by default, and the public-mode statement was read only in a search summary); whether a non-Cognito issuer works with the JWT authorizer; and native secrets injection for AgentCore.
 
 ## Decision
 
@@ -36,8 +36,10 @@ Kubernetes, EKS and a service mesh are out of scope.
 | Outcome of the attempt | Meaning | `read_only` | `idempotent` | `stateful` | `side-effecting` |
 |---|---|---|---|---|---|
 | **Known not accepted**: connection refused or failed before the request was sent, 429, an AWS-side 5xx returned before the agent ran, a retryable conflict | The target provably did not run the work | Fail over now | Fail over now | Fail over only to an instance holding the same state; otherwise fail clearly | Fail over only if the target honors `idempotency_key`; otherwise fail clearly |
-| **Unknown outcome**: timeout, connection reset after the request was sent, a response lost | The primary may still be running the work, and a timeout does not cancel it | At most **one** sequential retry on the secondary, only while `deadline_ms` remains; duplicate inference is **accepted and logged** (`possible_duplicate=true`, `attempt`) and counted against the request's `budget` | **Not allowed** until a target honors `idempotency_key` and deduplicates; none does today | Never | Never |
+| **Unknown outcome**: timeout, connection reset after the request was sent, a response lost | The primary may still be running the work, and a timeout does not cancel it | At most **one** sequential retry on the secondary, only while `deadline_ms` remains **and the budget rule below admits it**; duplicate inference is **accepted and logged** (`possible_duplicate=true`, `attempt`) | **Not allowed** until a target honors `idempotency_key` and deduplicates; none does today | Never | Never |
 | **Known failure after running**: the agent returned an application error | The work ran | No failover; report the error | No failover | No failover | No failover |
+
+**Budget rule for a retry after an unknown outcome.** `budget` has two units: `max_output_tokens` and `max_cost_usd`, each a ceiling for one attempt. The primary may already have spent its full allowance, so the retry is admitted only if the request's `budget` is present and its total is at least **twice** one attempt's ceiling (one allowance reserved for the unresolved primary, one for the secondary). If `budget` is absent or cannot cover that, there is **no retry**: the request fails with `possible_duplicate=unknown`, never a guess. Known-not-accepted failures need no reservation. Deterministic tests: unknown outcome with and without a sufficient budget, with an absent budget, with the budget exhausted exactly, and a second unknown outcome (no third attempt).
 
 Rules that apply to every row: never send the same request to both instances in parallel (no hedging); at most 2 attempts in total; never fail over to an instance whose identity is not authorized for the request's data; the breaker only decides the initial target, not retries after an unknown outcome. Nova research today is `read_only` (an inference call and a local append), so it uses the first two columns. "Idempotent" work is safe to replay only once a deduplication mechanism exists; this ADR does not assume one.
 
@@ -69,14 +71,14 @@ A stateless failover works only while memory is not read back; real shared memor
 | AgentCore Runtime, platform V2 | $0.1276 per vCPU-hour and $0.0169 per GB-hour |
 | Fargate, ARM | $0.0324 per vCPU-hour and $0.0036 per GB-hour |
 | Application Load Balancer | $0.0225 per hour plus $0.008 per LCU-hour |
-| Public IPv4 address | about $3.65 per month |
+| Public IPv4 address | about $3.65 per month each ($0.005 per hour); the task has one, and the load balancer has one **per Availability Zone it spans** (two assumed) |
 | NAT gateway (avoided) | about $0.045 per hour, about $33 per month |
 
 **Included:** the compute and load balancer lines in the totals below. **Excluded:** data transfer, ECR storage, CloudWatch Logs, Secrets Manager (about $0.40 per secret per month, unverified), certificates, and all LiteLLM inference, which is external.
 
 - AgentCore on demand: about $7.50 per month, range $3 to $40 depending on the active CPU share and platform version. No idle floor.
-- Fargate always on, ARM: 0.25 vCPU and 0.5 GB about $7 per month, 0.5 vCPU and 1 GB about $14.50; public IPv4 about $3.65; the load balancer, about $16 to $22 per month, is the largest fixed item. A NAT gateway would add about $33 and is avoided.
-- Standby totals: Fargate stack about $28 to $45 per month; AgentCore plus a warm Fargate standby about $35 to $85. With the Fargate service at desired count 0, only the load balancer remains (about $17 to $22).
+- Fargate always on, ARM: 0.25 vCPU and 0.5 GB about $7 per month, 0.5 vCPU and 1 GB about $14.50; the task's public IPv4 about $3.65; the load balancer is the largest fixed item at about $23 to $30 per month, itemized as the hourly charge (about $16), at least one LCU-hour charge (about $6) and two public IPv4 addresses (about $7.30, assuming two Availability Zones; confirm the zone count and address behavior in the AWS calculator). A NAT gateway would add about $33 and is avoided.
+- Standby totals: Fargate stack about $31 to $52 per month; AgentCore plus a warm Fargate standby about $38 to $92. With the Fargate service at desired count 0, only the load balancer remains (about $23 to $30).
 - Temporary: the load balancer and service can be created and deleted per test for about $0.05 per hour, so a four-hour test is about $0.20 plus inference.
 
 ## Validation plan
@@ -84,6 +86,8 @@ A stateless failover works only while memory is not read back; real shared memor
 Deterministic tests with mocked responses for: primary available, primary unavailable, secondary available, secondary unavailable, routing decisions, timeout handling, retry eligibility, authorization, request correlation, failure reporting. No repeated paid inference. After approval: verify both instances' health, run one authorized research request, make the primary unavailable, confirm eligible failover, confirm correlation and that inference went through LiteLLM. Use the fewest live calls possible.
 
 ## Open questions
+
+**Smoke-test prerequisite:** outbound access from an AgentCore runtime to the external LiteLLM endpoint must be demonstrated in the approved smoke test before AgentCore is relied on.
 
 Region choice (the newer AgentCore platform version is not available in every region); the domain and certificate for the load balancer; where the coordinator runs and how it authenticates to both; the ARM64 build story in CI; whether the Cloudflare gateway CA baked into `Dockerfile.research` is needed on AWS; AgentCore secrets injection.
 
