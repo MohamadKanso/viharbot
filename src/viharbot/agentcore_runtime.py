@@ -12,6 +12,7 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from pydantic import BaseModel, ValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .nova_contract import (
     INSTANCE_HEADER,
@@ -51,7 +52,7 @@ class NovaRoute(APIRoute):
                 response = await request_validation_exception_handler(request, exc)
                 response.headers[NOT_ACCEPTED_HEADER] = "1"
                 return response
-            except HTTPException as exc:
+            except StarletteHTTPException as exc:  # FastAPI's HTTPException is a subclass
                 if request.scope.get(_WORK_STARTED):
                     raise
                 raise _refusal(exc.status_code, exc.detail, exc.headers) from exc
@@ -76,6 +77,7 @@ def _admit(
         raise _refusal(422, "Invalid invocation envelope", stamp)
     values = parsed.model_dump(exclude_none=True)
     values["logical_agent"] = logical_agent
+    values.setdefault("attempt", 1)  # the effective attempt, as the response reports it
     return identity, NovaCallContext(
         runtime_instance=identity[0], runtime_kind=identity[1], **values)
 
@@ -129,6 +131,14 @@ def add_agentcore_routes(
         try:
             response = Response()
             result = handler(validated, response, request_id)
+        except StarletteHTTPException as exc:
+            if not identity:
+                raise
+            # A failure after work began: attribute it to this instance, never mark it.
+            raise HTTPException(
+                status_code=exc.status_code, detail=exc.detail,
+                headers={**(exc.headers or {}), INSTANCE_HEADER: identity[0]},
+            ) from exc
         finally:
             if token is not None:
                 reset_call_context(token)

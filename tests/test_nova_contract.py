@@ -10,6 +10,7 @@ import pytest
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from deadline_helpers import deadline_with, install_agentcore
 from viharbot import agentcore_runtime, research_agent
@@ -141,6 +142,24 @@ def test_failure_after_work_started_is_never_marked(nova, monkeypatch):
     result = invoke(client, request_id="r-3", attempt=1)
     assert result.status_code == 502
     assert "X-Nova-Not-Accepted" not in result.headers
+    assert result.headers["X-Nova-Instance"] == "nova-local-01"  # attributed, not marked
+
+
+def test_bare_invocation_logs_the_effective_attempt_on_success_and_failure(
+        nova, monkeypatch, caplog):
+    client, _ = nova
+    with caplog.at_level(logging.INFO, logger="research"):
+        invoke(client)
+
+        def failing(*, model_alias, system_prompt):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(research_agent, "build_agent", failing)
+        invoke(client)
+    for event in ("research completed", "research failed"):
+        record = next(r for r in caplog.records if r.getMessage() == event)
+        logged = json.loads(JsonFormatter().format(record))
+        assert logged["attempt"] == 1 and logged["runtime_instance"] == "nova-local-01"
 
 
 def test_auth_refusal_is_marked_and_the_handler_does_not_run():
@@ -153,8 +172,11 @@ def test_auth_refusal_is_marked_and_the_handler_does_not_run():
     async def adeny() -> None:
         raise HTTPException(status_code=403, detail="no")
 
+    def starlette_deny() -> None:
+        raise StarletteHTTPException(status_code=400, detail="no")
+
     calls = []
-    for dependency, status in ((deny, 401), (adeny, 403)):
+    for dependency, status in ((deny, 401), (adeny, 403), (starlette_deny, 400)):
         app = FastAPI()
         agentcore_runtime.add_agentcore_routes(
             app, Body, lambda *a: calls.append(a), dependencies=[Depends(dependency)],
