@@ -26,7 +26,7 @@ from viharbot.identity_registry import (
 )
 
 ORIGINAL_IDS = {"charlie", "nova", "atlas", "pixel", "sage", "cipher", "scout", "orbit"}
-EXPECTED_IDS = ORIGINAL_IDS | {"archie", "ada"}
+EXPECTED_IDS = ORIGINAL_IDS | {"archie", "ada", "kepler"}
 EXPECTED_CAPABILITIES = {
     "charlie": {"synthesis", "research"},
     "nova": {"research", "evidence_discovery"},
@@ -38,6 +38,7 @@ EXPECTED_CAPABILITIES = {
     "orbit": {"automation_engineering"},
     "archie": {"knowledge_curation"},
     "ada": {"curriculum_design"},
+    "kepler": {"software_engineering"},
 }
 EXPECTED_FAMILIES = {
     "charlie": "GPT-6 family",
@@ -50,6 +51,7 @@ EXPECTED_FAMILIES = {
     "orbit": "Claude Sonnet family",
     "archie": "Claude Opus family",
     "ada": "Claude Sonnet family",
+    "kepler": "Claude Sonnet family",
 }
 
 
@@ -74,8 +76,8 @@ def identity_kwargs(**overrides):
 def test_all_ten_identities_load_with_unique_ids():
     registry = load_registry()
     ids = [identity.id for identity in registry.list()]
-    assert len(registry) == 10 and len(ids) == 10
-    assert set(ids) == EXPECTED_IDS and len(set(ids)) == 10
+    assert len(registry) == 11 and len(ids) == 11
+    assert set(ids) == EXPECTED_IDS and len(set(ids)) == 11
 
 
 def test_the_eight_original_identities_keep_their_stable_ids_and_names():
@@ -253,7 +255,7 @@ def test_loading_makes_no_network_calls(monkeypatch):
     monkeypatch.setattr(socket, "socket", blocked)
     monkeypatch.setattr(socket, "create_connection", blocked)
     monkeypatch.setattr(socket, "getaddrinfo", blocked)
-    assert len(load_registry()) == 10
+    assert len(load_registry()) == 11
 
 
 def test_loading_does_not_import_inference_or_cloud_clients():
@@ -287,7 +289,7 @@ CREDENTIAL_PATTERNS = [
 
 def test_identity_files_and_prompts_contain_no_credentials_or_endpoints():
     files = list(IDENTITY_DIR.glob("*.toml")) + list((IDENTITY_DIR / "prompts").glob("*.md"))
-    assert len(files) == 20
+    assert len(files) == 22
     for path in files:
         text = path.read_text(encoding="utf-8")
         for pattern in CREDENTIAL_PATTERNS:
@@ -325,7 +327,7 @@ def test_capability_vocabulary_and_status():
         "research", "fact_check", "source_quality", "security_assessment", "privacy_review",
         "synthesis", "creative_design", "philosophical_analysis", "logistics_planning",
         "automation_engineering", "evidence_discovery", "slide_generation", "code_review",
-        "knowledge_curation", "curriculum_design",
+        "knowledge_curation", "curriculum_design", "software_engineering",
     }
     implemented = {c for c in Capability if capability_status(c) is CapabilityStatus.IMPLEMENTED}
     assert {c.value for c in implemented} == {
