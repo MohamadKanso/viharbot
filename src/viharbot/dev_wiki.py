@@ -704,7 +704,7 @@ def _maturity(epic: dict, merged: list) -> list[dict]:
         rows.append({"level": "implemented", "state": "not_evidenced", "evidence": []})
     for level in MATURITY_LEVELS[2:]:
         rows.append({"level": level, "state": "not_evidenced", "evidence": [],
-                     "note": "GitHub issues and pull requests do not establish this; see "
+                     "note": "Unknown: GitHub issues and pull requests do not establish this; see "
                              f"{STATUS_DOC} for audited evidence."})
     return rows
 

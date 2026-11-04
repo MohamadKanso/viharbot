@@ -126,7 +126,39 @@ def _wiki_headers(response: Response) -> None:
     response.headers["Cache-Control"] = "no-store"
 
 
-@app.get("/api/development/epics", include_in_schema=False)
+class WikiSync(BaseModel):
+    state: Literal["ok", "stale", "unavailable"]
+    stale: bool
+    error: str | None = None
+    synced_at: str | None = None
+    cache_seconds: int
+    repo: str
+    head_sha: str | None = None
+    rate_limit: dict | None = None
+    retry_after_seconds: int | None = None
+
+
+class WikiEpicSummary(BaseModel):
+    number: int
+    title: str
+    url: str
+    state: str
+    status: Literal["completed", "active", "planned", "blocked"]
+    agent: str | None = None
+    phase: str | None = None
+    progress: dict
+    counts: dict
+    labels: list[str]
+
+
+class WikiEpicsResponse(BaseModel):
+    sync: WikiSync
+    counts: dict | None = None
+    dashboard: dict | None = None
+    epics: list[WikiEpicSummary]
+
+
+@app.get("/api/development/epics", response_model=WikiEpicsResponse, include_in_schema=False)
 def development_epics(response: Response, _: None = Depends(require_web_access)) -> dict:
     _wiki_headers(response)
     return dev_wiki_service().epics()
@@ -143,6 +175,7 @@ def development_epic(number: int, response: Response, _: None = Depends(require_
     return found
 
 
+@app.get("/api/development/activity", include_in_schema=False)
 @app.get("/api/development/timeline", include_in_schema=False)
 def development_timeline(
     response: Response,

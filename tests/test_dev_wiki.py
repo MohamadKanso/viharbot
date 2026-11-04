@@ -453,3 +453,59 @@ def test_the_wiki_makes_no_model_calls():
     source = inspect.getsource(dev_wiki)
     for banned in ("import litellm", "litellm_client", "import openai", "strands", "completion("):
         assert banned not in source
+
+
+# ---- frontend (Node fake DOM; innerHTML throws there, so any HTML-string rendering fails) ----
+
+import shutil
+import subprocess
+from pathlib import Path
+
+NODE = shutil.which("node")
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def run_ui(hashes, api):
+    done = subprocess.run(
+        [NODE, str(ROOT / "tests" / "js" / "run_wiki.mjs"),
+         str(ROOT / "src" / "viharbot" / "static" / "index.html")],
+        input=json.dumps({"api": api, "hashes": hashes}), capture_output=True, text=True, timeout=60)
+    assert done.returncode == 0, done.stderr
+    return json.loads(done.stdout)
+
+
+def api_fixture(service):
+    return {"/api/development/epics": service.epics(), "/api/development/epics/10": service.epic(10)[0],
+            "/api/development/timeline": service.timeline(), "/api/development/docs": service.docs(),
+            "/api/development/docs/docs/guide.md": service.document("docs/guide.md")[0]}
+
+
+@pytest.mark.skipif(NODE is None, reason="Node.js is not installed")
+def test_ui_navigates_and_renders_every_view():
+    api = api_fixture(make_service())
+    result = run_ui(["#wiki", "#wiki/epic/10", "#wiki/docs", "#wiki/docs/docs/guide.md",
+                     "#wiki/timeline?epic=10", "#home"], api)["out"]
+    dash, epic, docs, doc, timeline, home = result
+    assert not dash["wikiHidden"] and dash["chatHidden"] and dash["current"] == "page"
+    assert "Last synchronized with GitHub" in dash["sync"] and "2 of 2 epics shown" in dash["body"]
+    assert "details" in dash["tags"] and "progressbar" not in dash["body"]
+    assert "Blocked by open #21" in epic["body"] and "Unknown / unverified" in epic["body"]
+    assert "Architecture Decision Records" in docs["body"] and "revision fffffff" in doc["body"]
+    assert "pr merged" in timeline["body"]
+    assert home["wikiHidden"] and not home["chatHidden"] and home["current"] is None
+
+
+@pytest.mark.skipif(NODE is None, reason="Node.js is not installed")
+def test_ui_shows_unavailable_without_inventing_data():
+    unavailable = WikiService(WikiConfig({}), FakeGitHub())
+    api = {"/api/development/epics": unavailable.epics()}
+    page = run_ui(["#wiki"], api)["out"]
+    assert "Unavailable" in page[0]["sync"] and "DEV_WIKI_GITHUB_TOKEN" in page[0]["sync"]
+    assert "details" not in page[0]["tags"]
+
+
+def test_activity_endpoint_is_the_timeline_and_epics_response_is_typed(client):
+    dev_wiki.set_service(make_service())
+    activity = client.get("/api/development/activity?epic=10").json()
+    assert activity["events"] and all(10 in e["epics"] for e in activity["events"])
+    assert client.get("/api/development/epics").json()["sync"]["state"] == "ok"

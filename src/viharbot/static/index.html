@@ -291,6 +291,9 @@
       .wiki-tile span { color: var(--muted); font-size: 12px; }
       .wiki-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
       .wiki-card { padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: var(--shadow); }
+      .wiki-card summary { cursor: pointer; font-weight: 700; font-size: 15px; line-height: 1.4; }
+      .wiki-card[hidden] { display: none; }
+      .wiki-filters input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
       .wiki-card h3 { margin: 0 0 6px; font-size: 15px; line-height: 1.35; }
       .wiki-card a { color: inherit; }
       .wiki-meta { color: var(--muted); font-size: 12px; margin: 4px 0; }
@@ -1750,21 +1753,43 @@
         }
         root.append(overall);
         const epics = wikiSection("Epics");
+        const controls = el("div", "wiki-filters");
+        const searchLabel = el("label", "", "Search epics");
+        const search = el("input"); search.setAttribute("type", "search"); search.setAttribute("aria-label", "Search epics by title, number or agent");
+        searchLabel.append(search);
+        const statusLabel = el("label", "", "Status");
+        const statusSel = el("select"); statusSel.setAttribute("aria-label", "Filter epics by status");
+        ["", "completed", "active", "planned", "blocked"].forEach((v) => { const o = el("option", "", v || "All"); o.value = v; statusSel.append(o); });
+        statusLabel.append(statusSel);
+        controls.append(searchLabel, statusLabel);
+        const count = el("p", "wiki-meta"); count.setAttribute("role", "status");
         const grid = el("div", "wiki-grid");
-        data.epics.forEach((epic) => {
-          const card = el("article", "wiki-card");
-          const h = el("h3");
-          h.append(wikiAnchor(`#wiki/epic/${epic.number}`, `#${epic.number} ${epic.title}`));
-          card.append(h);
+        const cards = data.epics.map((epic) => {
+          const card = el("details", "wiki-card");
+          const sum = el("summary");
+          sum.append(statusBadge(epic.status), `#${epic.number} ${epic.title}`);
+          card.append(sum, wikiBar(epic.progress, `Progress of epic ${epic.number}`));
           const meta = el("div", "wiki-meta");
-          meta.append(statusBadge(epic.status));
-          if (epic.agent) meta.append(el("span", "", `Agent: ${epic.agent} `));
-          if (epic.phase) meta.append(el("span", "", `Phase ${epic.phase}`));
-          card.append(meta, wikiBar(epic.progress, `Progress of epic ${epic.number}`),
-            el("div", "wiki-meta", `${epic.counts.prs_merged} merged PR(s) referencing this epic`));
+          if (epic.agent) meta.append(`Agent: ${epic.agent} · `);
+          if (epic.phase) meta.append(`Phase ${epic.phase} · `);
+          meta.append(`${epic.counts.children_open} open / ${epic.counts.children_closed} closed children · ${epic.counts.prs_merged} merged PR(s) · `, wikiAnchor(`#wiki/epic/${epic.number}`, "Open epic page"));
+          card.append(meta);
           grid.append(card);
+          return { epic, card };
         });
-        epics.append(grid);
+        const apply = () => {
+          const q = String(search.value || "").toLowerCase(); const st = statusSel.value;
+          let shown = 0;
+          cards.forEach(({ epic, card }) => {
+            const hay = `#${epic.number} ${epic.title} ${epic.agent || ""}`.toLowerCase();
+            const ok = (!q || hay.includes(q)) && (!st || epic.status === st);
+            card.hidden = !ok; if (ok) shown += 1;
+          });
+          count.textContent = `${shown} of ${cards.length} epics shown`;
+        };
+        search.addEventListener("input", apply); statusSel.addEventListener("change", apply);
+        apply();
+        epics.append(controls, count, grid);
         root.append(epics);
         const prs = wikiSection("Recently merged pull requests");
         prs.append(wikiList(d.recent_merged_prs, (p) => [ext(p.url, `#${p.number} ${p.title}`), ` · ${wikiDate(p.merged_at)}`], "No merged pull requests found."));
@@ -1821,7 +1846,7 @@
         s8.append(wikiList(e.checklist, (c) => [`${c.checked ? "☑" : "☐"} ${c.text}`, el("span", "wiki-meta", ` (${c.section || "no heading"})`)], "The epic has no checklist."));
         root.append(s8);
         const s9 = wikiSection("Maturity", "h3");
-        s9.append(wikiList(e.maturity, (m) => [el("strong", "", m.level), m.state === "evidenced" ? " — evidenced: " : " — not evidenced here. ", ...(m.evidence || []).map((x) => ext(x.url, x.claim))], ""));
+        s9.append(wikiList(e.maturity, (m) => [el("strong", "", m.level), m.state === "evidenced" ? " — evidenced: " : " — Unknown / unverified: no evidence here. ", ...(m.evidence || []).map((x) => ext(x.url, x.claim))], ""));
         s9.append(el("p", "wiki-method", "A closed issue or merged pull request does not prove deployment or live validation."));
         root.append(s9);
         const s10 = wikiSection("Documentation and ADRs", "h3");
