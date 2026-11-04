@@ -509,3 +509,45 @@ def test_activity_endpoint_is_the_timeline_and_epics_response_is_typed(client):
     activity = client.get("/api/development/activity?epic=10").json()
     assert activity["events"] and all(10 in e["epics"] for e in activity["events"])
     assert client.get("/api/development/epics").json()["sync"]["state"] == "ok"
+
+
+# ---- redirects must never carry the token to another host ----
+
+def test_default_transport_does_not_follow_redirects_or_forward_the_token():
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    seen = []
+
+    class Target(BaseHTTPRequestHandler):
+        def do_GET(self):
+            seen.append(self.headers.get("Authorization"))
+            self.send_response(200); self.end_headers(); self.wfile.write(b"[]")
+
+        def log_message(self, *a):
+            pass
+
+    target = HTTPServer(("127.0.0.1", 0), Target)
+
+    class Redirector(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(302)
+            self.send_header("Location", f"http://127.0.0.1:{target.server_port}/stolen")
+            self.end_headers()
+
+        def log_message(self, *a):
+            pass
+
+    front = HTTPServer(("127.0.0.1", 0), Redirector)
+    for server in (target, front):
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        config = WikiConfig({"DEV_WIKI_GITHUB_TOKEN": "synthetic-token", "DEV_WIKI_REPO": REPO,
+                             "DEV_WIKI_API_URL": f"http://127.0.0.1:{front.server_port}"})
+        with pytest.raises(WikiError) as caught:
+            GitHubReader(config).get_json("/repos/x/y")
+        assert caught.value.code == "redirect_refused"
+        assert seen == []  # the second server was never contacted, so it never saw a credential
+    finally:
+        for server in (target, front):
+            server.shutdown()

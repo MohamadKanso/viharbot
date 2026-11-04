@@ -116,13 +116,23 @@ class WikiError(Exception):
         self.retry_after = retry_after
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never follow a redirect: urllib would resend the Authorization header to the new host."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _default_transport(url: str, headers: dict[str, str]) -> tuple[int, dict[str, str], bytes]:
     request = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response:  # noqa: S310
+        with _OPENER.open(request, timeout=REQUEST_TIMEOUT) as response:  # noqa: S310
             return (response.status, {k.lower(): v for k, v in response.headers.items()},
                     response.read())
-    except urllib.error.HTTPError as exc:
+    except urllib.error.HTTPError as exc:  # includes unfollowed 3xx
         return exc.code, {k.lower(): v for k, v in exc.headers.items()}, exc.read()
     except (urllib.error.URLError, TimeoutError, OSError):
         raise WikiError("network") from None
@@ -153,6 +163,8 @@ class GitHubReader:
             if wait is None and self.rate_reset:
                 wait = max(0, self.rate_reset - int(time.time()))
             raise WikiError("rate_limited", retry_after=float(wait if wait is not None else 60))
+        if 300 <= status < 400:
+            raise WikiError("redirect_refused")  # a moved API is reported, never followed
         if status in (401, 403):
             raise WikiError("auth_failed")
         if status == 404:
