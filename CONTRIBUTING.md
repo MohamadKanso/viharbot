@@ -44,7 +44,7 @@ Trusted contributors branch from current `main` in this repository, push to a fe
 
 Both paths follow the same rule: **never push directly to `main`.**
 
-The `protect-main` ruleset is **active** on `main`. It is defined in [`.github/rulesets/protect-main.json`](.github/rulesets/protect-main.json). GitHub enforces it: it blocks deletion and force pushes, requires a pull request with one approval and resolved conversations, and requires the `CI result`, `Contributor registry` and `Dependency review` checks to pass. A repository admin may merge their own pull request once those checks pass (bypass mode `pull_request`), but cannot push to `main` directly. The Sage review is advisory and is deliberately **not** a required check.
+The `protect-main` ruleset is **active** on `main`. It is defined in [`.github/rulesets/protect-main.json`](.github/rulesets/protect-main.json). GitHub enforces it: it blocks deletion and force pushes, requires a pull request with one approval and resolved conversations, and requires the `CI result`, `Contributor registry`, `CLA acceptance` and `Dependency review` checks to pass (`CLA acceptance` was applied to the live ruleset on 2026-11-04; see the [activation record](docs/governance/cla-activation.md) for what was and was not verified). A repository admin may merge their own pull request once those checks pass (bypass mode `pull_request`), but cannot push to `main` directly. The Sage review is advisory and is deliberately **not** a required check.
 
 ### Branches, commits and pull requests
 
@@ -57,7 +57,9 @@ The `protect-main` ruleset is **active** on `main`. It is defined in [`.github/r
 
 External contributions will not be merged until the founder has approved a contribution agreement and the contributor has accepted it.
 
-The intended mechanism is a Contributor License Agreement (CLA) that supports possible future commercial distribution and relicensing. **No CLA exists yet.** Until one is approved, external pull requests can be opened, reviewed and discussed, but external code will not be merged. This restriction is temporary and stays in force until the agreement is approved and published. A Developer Certificate of Origin (DCO) sign-off is not required and is not being introduced.
+The mechanism is a Contributor License Agreement (CLA) that supports commercial distribution and relicensing. The [agreement](docs/governance/contributor-license-agreement.md) is approved by the founder and is in force from the merge of the pull request that records it as `in-force` in [CLA-ACCEPTANCES.md](CLA-ACCEPTANCES.md). **No lawyer has reviewed it; the founder waived legal review and accepted that risk**, and the agreement says so. External pull requests can be opened, reviewed and discussed without it, but external code is merged only after its author has accepted the agreement and the acceptance is recorded. A Developer Certificate of Origin (DCO) sign-off is not required and is not being introduced.
+
+You accept by posting the exact statement the agreement specifies (it names the legal-terms version and this repository) as a comment on your pull request. Commit with an email linked to your GitHub account (GitHub's noreply address works): the check cannot resolve a commit author it cannot link, and fails. You must be at least 18 unless the founder separately approves otherwise, and contributions that belong to an employer need that employer's authorization or a corporate agreement. The founder verifies your comment, keeps the detailed evidence privately, and records a minimal entry in [CLA-ACCEPTANCES.md](CLA-ACCEPTANCES.md); the `CLA acceptance` check recognises you only after that record is merged, and checks every commit author and co-author in your pull request, not only you. A material change to the agreement needs you to accept again; an editorial one does not. You may withdraw from future participation, which keeps the grants you already made. How it works, and what was and was not verified before activation, are in [CLA acceptance](docs/governance/cla-acceptance.md) and the [activation record](docs/governance/cla-activation.md).
 
 When the CLA is drafted it is expected to cover these subjects, so you can see what you would be asked to confirm:
 
@@ -157,4 +159,4 @@ GitHub private vulnerability reporting is **not enabled** for this repository at
 
 ## Not yet decided
 
-These are open and are not resolved by this document: the contribution agreement and its wording; the repository's licence terms and any notice; contribution terms for trusted contributors; and a private channel for security reports.
+These are open and are not resolved by this document: legal review of the contribution agreement (waived by the founder, not completed); the repository's licence terms and any notice; contribution terms for trusted contributors; and a private channel for security reports.

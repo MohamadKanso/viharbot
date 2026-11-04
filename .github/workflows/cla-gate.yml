@@ -1,0 +1,62 @@
+name: CLA acceptance
+
+# Merge gate for the contribution agreement. It fails a pull request unless every identifiable
+# contributor (author, commit authors, committers, co-author trailers) is covered by a recorded
+# acceptance or a logged, founder-approved exemption. While the agreement is a draft it fails every
+# non-exempt contributor. It never approves, never merges and grants no trust. See
+# docs/governance/cla-acceptance.md.
+#
+# Why pull_request_target: the workflow, the script, the record, the exceptions and the founder's
+# identity all come from the protected base branch, so a pull request cannot edit the check that
+# judges it or accept for itself. The pull request's code is never checked out, installed, imported
+# or run. Its commit list and file list are read through the API as data, and only the few
+# protected files it changes are fetched as plain text to be parsed. The token is read-only and no
+# secret is used.
+#
+# Required-check safety: this workflow has no path filter and the job has no `if:`, so it reports
+# on every pull request and cannot be skipped into a pass. Every error, including a GitHub outage
+# or rate limit, makes it fail. tests/test_cla_gate.py asserts these properties.
+on:
+  pull_request_target:
+    branches: [main]
+
+concurrency:
+  group: cla-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cla:
+    name: CLA acceptance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      # Base branch only. The default for this event is the base branch; the SHA makes it explicit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - name: Check acceptance of the agreement
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Fetch the pull request's commit as data. Nothing from it is checked out or run.
+          git fetch --no-tags --depth=1 origin "refs/pull/${PR_NUMBER}/head"
+          head_dir="$RUNNER_TEMP/head"
+          for path in CLA-ACCEPTANCES.md CLA-EXCEPTIONS.md docs/governance/contributor-license-agreement.md; do
+            mkdir -p "$head_dir/$(dirname "$path")"
+            if git cat-file -e "FETCH_HEAD:$path" 2>/dev/null; then
+              git show "FETCH_HEAD:$path" > "$head_dir/$path"
+            fi
+          done
+          python3 .github/scripts/cla_gate.py check-pr \
+            --repo "$REPO" --pr "$PR_NUMBER" --base-dir . --head-dir "$head_dir"
