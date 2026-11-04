@@ -207,6 +207,7 @@ def test_no_model_is_claimed_when_none_was_reported():
     assert not [n for n in with_class(result["final"], "live-name") if "·" in text_of(n)]
 
 
+@needs_node
 def test_the_fact_check_section_shows_the_cited_quote_and_whether_it_was_found():
     from test_ui_orchestration import chat_body
     claims = [
