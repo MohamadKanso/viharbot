@@ -18,7 +18,26 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 MAX_DOCUMENT_BYTES = 400_000
-_HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$", re.M)
+_HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$")
+_FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
+
+
+def _extract_headings(text: str) -> tuple[str, ...]:
+    """Markdown headings outside fenced code blocks (a fenced '# x' is not a section)."""
+    headings: list[str] = []
+    fence: str | None = None
+    for line in text.splitlines():
+        marker = _FENCE.match(line)
+        if marker:
+            char = marker.group(1)
+            if fence is None:
+                fence = char
+            elif char[0] == fence[0] and len(char) >= len(fence):
+                fence = None
+            continue
+        if fence is None and (match := _HEADING.match(line)):
+            headings.append(_normalize(match.group(1)))
+    return tuple(headings)
 _VERSION = re.compile(r"\bVersion\s+(\d+(?:\.\d+)*)")
 
 
@@ -94,7 +113,8 @@ def load_governance(
             path = (base / doc.path).resolve()
             if base not in path.parents or not path.is_file():
                 raise GovernanceLoadError(f"{doc.key}: {doc.path} is missing")
-            raw = path.read_bytes()
+            with path.open("rb") as handle:
+                raw = handle.read(MAX_DOCUMENT_BYTES + 1)  # bounded: never read an unbounded file
         except OSError:
             raise GovernanceLoadError(f"{doc.key}: {doc.path} is unreadable") from None
         if len(raw) > MAX_DOCUMENT_BYTES:
@@ -111,7 +131,7 @@ def load_governance(
             if match is None:
                 raise GovernanceLoadError(f"{doc.key}: {doc.path} states no version")
             version = match.group(1)
-        headings = tuple(_normalize(m) for m in _HEADING.findall(text))
+        headings = _extract_headings(text)
         loaded.append(
             LoadedDocument(
                 key=doc.key,
@@ -190,24 +210,52 @@ class GovernanceProposal:
             raise ValueError("a governance proposal needs a rationale")
 
 
-def is_protected_path(path: str) -> bool:
-    parts = PurePosixPath(path.replace("\\", "/")).parts
+def _lexical(path: str) -> str:
+    """Normalize a checkout-relative path; raise if it is absolute or escapes the checkout."""
+    text = path.replace("\\", "/")
+    if not text or text.startswith("/") or re.match(r"^[A-Za-z]:", text) or "\x00" in text:
+        raise GovernanceModificationError(f"{path!r} must be a checkout-relative path")
     normalized: list[str] = []
-    for part in parts:
+    for part in PurePosixPath(text).parts:
         if part in ("", "."):
             continue
         if part == "..":
-            if normalized:
-                normalized.pop()
+            if not normalized:
+                raise GovernanceModificationError(f"{path!r} escapes the checkout")
+            normalized.pop()
             continue
         normalized.append(part)
-    joined = "/".join(normalized)
-    return any(joined == p.rstrip("/") or joined.startswith(p) for p in PROTECTED_PATHS)
+    return "/".join(normalized)
 
 
-def require_editable(path: str) -> None:
+def _matches(relative: str) -> bool:
+    # Casefolded: macOS and Windows checkouts are usually case-insensitive.
+    wanted = relative.casefold()
+    return any(
+        wanted == p.rstrip("/").casefold() or wanted.startswith(p.casefold())
+        for p in PROTECTED_PATHS
+    )
+
+
+def is_protected_path(path: str, root: Path) -> bool:
+    """True if `path` (checkout-relative) names a protected path, directly or through a symlink.
+
+    `root` is the trusted checkout root. Absolute and escaping paths raise
+    `GovernanceModificationError` (fail closed). The path is checked as written and again
+    after symlinks are resolved inside `root`, so an ordinary-looking alias is still caught.
+    """
+    relative = _lexical(path)
+    base = Path(root).resolve()
+    target = (base / relative).resolve()
+    if target != base and base not in target.parents:
+        raise GovernanceModificationError(f"{path!r} resolves outside the checkout")
+    resolved = target.relative_to(base).as_posix()
+    return _matches(relative) or _matches(resolved)
+
+
+def require_editable(path: str, root: Path) -> None:
     """Raise unless `path` may be edited directly; protected paths need a proposal."""
-    if is_protected_path(path):
+    if is_protected_path(path, root):
         raise GovernanceModificationError(
             f"{path} is governance: submit a GovernanceProposal for founder approval"
         )

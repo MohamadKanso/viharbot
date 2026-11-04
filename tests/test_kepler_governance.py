@@ -154,19 +154,93 @@ def test_kepler_proposes_but_cannot_approve_governance_changes():
         "docs/governance/agent-constitution-v1.md",
         "docs/adr/ADR-006-workload-identity-and-authorization.md",
         "AGENTS.md",
+        "agents.md",  # case-insensitive filesystems
+        "Docs/Governance/x.md",
         "./docs/governance/../governance/founding-charter-v2.md",
         "docs\\governance\\x.md",
         "src/../AGENTS.md",
     ],
 )
-def test_protected_paths_need_a_proposal(path):
-    assert is_protected_path(path)
+def test_protected_paths_need_a_proposal(checkout: Path, path):
+    assert is_protected_path(path, checkout)
     with pytest.raises(GovernanceModificationError):
-        require_editable(path)
+        require_editable(path, checkout)
 
 
 @pytest.mark.parametrize("path", ["src/viharbot/kepler_governance.py", "docs/architecture.md",
                                   "docs/governance-notes.md", "tests/test_x.py"])
-def test_ordinary_paths_are_editable(path):
-    assert not is_protected_path(path)
-    require_editable(path)
+def test_ordinary_paths_are_editable(checkout: Path, path):
+    assert not is_protected_path(path, checkout)
+    require_editable(path, checkout)
+
+
+@pytest.mark.parametrize(
+    "path", ["/etc/passwd", "/abs/checkout/AGENTS.md", "C:\\x\\AGENTS.md", "../outside.md",
+             "docs/../../outside.md", "", "a\x00b"],
+)
+def test_absolute_and_escaping_paths_fail_closed(checkout: Path, path):
+    with pytest.raises(GovernanceModificationError):
+        require_editable(path, checkout)
+
+
+def test_the_absolute_path_of_a_protected_file_is_rejected_not_allowed(checkout: Path):
+    with pytest.raises(GovernanceModificationError):
+        require_editable(str(checkout / "AGENTS.md"), checkout)
+
+
+def test_symlink_alias_of_a_protected_path_is_protected(checkout: Path):
+    (checkout / "notes").symlink_to(checkout / "docs" / "governance", target_is_directory=True)
+    (checkout / "innocent.md").symlink_to(checkout / "docs/governance/agent-constitution-v1.md")
+    assert is_protected_path("notes/anything.md", checkout)
+    assert is_protected_path("innocent.md", checkout)
+    with pytest.raises(GovernanceModificationError):
+        require_editable("innocent.md", checkout)
+
+
+def test_symlink_pointing_outside_the_checkout_fails_closed(checkout: Path, tmp_path_factory):
+    outside = tmp_path_factory.mktemp("elsewhere")
+    (checkout / "link").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(GovernanceModificationError):
+        require_editable("link/file.md", checkout)
+
+
+def test_document_reads_are_bounded(checkout: Path, monkeypatch):
+    from viharbot import kepler_governance as kg
+
+    path = checkout / "docs/governance/agent-constitution-v1.md"
+    path.write_bytes(b"x" * 5_000_000)
+    reads: list[int] = []
+    real_open = Path.open
+
+    def spy(self, *args, **kwargs):
+        handle = real_open(self, *args, **kwargs)
+        if self == path.resolve():
+            original = handle.read
+            handle.read = lambda n=-1: (reads.append(n), original(n))[1]
+        return handle
+
+    monkeypatch.setattr(Path, "open", spy)
+    with pytest.raises(GovernanceLoadError, match="size limit"):
+        load_governance(checkout)
+    assert reads == [kg.MAX_DOCUMENT_BYTES + 1]  # one bounded read, never read-everything
+
+
+def test_headings_inside_fenced_code_are_not_sections(checkout: Path):
+    path = checkout / "docs/governance/agent-constitution-v1.md"
+    path.write_text(
+        path.read_text()
+        + "\n```\n## Section 99.1 — Fenced Example\n```\n"
+        + "~~~md\n## Section 99.2 — Tilde Example\n~~~\n"
+        + "\n## Section 99.3 — Real Heading\n"
+    )
+    bundle = load_governance(checkout)
+    for fenced in ("Section 99.1 — Fenced Example", "Section 99.2 — Tilde Example"):
+        with pytest.raises(GovernanceCitationError):
+            verify_citations(bundle, (GovernanceCitation("constitution", fenced, "x"),))
+    verify_citations(
+        bundle, (GovernanceCitation("constitution", "Section 99.3 — Real Heading", "x"),)
+    )
+    # headings after a closed fence, and the original ones, still count
+    verify_citations(
+        bundle, (GovernanceCitation("constitution", "Section 2.4 — Human Approval", "x"),)
+    )

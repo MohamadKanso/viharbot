@@ -13,7 +13,9 @@ Status: **proposed**. Epic [#125](https://github.com/vchokshi/viharbot/issues/12
 - **Fails closed.** A missing, unreadable, empty, oversized, non-UTF-8, unversioned (where a version is expected) or checkout-escaping document raises `GovernanceLoadError` and no bundle is returned, so the assignment cannot start. Errors name the document and the problem, never its contents.
 - **Records versions.** Each document's stated version and SHA-256 are recorded (`GovernanceBundle.versions()`) for the audit log and the pull request. The hash is the authoritative identity.
 - **Checks citations.** `verify_citations` requires every cited section to exist as a heading in the named document and every citation to carry evidence. `render_governance_followed` produces the mandatory "Governance followed" PR section. This proves the section exists, not that the evidence is true: Sage verifies that independently (#134).
-- **Proposes, never approves.** `GovernanceProposal` is always `proposed`; constructing one with any other status raises. `require_editable` rejects direct edits under `docs/governance/`, `docs/adr/` and to `AGENTS.md`. The workflow that calls it is #128.
+- **Proposes, never approves.** `GovernanceProposal` is always `proposed`; constructing one with any other status raises. `require_editable(path, root)` rejects direct edits under `docs/governance/`, `docs/adr/` and to `AGENTS.md`. Its contract: `path` is checkout-relative and `root` is the trusted checkout root. Absolute, escaping and NUL-containing paths raise (fail closed), symlinks are resolved inside `root` so an innocent-looking alias of a protected file is still protected, and matching is case-insensitive. The workflow that calls it is #128.
+- **Bounded reads.** Each document is read with a single read of at most the size limit plus one byte, so an oversized file produces the controlled error instead of exhausting memory.
+- **Real headings only.** Headings inside fenced code blocks are not sections and cannot be cited.
 
 ## Limitations
 
