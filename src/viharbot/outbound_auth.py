@@ -4,10 +4,10 @@ The callee side is ``service_auth``. This module only decides whether to attach 
 ``X-Viharbot-Assertion`` header to a plain HTTP call and builds it with ``service_auth``'s own
 canonicalization and minting code (nothing is re-implemented here).
 
-Issuer location: the founder has NOT finalized where the issuer key lives (ADR-006, "Where the
-issuer's key lives"). ``InProcessIssuer`` is option A (the web/orchestrator process signs), which the
-ADR recommends first. ``AssertionIssuer`` is the seam: a separate internal signer (option B) can
-implement it later without changing any caller.
+Issuer location: option A of ADR-006 ("Where the issuer's key lives") is accepted (founder decision,
+2026-11-03): the web/orchestrator process holds the key and signs, via ``InProcessIssuer``.
+``AssertionIssuer`` is kept as the seam so a separate internal signer (option B) can replace it
+later without changing any caller. docs/service-authentication.md says what this does not change.
 
 Off by default. With ``VIHARBOT_OUTBOUND_AUTH`` unset nothing here runs and requests are unchanged.
 When it is on and a header cannot be produced, ``OutboundAuthError`` is raised and the caller must

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import io
 import logging
+import threading
 import time
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
 
@@ -251,7 +254,7 @@ def test_end_to_end_post_json_to_specialist_with_auth_enabled(on, monkeypatch, t
         load_specialist(monkeypatch, tmp_path)
 
 
-def test_signed_requests_use_the_no_redirect_opener(on, monkeypatch):
+def test_signed_requests_select_the_no_redirect_opener(on, monkeypatch):
     plain, strict = Transport(), Transport()
     monkeypatch.setattr(demo, "urlopen", plain)
     monkeypatch.setattr(demo, "no_redirect_urlopen", strict)
@@ -259,3 +262,55 @@ def test_signed_requests_use_the_no_redirect_opener(on, monkeypatch):
     assert (len(plain.requests), len(strict.requests)) == (0, 1)
     demo.post_json("http://research:8000/research", {"a": 1}, "rid", "research")  # unsigned
     assert (len(plain.requests), len(strict.requests)) == (1, 1)
+
+
+@contextmanager
+def loopback_server(handler):
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)  # ephemeral port, loopback only
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield server
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_real_redirect_is_not_followed_and_assertion_is_not_forwarded(on):
+    """A signed request answered with a 302 must never reach the redirect target."""
+    seen = []  # headers received by the second server
+
+    class Target(BaseHTTPRequestHandler):
+        def do_POST(self):
+            seen.append(dict(self.headers))
+            self.send_response(200)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        do_GET = do_POST
+
+        def log_message(self, *args):
+            pass
+
+    with loopback_server(Target) as second:
+        location = f"http://127.0.0.1:{second.server_port}/landed"
+
+        class Redirector(BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers.get("Content-Length", 0)))
+                self.send_response(302)
+                self.send_header("Location", location)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        with loopback_server(Redirector) as first:
+            url = f"http://127.0.0.1:{first.server_port}/process"
+            with pytest.raises(HTTPError) as raised:
+                demo.post_json(url, {"a": 1}, "rid", "fact-check")
+    # The client surfaces the 302 itself as an HTTP error and never contacts the target.
+    assert raised.value.code == 302
+    assert seen == []

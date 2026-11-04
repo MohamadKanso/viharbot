@@ -48,10 +48,8 @@ inject them from the platform secret store.
 **Status: implemented for plain HTTP calls through `demo.post_json`, off by default.** Code:
 `src/viharbot/outbound_auth.py`.
 
-**Issuer location is not decided.** The founder has not finalized where the issuer key lives
-(ADR-006, "Where the issuer's key lives"). `AssertionIssuer` is a one-method interface and
-`InProcessIssuer` (option A: the web/orchestrator process signs) is its only implementation, as the
-ADR recommends first. A separate internal signer (option B) can replace it without changing callers.
+**Issuer location:** option A is accepted; see "Issuer-key location" below. `AssertionIssuer` is a
+one-method interface and `InProcessIssuer` is its only implementation.
 
 Each call mints one token from the actual request: `mth` (POST), `tgt` (the URL's path and query as
 sent, canonicalized by `service_auth.canonical_target`), `req_sha256` (the exact body bytes),
@@ -82,9 +80,24 @@ Not wired:
   verifier yet.
 - AgentCore (`agentcore://`): untouched; the SigV4-plus-assertion carrier is separate work.
 - No Sage client exists in `src`; Sage is not called by the web tier.
-- Redirects: a signed request is sent through the no-redirect opener (`litellm_client.urlopen`), so the token is never forwarded to another origin; a redirecting callee surfaces as an HTTP error. Unsigned calls keep the default behavior.
+- Redirects: a signed request is sent through the no-redirect opener (`litellm_client.urlopen`), so the token is never forwarded to another origin; a redirecting callee surfaces as the 3xx `HTTPError`, and a loopback test with a real 302 asserts the target is never contacted. Unsigned calls keep the default behavior.
 - `eng` and `cls` are fixed placeholders (`unscoped`, `unclassified`); there is no `dlg` (A3).
-- No sustained rotation, no separate signer, no per-user identity.
+- No rotation tooling, no separate signer, no per-user identity.
+- ADR-006's text still recommends option B before any AWS deployment; a follow-up must update it (see below).
+
+### Issuer-key location (founder decision, 2026-11-03)
+
+Option A (ADR-006) is accepted: the web process holds the signing key and mints assertions. This is a
+lab. The same holds if the web service runs in AWS, where the key would be stored in AWS Secrets
+Manager and injected into the web service (not verified or provisioned here). Keys are separate per
+environment: a Stage key must never be accepted in production. Rotation is every 30 to 90 days with
+an overlap window, per ADR-006. The `AssertionIssuer` interface is kept so a separate signer
+(option B) can replace `InProcessIssuer` later.
+
+What this does not change: a secret store protects storage and rotation, but the web process still
+reads the key at runtime, so compromise of the web process still lets an attacker mint assertions for
+every agent. It also relaxes ADR-006's recommendation to move to option B before any AWS deployment.
+The ADR text is not updated in this PR; a follow-up is needed.
 
 ## Known limitations of A2
 
