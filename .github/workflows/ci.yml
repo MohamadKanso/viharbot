@@ -258,6 +258,22 @@ jobs:
         run: |
           mkdir -p reports
           docker compose --profile demo --profile tests build --progress=plain 2>&1 | tee reports/docker-build.log
+      # Runs the offline suite inside the test image, as `docker compose --profile tests run` does
+      # locally, so the image is executed and not only built. The container has no network and no
+      # secrets (see the `tests` service in compose.yaml). The report is written to reports/.
+      - name: Run the offline test suite in Docker
+        shell: bash
+        run: |
+          mkdir -p reports
+          docker compose --profile tests run --rm -v "$PWD/reports:/reports" tests \
+            python -m pytest -ra -q -p no:cacheprovider --junitxml=/reports/docker-test-results.xml
+      # A skip means a test did not run. The only skips allowed are the opt-in live LiteLLM checks,
+      # which are off by design (they make billable calls). A skipped Node test fails this step.
+      - name: Require that only the opt-in live checks were skipped
+        run: >
+          python .github/scripts/junit_summary.py reports/docker-test-results.xml
+          --name "Docker tests" --fail-on-skipped
+          --allow-skip 'RUN_LITELLM_(INTEGRATION|INFERENCE)=1 to'
       # Starts the stack with no LiteLLM key and no optional modes, then checks only things that
       # need no model: health, the page, and the stream route's refusal when iterative mode is off.
       - name: Start the stack and check health
@@ -281,6 +297,11 @@ jobs:
             echo "| Check | Result | Evidence |"
             echo "|---|---|---|"
             echo "| Build all images (web, 5 agents, orchestrator, tests) | ${{ job.status }} | viharbot-docker-build-log |"
+            if [ -f reports/docker-test-results.xml ]; then
+              python .github/scripts/junit_summary.py reports/docker-test-results.xml --name "Offline suite in Docker" || true
+            else
+              echo "| Offline suite in Docker | no result produced | see the job log |"
+            fi
             echo "| Stack health, page, stream route (409 and 422) | ${{ job.status }} | viharbot-docker-build-log |"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload build log

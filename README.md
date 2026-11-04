@@ -101,7 +101,13 @@ The default suite mocks all model and LiteLLM calls and is the authoritative one
 python -m pytest -q
 ```
 
-Two environment notes. A local `.env` is loaded by python-dotenv and can flip the feature flags on, which makes about 15 tests fail; move `.env` aside when running tests. The Docker profile (`docker compose --profile tests run --build --rm tests`) does **not** run the full suite today: its image has no Node, no `compose.yaml`, no `.env.example` and no `images/`, so one test module fails to import and several others fail. See [development status](docs/development-status.md). Opt-in live checks (`RUN_LITELLM_INTEGRATION`, `RUN_LITELLM_INFERENCE`) and `scripts/fact_check_eval/run.py` make billable calls and are off by default.
+Two environment notes. A local `.env` is loaded by python-dotenv and can flip the feature flags on, which makes about 15 tests fail on the host; move `.env` aside when running tests there. The Docker profile runs the same offline suite in a container:
+
+```bash
+docker compose --profile tests run --build --rm tests
+```
+
+The test image (`Dockerfile.tests`) adds Node 24 and `git`, and its build context is an allowlist (`Dockerfile.tests.dockerignore`), so a local `.env`, credentials and `.git` never enter it. The `tests` service takes no values from your shell or `.env`, keeps the opt-in live checks off and has no network at run time, so it cannot make a model call. The image is for tests only; the production images contain neither pytest nor Node. A skipped test is not a pass: without Node the UI tests skip, and CI fails on any skip other than the opt-in live checks. Opt-in live checks (`RUN_LITELLM_INTEGRATION`, `RUN_LITELLM_INFERENCE`) and `scripts/fact_check_eval/run.py` make billable calls and are off by default.
 
 ## Development Wiki
 
