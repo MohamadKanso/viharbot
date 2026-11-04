@@ -1,76 +1,110 @@
-# ViharBot Contributor License Agreement (DRAFT)
+# ViharBot Contributor License Agreement
 
-**Version: 0.1-draft. Status: draft, not in force.**
+**Legal-terms version: 1.0**
+**Editorial revision: 1**
+**Status: DRAFT. Not in force.**
 
-> **This is a draft for the founder's review. It has not had legal review and must not be treated as enforceable.** It is not a contract, not legal advice and not a template whose sufficiency has been established. It binds no one until the founder has had it reviewed by counsel, approved it, published a version number without `-draft`, and set the status in [`CLA-ACCEPTANCES.md`](../../CLA-ACCEPTANCES.md) to `in-force`. Until then, external code is not merged (see [CONTRIBUTING](../../CONTRIBUTING.md#contribution-rights)). Text in **[DECISION: ...]** marks a choice the founder or counsel must make; remove each marker when it is settled.
+> **Review status.** This text implements the founder's twelve recorded policy decisions. **It has not had legal review and is not counsel-approved.** It is not a contract, not legal advice and not enforceable until: (1) counsel has reviewed it and the review is recorded in [`CLA-ACCEPTANCES.md`](../../CLA-ACCEPTANCES.md); (2) the founder has approved it; (3) the text is frozen (its SHA-256 recorded); and (4) the record's status is `in-force`. Items marked **[COUNSEL]** are provisions or blanks counsel must confirm or supply. Nothing in this draft should be described as counsel-reviewed or enforceable until the record says so. Process and activation steps: [CLA acceptance](cla-acceptance.md) and [activation checklist](cla-activation.md).
 
-This agreement is between you ("**Contributor**") and the owner of the ViharBot project ("**Owner**"), identified in [CONTRIBUTING](../../CONTRIBUTING.md) as the project's founder. It covers your contributions to the repository `vchokshi/viharbot`.
+## 1. Parties and definitions
 
-## 1. Definitions
+This agreement is between you ("**Contributor**") and **Vihar Chokshi, an individual** ("**Owner**"), who at the time this version takes effect personally owns the ViharBot project. "Owner" includes any **Successor** under section 13.
 
-* **Contribution**: any code, documentation, configuration, test, design or other material you submit to the project, for example through a pull request, and any later revision of it that you submit.
-* **Project**: ViharBot and the repository `vchokshi/viharbot`, including any commercial product the Owner derives from it.
+* **Project**: ViharBot and the repository `vchokshi/viharbot`, and any product, service or distribution the Owner derives from it, whether proprietary, commercial or open source.
+* **Contribution**: any code, documentation, configuration, test, design or other material you Submit, and each later revision of it you Submit.
+* **Submit**: to propose a Contribution to the Project in any way, for example a pull request, a commit in one, a patch or a comment containing code.
+* **Acceptance**: your recorded agreement to this version under section 8.
+* **Effective Time**: the time of the GitHub comment that makes your Acceptance, once the Owner has verified and recorded it.
+* **Withdrawal Time**: the time a withdrawal under section 10 takes effect.
+* **Covered Contribution**: a Contribution Submitted by you after the Effective Time and before any Withdrawal Time, and any Contribution Submitted earlier that belongs to a pull request still open when you accept (so work already offered is not left outside the agreement).
+* **Recipient**: any person who receives the Project, or a Covered Contribution, from the Owner, a Successor, or their licensees.
 
 ## 2. You keep your copyright
 
-You do not transfer ownership of your Contribution. You keep the copyright and any other rights in it that this agreement does not grant. Nothing here presumes an assignment.
+You keep the copyright and every other right in your Contributions that this agreement does not expressly grant. **Nothing in this agreement assigns or transfers your copyright**, and none is to be presumed.
 
-## 3. Copyright licence to the Owner
+## 3. Copyright licence
 
-You grant the Owner a perpetual, worldwide, non-exclusive, royalty-free, irrevocable licence to use, reproduce, modify, prepare derivative works of, publicly display and perform, distribute and sublicense your Contribution and derivative works of it, in source or binary form, **under any licence terms the Owner chooses, including proprietary and commercial terms, and to relicense it later**.
+Effective for each Covered Contribution on Submission, you grant the Owner a perpetual, worldwide, non-exclusive, royalty-free, fully paid-up licence, **irrevocable except as section 10 limits it to future contributions only**, to use, reproduce, modify, prepare derivative works of, publicly display, publicly perform, distribute, make available, sell, sublicense through multiple tiers, and otherwise exploit the Covered Contribution and derivative works of it, in source and object form, **under any licence terms the Owner chooses**. That expressly includes proprietary and commercial licensing, relicensing, sale of the Project or of rights in it, merger, acquisition and financing transactions, and **later release under an open-source licence**.
 
-This is the grant that lets the Project remain proprietary and become a commercial product. You are agreeing to it knowingly; the repository being publicly visible does not license anyone else to use the code.
-
-**[DECISION: irrevocable versus revocable for future contributions only.]** Issue #56 asks for a revocation policy. As drafted, the licence is irrevocable for contributions already merged. Whether a contributor may withdraw acceptance for *future* contributions (which the gate already allows, by removing their row) is a choice for the founder.
+Public visibility of the repository is not a licence to anyone else.
 
 ## 4. Patent licence
 
-You grant the Owner and recipients of the Project from the Owner a perpetual, worldwide, non-exclusive, royalty-free, irrevocable patent licence to make, have made, use, sell, offer to sell, import and otherwise transfer your Contribution, but only for patent claims you can license that are necessarily infringed by your Contribution alone or in combination with the Project at the time you submit it. If you start patent litigation alleging that the Project or a Contribution infringes a patent, the patent licences granted to you under this agreement end on the date you file it.
+Effective for each Covered Contribution on Submission, you grant the Owner and every Recipient a perpetual, worldwide, non-exclusive, royalty-free, fully paid-up, irrevocable (subject to section 10 and this section) licence under **every patent claim you own or have the right to license, now or later, that is necessarily infringed by** (a) the Covered Contribution alone, or (b) the Covered Contribution in combination with the Project, or with modifications of the Project, as the Contribution was Submitted or later developed, to make, have made, use, sell, offer to sell, import and otherwise transfer the Covered Contribution and works that include it. It does not extend to claims infringed only by combining the Contribution with something that is not part of the Project.
 
-**[DECISION: counsel to confirm the termination wording.]**
+**Defensive termination (scoped).** If an entity (a "Challenger") brings patent litigation, including a cross-claim or counterclaim, alleging that the Project, or a Covered Contribution as included in the Project, infringes a patent, then **the patent licences that you grant to that Challenger under this section** end on the date the litigation is filed, as to that Challenger only. It does not end the Owner's licence, any other Recipient's licence, or the licences you grant in section 3. **[COUNSEL: confirm the Challenger scope, whether affiliates of the Challenger are covered, and the interaction with the Owner's own claims.]**
 
-## 5. What you confirm about your Contribution
+## 5. What you confirm
 
-You confirm that:
+You confirm that, for each Contribution, when you Submit it:
 
-1. You are legally entitled to grant the licences above, and each Contribution is **your original work**, or you have clearly identified in the pull request any material that is not.
-2. You have listed third-party code and dependencies, their licences and any compatibility concern in the pull request, as [CONTRIBUTING](../../CONTRIBUTING.md#contribution-rights) requires. You have not included code under a licence that would conflict with proprietary distribution, such as a copyleft licence, unless the Owner has agreed in writing.
-3. **Your employer or another person has no rights in the Contribution**, or you have obtained a written waiver or authorisation from them, covering this Contribution, before submitting it. If your employer's policy or contract gives it rights in work you do, do not contribute without checking. **[DECISION: a separate corporate agreement for employer-owned contributions is not defined yet, as issue #56 notes.]**
-4. The Contribution contains no secret, credential, personal data or confidential material, and you have checked AI-assisted output for copied code and licence obligations as CONTRIBUTING requires.
+1. You have sufficient rights to grant the licences in sections 3 and 4.
+2. If your employer or any other third party has or may have rights in it, you have obtained their authorization or waiver where required (see section 6).
+3. You have **disclosed** in the pull request any third-party material included, with its licence and any restriction. Use of material under a licence with reciprocal or copyleft terms is **not forbidden**, but it must be disclosed, and the Owner may require a documented compatibility review before accepting it.
+4. You are not knowingly introducing confidential information, secrets, credentials, personal data or unlawfully obtained data.
+5. If AI tools helped produce it, you have reviewed the output for provenance, copied code and licensing concerns, and you understand it.
+6. **You are at least 18 years old**, unless the Owner has separately approved your participation under section 6.
 
-If any of this becomes untrue, tell the Owner promptly.
+Tell the Owner promptly if any confirmation stops being true.
 
-## 6. No obligation, no warranty
+## 6. Who may contribute
 
-The Owner does not have to use, merge or credit your Contribution. You provide it **"as is"**, without warranty of any kind, except for the confirmations in section 5. You are not required to provide support.
+* **Individuals** may contribute in their own right.
+* **Employees and others with a third-party claim** may contribute only with the authorization the employer or third party requires. Where an entity owns or may own the Contribution, the Owner may require a **separate corporate agreement or equivalent written authorization** before accepting it, and may hold your contributions until it is recorded. **[COUNSEL: the corporate CLA does not exist yet and must be supplied.]**
+* **Minors** are not accepted by default. A Contribution from someone under 18 needs separate legal review and the Owner's express written approval, recorded as an exception.
 
-## 7. Moral rights
+## 7. No warranty, no obligation, moral rights
 
-To the extent the law allows, you waive, or agree not to assert, moral rights in your Contribution against the Owner and its licensees. Where a waiver is not permitted, you grant the Owner the rights it needs to use your Contribution as this agreement describes.
+To the maximum extent the law allows, you provide Contributions **"as is"**, without warranty of any kind, except for your confirmations in section 5. The Owner is not required to use, merge, credit or support any Contribution. To the extent the law allows, you waive, or agree not to assert, moral rights in your Contributions against the Owner and Recipients; where a waiver is not permitted, you grant the rights the Owner needs to use them as this agreement describes. **[COUNSEL: confirm the limitation of warranty and moral-rights wording for the Owner's and Contributors' jurisdictions.]**
 
-## 8. How you accept this agreement
+## 8. How you accept
 
-Acceptance is by a recorded statement, not a signature on paper. In the pull request (or the issue it links), post a comment from your own GitHub account containing **only** this text, with the version that is currently in force:
+Acceptance is a recorded statement, not a paper signature. Post a comment from your own GitHub account on your pull request, or the issue it links, containing **only** this text, with this version:
 
 ```text
-I have read the ViharBot Contributor License Agreement, version <VERSION>, and I agree to its terms for my contributions to vchokshi/viharbot.
+I have read the ViharBot Contributor License Agreement, legal-terms version <VERSION>, and I agree to its terms for my contributions to vchokshi/viharbot.
 ```
 
-The founder checks the comment and records your acceptance in [`CLA-ACCEPTANCES.md`](../../CLA-ACCEPTANCES.md), keyed by your numeric GitHub account ID. **Posting the comment is a request, not an acceptance on record.** The check described in [CLA acceptance](cla-acceptance.md) recognises you only after the founder-approved record is merged into `main`. Edit or delete your comment afterwards and the founder will see the record no longer matches; post a fresh comment instead.
+Your comment is a **request**. The Owner verifies that it is the unedited exact statement written by your own account, preserves the evidence privately, and records your numeric GitHub ID, your username at the time and this version in the public acceptance record through a merged, founder-approved change. **You are covered only once that record is merged into `main`.** Editing or deleting your comment afterwards does not undo a recorded Acceptance; the Owner's private snapshot of what was verified governs. If you want to stop contributing, use section 10, not deletion.
 
-Your acceptance covers Contributions you submit **after** it is recorded, for the version you accepted. A new version needs a new acceptance.
+**[COUNSEL: confirm that an exact-text GitHub comment, verified and recorded this way, is sufficient evidence of agreement in the Owner's and Contributors' jurisdictions.]**
 
-## 9. Changes to this agreement
+## 9. Versions
 
-The Owner may publish a new version. A new version does not alter the terms you accepted for Contributions you already submitted. **[DECISION: whether a minor version needs re-acceptance. As drafted, any version change does, because the gate matches the exact version.]**
+* A **material change** is any change to the rights granted, the confirmations, who may contribute, withdrawal, assignment, governing law or venue, or anything else affecting rights or obligations. It gets a new legal-terms version (for example 1.0 to 2.0) and **requires renewed Acceptance** before you Submit further Contributions.
+* An **editorial change** (typographical, formatting, link or wording changes that alter no right or obligation) gets a new editorial revision of the same legal-terms version and **does not require renewed Acceptance**. A change the Owner records as editorial that in fact alters a right or obligation is treated as material.
+* Each Covered Contribution is governed by the legal-terms version you accepted when you Submitted it. A later version never reduces rights you or the Owner already hold in earlier Covered Contributions.
 
-## 10. General
+## 10. Withdrawal from future participation
 
-**[DECISION: governing law, venue, entire-agreement and severability wording. Counsel to supply.]**
+You may withdraw from future participation by notice under section 12. The withdrawal takes effect at the time the Owner records it (the Withdrawal Time). After it, you may not Submit further Contributions under this agreement, and the Owner will not treat new ones as covered. **Withdrawal is prospective only:** the licences in sections 3 and 4 for every Covered Contribution Submitted before the Withdrawal Time **remain irrevocable and survive**, and the Owner need not remove those Contributions. Withdrawal does not delete the acceptance record or the evidence behind it. The Owner may, at its sole discretion and in writing, admit a specific pull request that was open before the Withdrawal Time.
 
-## Open questions for counsel
+## 11. Survival
 
-* Is a click-and-comment acceptance by a GitHub account sufficient evidence of agreement, in the Owner's jurisdiction and the Contributor's?
-* Is a non-assignment licence with a relicensing right enough for a possible future commercial product, or is assignment needed?
-* Contributors under 18, contributors acting for a company, and contributions by trusted contributors (whose terms are "not defined in this document yet" in CONTRIBUTING).
-* Data protection: the acceptance record keeps a GitHub username, numeric ID, date and a link to the comment. Confirm that, and its retention, are acceptable.
+Sections 2 to 5, 7, 10 and 12 to 15 survive withdrawal and any end of your participation.
+
+## 12. Notices
+
+Notice to the Owner: by the contact route on the Owner's GitHub profile, or by an issue titled "CLA notice" that contains no confidential information; legal notices to the address recorded in the repository's contribution policy. **[COUNSEL/FOUNDER: supply a legal notice address; none is published yet.]** Notice to you: by a comment mentioning your GitHub account, or by any contact route you have made public. Notices are effective when recorded or delivered.
+
+## 13. Assignment and succession
+
+The Owner may transfer, assign or license all or any part of its rights and obligations under this agreement, and the Project itself, to a company the Owner controls, to a successor, or to an acquirer or purchaser of the Project or its business ("**Successor**"), **without your consent**, by a written instrument and a notice recorded in the repository. The Successor becomes the "Owner" for every purpose of this agreement and every Covered Contribution, and the licences you granted run to it. You may not assign this agreement without the Owner's written consent. **This section transfers the Owner's rights only. It does not, and nothing in this agreement does, assign your copyright to anyone.**
+
+## 14. Governing law and venue
+
+This agreement is governed by the laws of the **State of Arizona**, without regard to conflict-of-laws rules. The exclusive venue for a dispute is the state courts located in **Maricopa County, Arizona**, and the United States District Court for the District of Arizona sitting in Phoenix, and you and the Owner consent to their jurisdiction, **in each case subject to any mandatory rule of law that gives a party another forum or right.** **[COUNSEL: confirm the venue wording, any jury or dispute-resolution terms, and consumer or minor-protection overrides.]**
+
+## 15. General
+
+If any part of this agreement is held unenforceable, the rest remains in effect and the part is limited to the minimum extent needed. This agreement, together with any corporate agreement or written authorization under section 6 and any written approval under section 10, is the entire agreement on its subject and replaces earlier understandings about your Contributions to the Project. It may be changed only by a new version under section 9 or in a writing signed by the Owner and you. A failure to enforce a term is not a waiver. You agree that records kept by the Owner in electronic form are evidence of your Acceptance. **[COUNSEL: confirm these general provisions.]**
+
+## Open items for counsel
+
+* Sufficiency of acceptance by verified GitHub comment; electronic-records clause.
+* Patent grant breadth and the defensive-termination scope (section 4).
+* The corporate agreement and employer-authorization form (section 6); the approval process for minors.
+* Governing law, venue and mandatory-law carve-outs (section 14); notice address (section 12).
+* Whether Arizona's rules on assignment, minors and limitation of warranty require changes.
+* Data protection and retention for the acceptance record and the private evidence ([private evidence architecture](cla-private-evidence.md)).

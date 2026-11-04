@@ -1,22 +1,30 @@
 # Contribution Agreement Acceptances
 
-This file is the **record of who has accepted the ViharBot [Contributor License Agreement](docs/governance/contributor-license-agreement.md)**, and which version. It is read by the `CLA acceptance` check from the protected `main` branch only, never from a pull request's own copy. Only a founder-approved merge changes it. A proposed row, or a passing check, accepts nothing.
+This is the **public record the `CLA acceptance` check reads**: the agreement's status, its frozen legal-terms version, and one row per accepted account. It contains only what the automated check needs. **It is not the evidence.** Evidence of each acceptance is kept in a private store ([private evidence architecture](docs/governance/cla-private-evidence.md)); a public Markdown file is not private storage and must never hold comment text, emails or personal data. The check reads this file only from the protected `main` branch, never from a pull request's copy. See [CLA acceptance](docs/governance/cla-acceptance.md).
 
 ## Status
 
 * CLA status: draft
-* CLA version: 0.1-draft
+* CLA legal-terms version: 1.0
+* CLA editorial revision: 1
+* CLA text SHA-256: unfrozen
+* Legal review: pending
+* Founder approval: pending
+* Private evidence storage: not-verified
+* Required ruleset: not-verified
 
-`draft` means no agreement is in force: the `CLA acceptance` check fails for every author who is not exempt, which is how CONTRIBUTING's "external code will not be merged" rule is enforced. The founder sets the status to `in-force` and the version to the approved one only after legal review. See [CLA acceptance](docs/governance/cla-acceptance.md).
+`in-force` is accepted only when the text is frozen and every prerequisite line above is recorded as complete; otherwise the file is invalid and the check fails closed. Nothing here is activated yet. While the status is `draft`, the check fails every contributor who is not exempt.
 
 ## Acceptances
 
-| GitHub username | GitHub numeric account ID | CLA version | Accepted on (UTC) | Evidence |
-| --- | ---: | --- | --- | --- |
+| GitHub numeric ID | GitHub username at acceptance | Legal-terms version | Effective from (UTC) | Status | Withdrawn from (UTC) | Eligibility | Evidence ID | Evidence SHA-256 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
-## Boundaries
+## Rules
 
-- The numeric account ID is the key; usernames can change. A row grants nothing except recognition by the check, and only for the exact version it names.
-- The founder and the dependency bot are exempt by the check's own rules, not by rows here. Trusted contributors are **not** exempt: their terms are not defined yet.
-- Evidence is a link to the contributor's own acceptance comment. Do not put anything else personal in this file.
-- To withdraw a contributor's acceptance, remove their row through a founder-approved pull request. Merged commits keep the terms accepted when they were submitted.
+- The numeric GitHub ID is the key; the username is what the account was called at acceptance and may differ later.
+- **Rows are never deleted or rewritten.** Only `Status` (to `withdrawn`, with a UTC timestamp, never back) and `Eligibility` may change. The check rejects any change that removes a row or edits another column, even from the founder, because deleting a row would erase evidence of a licence grant.
+- A row covers the exact legal-terms version it names. A material change (new legal-terms version) needs renewed acceptance; an editorial revision does not.
+- `Eligibility`: `adult-individual`, `employee-authorized`, `corporate-cla`, `minor-approved` are covered. `hold-corporate` and `hold-minor` block the contributor until the founder resolves them. `employee-authorized`, `corporate-cla` and `minor-approved` must be backed by authorization held in the private store.
+- `Evidence ID` and `Evidence SHA-256` point at, and fingerprint, the private evidence record. The digest lets the founder detect a missing or altered private record; it reveals nothing.
+- Withdrawal blocks new contributions only. Merged commits and their grants are unaffected.
