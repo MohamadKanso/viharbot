@@ -14,6 +14,8 @@ ViharBot adds two identities that will turn its verified engineering history int
 - 20 declarative skills (10 each, domain `education`), all `proposed`.
 - No execution binding, endpoint, service, GitHub access, memory access or model alias. The team page gains a coming-soon section with their portrait; the chat sidebar and every execution path are unchanged. Neither agent can be reached by orchestration or chat.
 
+- Eleven `learning.*`, `curriculum.*`, `lesson.*` and `assessment.*` activity events are **declared** in `live_events.py` (`EDUCATION_EVENT_TYPES`) and documented in [live observability](live-observability.md#education-events-declared-not-emitted). They are **not yet emitted** by any code, are never terminal, and are not part of the chat stream.
+
 ## Phase 2: GitHub learning (implemented)
 
 `src/viharbot/learning/` reads one merged ViharBot pull request as untrusted data and turns it into a provenance-labelled learning artifact. It is run from `scripts/archie_learn.py`, not from chat or orchestration, and there is still no execution binding for Archie or Ada.
@@ -28,7 +30,7 @@ ViharBot adds two identities that will turn its verified engineering history int
 
 ### Not yet done in Phase 2
 
-Model-assisted enrichment (objectives, rationale synthesis) through LiteLLM, `learning.*` activity events, and a webhook endpoint. The instructor repo has no `knowledge/` directory yet; the first proposal creates it. Human review of the artifact format is needed before any are merged.
+Model-assisted enrichment (objectives, rationale synthesis) through LiteLLM, emission of the `learning.*` activity events (declared, not emitted), and a webhook endpoint. The instructor repo has no `knowledge/` directory yet; the first proposal creates it. Human review of the artifact format is needed before any are merged.
 
 ## Phase 3: Institutional memory (implemented as interfaces and a local store)
 
@@ -65,7 +67,7 @@ No lesson generation, no model call, no GitHub access, no pull requests for curr
 
 ## What is not implemented
 
-Curriculum generation, learner records, lessons, assessments, `learning.*`/`curriculum.*`/`lesson.*` events and repository credentials. These are phases 4 to 6 of the specification and each needs its own reviewed change.
+Curriculum generation, learner records, lessons, assessments, emission of the `learning.*`/`curriculum.*`/`lesson.*` events (they are declared, not emitted) and repository credentials. These are phases 4 to 6 of the specification and each needs its own reviewed change.
 
 ## Findings that shape later phases
 

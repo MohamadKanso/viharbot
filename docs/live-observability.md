@@ -103,6 +103,24 @@ Notes:
 * `agent_completed.validated` is always `true`: an agent is reported complete only after its response passed the existing contract validation.
 * The terminal events are `orchestration_completed` and `orchestration_failed`. `final_response` is **not** terminal; it always precedes `orchestration_completed`.
 
+### Education events (declared, not emitted)
+
+Eleven further events are declared in `EDUCATION_EVENT_TYPES` for the education agents ([spec status](education-agents.md)). They are **not** part of `EVENT_TYPES` or the 14-event chat stream, nothing emits them, none is terminal (they can never end a stream), and `check_stream` is unchanged. `parse_event` validates them with the same envelope; names are dotted here because the specification fixes them. They carry only opaque ids (`^[a-z0-9][a-z0-9-]{0,63}$`), repository names, counts and states: never prompt text, PR bodies, learner names or secrets. Examples are in `tests/fixtures/live_events/education/education_events.json`. The chat page still rejects unknown event types, so these must not be sent to it until a client change is reviewed.
+
+| Event type | `data` fields (all required) | Source identity | Terminal |
+|---|---|---|---|
+| `learning.pr_discovered` | `status`, `repository`, `pr_number` | Archie | no |
+| `learning.extraction_started` | `status`, `extraction_id`, `pr_number` | Archie | no |
+| `learning.extraction_completed` | `status`, `extraction_id`, `artifact_count`, `duration_ms` | Archie | no |
+| `learning.instructor_update_proposed` | `status`, `proposal_id`, `artifact_count` | Archie | no |
+| `learning.instructor_update_approved` | `status`, `proposal_id` | Archie | no |
+| `curriculum.revision_started` | `status`, `revision_id`, `track_id` | Ada | no |
+| `curriculum.revision_proposed` | `status`, `revision_id`, `track_id`, `change_count` | Ada | no |
+| `curriculum.revision_approved` | `status`, `revision_id`, `track_id` | Ada | no |
+| `lesson.started` | `status`, `lesson_id`, `learner_ref` | Ada | no |
+| `lesson.completed` | `status`, `lesson_id`, `learner_ref`, `duration_ms` | Ada | no |
+| `assessment.completed` | `status`, `assessment_id`, `lesson_id`, `learner_ref`, `question_count`, `outcome` | Ada | no |
+
 ### Error and reason codes
 
 `planner_failed.error_code`: `planner_unavailable`, `planner_inference_failed`, `planner_output_invalid`, `deadline_exceeded`. `agent_failed.error_code`: `agent_execution_failed`, `agent_response_invalid`, `deadline_exceeded`. `orchestration_failed.error_code`: `planner_unavailable`, `planner_inference_failed`, `planner_output_invalid`, `agent_execution_failed`, `agent_response_invalid`, `deadline_exceeded`, `orchestration_incomplete`, `internal_error` (the code `cancelled` is defined and has a message, but is never emitted; see the audit). `delegation_rejected.rejection_code` is one of 16 fixed codes defined as `RejectionCode` in `live_events.py` (for example `dependency_unmet`, `repeat_limit`, `execution_budget`, `deadline_exceeded`).
