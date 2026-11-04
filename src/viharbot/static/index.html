@@ -273,6 +273,57 @@
         .composer { gap: 8px; padding-left: 12px; }
         .composer-foot { font-size: 9px; }
       }
+      /* Development Wiki */
+      .wiki-page { max-width: 1180px; margin: 0 auto; padding: 28px 24px 64px; }
+      .wiki-page h1 { margin: 4px 0 6px; font-size: 34px; letter-spacing: -.02em; }
+      .wiki-page h2 { margin: 28px 0 10px; font-size: 20px; }
+      .wiki-page h3 { margin: 18px 0 6px; font-size: 16px; }
+      .wiki-kicker { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+      .wiki-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 6px; }
+      .wiki-tabs a { padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: rgba(255,255,255,.78); font-size: 13px; font-weight: 700; text-decoration: none; }
+      .wiki-tabs a[aria-current="page"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+      .wiki-sync { margin: 10px 0 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); font-size: 13px; color: #55574f; }
+      .wiki-sync.warn { background: var(--gold-soft); border-color: #e8d3a3; color: #6d5316; }
+      .wiki-sync.error { background: var(--coral-soft); border-color: #efc2b3; color: #7a3a26; }
+      .wiki-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 14px 0; }
+      .wiki-tile { padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+      .wiki-tile strong { display: block; font-size: 28px; line-height: 1.1; }
+      .wiki-tile span { color: var(--muted); font-size: 12px; }
+      .wiki-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+      .wiki-card { padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: var(--shadow); }
+      .wiki-card h3 { margin: 0 0 6px; font-size: 15px; line-height: 1.35; }
+      .wiki-card a { color: inherit; }
+      .wiki-meta { color: var(--muted); font-size: 12px; margin: 4px 0; }
+      .wiki-badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--blue-soft); color: #3f5a99; margin-right: 6px; }
+      .wiki-badge.completed { background: var(--green-soft); color: #3d6446; }
+      .wiki-badge.active { background: var(--blue-soft); color: #3f5a99; }
+      .wiki-badge.planned { background: var(--lilac-soft); color: #62499a; }
+      .wiki-badge.blocked { background: var(--coral-soft); color: #8a3d26; }
+      .wiki-bar { height: 10px; border-radius: 999px; background: #ece9df; overflow: hidden; margin: 8px 0 4px; }
+      .wiki-bar > span { display: block; height: 100%; background: var(--green); }
+      .wiki-unknown { font-size: 12px; color: var(--muted); font-style: italic; }
+      .wiki-list { margin: 6px 0; padding-left: 20px; }
+      .wiki-list li { margin: 4px 0; }
+      .wiki-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--card); }
+      .wiki-table th, .wiki-table td { padding: 7px 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+      .wiki-page a { color: #3f5a99; }
+      .wiki-method { font-size: 12px; color: var(--muted); max-width: 70ch; }
+      .wiki-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+      .wiki-filters label { font-size: 12px; font-weight: 700; display: grid; gap: 3px; }
+      .wiki-filters select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font: inherit; }
+      .wiki-doc { max-width: 78ch; line-height: 1.6; }
+      .wiki-doc pre { overflow-x: auto; padding: 12px; border-radius: 10px; background: #f3f1ea; font-size: 12.5px; }
+      .wiki-doc blockquote { margin: 10px 0; padding: 4px 14px; border-left: 3px solid var(--line); color: #55574f; }
+      .wiki-doc code { background: #f3f1ea; padding: 1px 5px; border-radius: 5px; font-size: .92em; }
+      .wiki-doc pre code { background: none; padding: 0; }
+      .wiki-doc .table-wrap { overflow-x: auto; }
+      .wiki-tl { list-style: none; margin: 8px 0; padding: 0; border-left: 2px solid var(--line); }
+      .wiki-tl li { position: relative; margin: 0 0 12px; padding: 0 0 0 16px; }
+      .wiki-tl li::before { content: ""; position: absolute; left: -6px; top: 7px; width: 10px; height: 10px; border-radius: 50%; background: var(--blue); }
+      .wiki-tl li.pr_merged::before { background: var(--green); }
+      .wiki-tl li.epic_created::before, .wiki-tl li.epic_closed::before { background: var(--coral); }
+      .wiki-tl li.release::before, .wiki-tl li.milestone_reached::before { background: var(--gold); }
+      @media (max-width: 680px) { .wiki-page { padding: 18px 16px 48px; } .wiki-page h1 { font-size: 26px; } }
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
       }
@@ -296,6 +347,7 @@
         </a>
         <div class="top-right">
           <span class="privacy-label">Thoughtful answers, with room for uncertainty</span>
+          <a class="team-link" id="wiki-link" href="#wiki"><span aria-hidden="true">▤</span> Development Wiki</a>
           <a class="team-link" id="team-link" href="#team"><span aria-hidden="true">✳</span> Meet the team</a>
           <span class="team-status"><i></i>6 live · 10 in the crew</span>
         </div>
@@ -364,6 +416,18 @@
           </div>
         </main>
       </div>
+      <main class="wiki-page" id="wiki-page" hidden>
+        <div class="wiki-kicker">Read-only · sourced from GitHub</div>
+        <h1 id="wiki-heading">Development Wiki</h1>
+        <nav class="wiki-tabs" aria-label="Development Wiki sections">
+          <a href="#wiki" id="wiki-tab-dashboard">Dashboard</a>
+          <a href="#wiki/docs" id="wiki-tab-docs">Architecture &amp; docs</a>
+          <a href="#wiki/timeline" id="wiki-tab-timeline">Timeline</a>
+          <a href="#home">Back to chat</a>
+        </nav>
+        <p class="wiki-sync" id="wiki-sync" role="status" aria-live="polite">Loading…</p>
+        <div id="wiki-body"></div>
+      </main>
       <main class="team-page" id="team-page" hidden>
         <div class="team-page-head">
           <div>
@@ -1575,15 +1639,362 @@
       const teamPage = document.querySelector("#team-page");
       const teamLink = document.querySelector("#team-link");
       const chatTitle = document.title;
+      // ---- Development Wiki -------------------------------------------------------------
+      // Everything here is built with createElement and textContent from JSON the server has
+      // already shaped; no HTML string from GitHub or a document is ever parsed by the page.
+      const wikiPage = document.querySelector("#wiki-page");
+      const wikiLink = document.querySelector("#wiki-link");
+      const wikiBody = document.querySelector("#wiki-body");
+      const wikiSync = document.querySelector("#wiki-sync");
+      let wikiToken = 0;
+      const wikiDate = (value) => (value ? String(value).slice(0, 10) : "unknown");
+      function wikiAnchor(href, text, external) {
+        const a = el("a", "", text);
+        if (external) {
+          if (typeof href === "string" && /^https:\/\//.test(href)) {
+            a.setAttribute("href", href);
+            a.setAttribute("target", "_blank");
+            a.setAttribute("rel", "noopener noreferrer");
+          }
+        } else {
+          a.setAttribute("href", href);
+        }
+        return a;
+      }
+      const ext = (href, text) => wikiAnchor(href, text, true);
+      function wikiSection(title, level = "h2") {
+        const section = el("section");
+        section.append(el(level, "", title));
+        return section;
+      }
+      function wikiList(rows, build, empty) {
+        if (!rows || rows.length === 0) return el("p", "wiki-meta", empty);
+        const ul = el("ul", "wiki-list");
+        rows.forEach((row) => { const li = el("li"); li.append(...[].concat(build(row))); ul.append(li); });
+        return ul;
+      }
+      function wikiBar(progress, label) {
+        const wrap = el("div");
+        if (!progress || progress.percent === null || progress.percent === undefined) {
+          wrap.append(el("span", "wiki-unknown", "Progress unknown: no child issues are linked to this epic."));
+          return wrap;
+        }
+        const bar = el("div", "wiki-bar");
+        bar.setAttribute("role", "progressbar");
+        bar.setAttribute("aria-label", label);
+        bar.setAttribute("aria-valuemin", "0");
+        bar.setAttribute("aria-valuemax", "100");
+        bar.setAttribute("aria-valuenow", String(progress.percent));
+        bar.setAttribute("aria-valuetext", `${progress.done} of ${progress.total} child issues closed`);
+        const fill = el("span");
+        fill.style.width = `${progress.percent}%`;
+        bar.append(fill);
+        wrap.append(bar, el("div", "wiki-meta", `${progress.done} of ${progress.total} linked child issues closed (${progress.percent}%)`));
+        return wrap;
+      }
+      function wikiSyncBar(sync) {
+        if (!wikiSync) return;
+        wikiSync.className = "wiki-sync";
+        const messages = {
+          not_configured: "The Development Wiki is not connected to GitHub. Set DEV_WIKI_GITHUB_TOKEN (read-only) on the web service.",
+          rate_limited: "GitHub's rate limit was reached.",
+          auth_failed: "GitHub rejected the configured token.",
+          not_found: "The repository was not found with the configured token.",
+          network: "GitHub could not be reached.",
+          syncing: "The first synchronization has not completed yet.",
+        };
+        if (!sync || sync.state === "unavailable") {
+          wikiSync.className = "wiki-sync error";
+          wikiSync.textContent = `Unavailable. ${messages[sync?.error] || "GitHub data could not be loaded."} No data is shown, and none is invented.`;
+          return;
+        }
+        let text = `Last synchronized with GitHub: ${String(sync.synced_at).replace("T", " ").replace("Z", " UTC")} · ${sync.repo}`;
+        if (sync.head_sha) text += ` @ ${sync.head_sha.slice(0, 7)}`;
+        if (sync.stale) {
+          wikiSync.className = "wiki-sync warn";
+          text += ` · Showing cached data: ${messages[sync.error] || "the latest refresh failed."}`;
+          if (sync.retry_after_seconds) text += ` Next attempt in about ${sync.retry_after_seconds}s.`;
+        }
+        wikiSync.textContent = text;
+      }
+      async function wikiFetch(path) {
+        const response = await fetch(path, { headers: { Accept: "application/json" } });
+        let data = null;
+        try { data = await response.json(); } catch (_) { data = null; }
+        if (!response.ok) {
+          const error = new Error(response.status === 404 ? "Not found." : "The Development Wiki is unavailable.");
+          error.sync = data?.detail?.sync || null;
+          error.status = response.status;
+          throw error;
+        }
+        return data;
+      }
+      function statusBadge(status) { return el("span", `wiki-badge ${status}`, status); }
+
+      function renderDashboard(data) {
+        const root = el("div");
+        const d = data.dashboard;
+        if (!d) { root.append(el("p", "", "There is nothing to show until GitHub data loads.")); return root; }
+        const tiles = el("div", "wiki-tiles");
+        [["Epics", d.epic_total], ["Completed", d.by_status.completed], ["Active", d.by_status.active],
+         ["Planned", d.by_status.planned], ["Blocked", d.by_status.blocked]].forEach(([label, n]) => {
+          const tile = el("div", "wiki-tile");
+          tile.append(el("strong", "", String(n)), el("span", "", label));
+          tiles.append(tile);
+        });
+        root.append(tiles);
+        const overall = wikiSection("Overall progress");
+        overall.append(wikiBar(d.overall_progress, "Overall progress across linked child issues"), el("p", "wiki-method", d.overall_progress.method));
+        if (d.epics_with_unknown_progress.length) {
+          overall.append(el("p", "wiki-meta", `Unknown (no linked children): ${d.epics_with_unknown_progress.map((n) => "#" + n).join(", ")}`));
+        }
+        root.append(overall);
+        const epics = wikiSection("Epics");
+        const grid = el("div", "wiki-grid");
+        data.epics.forEach((epic) => {
+          const card = el("article", "wiki-card");
+          const h = el("h3");
+          h.append(wikiAnchor(`#wiki/epic/${epic.number}`, `#${epic.number} ${epic.title}`));
+          card.append(h);
+          const meta = el("div", "wiki-meta");
+          meta.append(statusBadge(epic.status));
+          if (epic.agent) meta.append(el("span", "", `Agent: ${epic.agent} `));
+          if (epic.phase) meta.append(el("span", "", `Phase ${epic.phase}`));
+          card.append(meta, wikiBar(epic.progress, `Progress of epic ${epic.number}`),
+            el("div", "wiki-meta", `${epic.counts.prs_merged} merged PR(s) referencing this epic`));
+          grid.append(card);
+        });
+        epics.append(grid);
+        root.append(epics);
+        const prs = wikiSection("Recently merged pull requests");
+        prs.append(wikiList(d.recent_merged_prs, (p) => [ext(p.url, `#${p.number} ${p.title}`), ` · ${wikiDate(p.merged_at)}`], "No merged pull requests found."));
+        root.append(prs);
+        const blockers = wikiSection("Open blockers");
+        blockers.append(wikiList(d.open_blockers, (b) => [`Epic #${b.epic}: `, ext(b.url, `#${b.number} ${b.title}`)], "None recorded. Only issues named as 'blocked by' in an epic, or a 'blocked' label, count."));
+        root.append(blockers);
+        const ms = wikiSection("Upcoming milestones");
+        ms.append(wikiList(d.upcoming_milestones, (m) => [ext(m.url, m.title || "Untitled"), ` · due ${m.due_on ? wikiDate(m.due_on) : "no date set"} · ${m.open_issues} open, ${m.closed_issues} closed`], "No open milestones."));
+        root.append(ms);
+        root.append(el("p", "wiki-method", d.deployments_note));
+        return root;
+      }
+
+      function issueRow(i) { return [ext(i.url, `#${i.number} ${i.title}`), ` · ${i.state}`]; }
+      function evidenceList(rows) { return wikiList(rows, (r) => [ext(r.url, r.claim)], "No evidence."); }
+      function renderEpic(payload) {
+        const e = payload.epic;
+        const root = el("div");
+        const back = el("p", "wiki-meta"); back.append(wikiAnchor("#wiki", "← All epics")); root.append(back);
+        const head = el("h2", "", `#${e.number} ${e.title}`);
+        root.append(head);
+        const meta = el("div", "wiki-meta");
+        meta.append(statusBadge(e.status), ext(e.url, "Open on GitHub"));
+        root.append(meta);
+        const s1 = wikiSection("Status and evidence", "h3");
+        s1.append(evidenceList(e.status_evidence));
+        root.append(s1);
+        const s2 = wikiSection("Business objective", "h3");
+        s2.append(el("p", "", e.objective || "No objective is stated in the epic."));
+        root.append(s2);
+        const s3 = wikiSection("Owner and agent", "h3");
+        const who = [];
+        if (e.owners.length) who.push(`Assignees: ${e.owners.join(", ")}`);
+        if (e.agent) who.push(`Agent: ${e.agent} (from the issue ${e.agent_source})`);
+        s3.append(el("p", "", who.join(" · ") || e.owner_note));
+        root.append(s3);
+        const s4 = wikiSection("Progress", "h3");
+        s4.append(wikiBar(e.progress, `Progress of epic ${e.number}`), el("p", "wiki-method", e.progress.method));
+        root.append(s4);
+        const s5 = wikiSection(`Child issues (${e.counts.children_open} open, ${e.counts.children_closed} closed)`, "h3");
+        s5.append(wikiList(e.children, issueRow, "No child issues are linked."));
+        if (e.unresolved_references.length) s5.append(el("p", "wiki-meta", `References that matched no issue (excluded): ${e.unresolved_references.map((n) => "#" + n).join(", ")}`));
+        root.append(s5);
+        const s6 = wikiSection("Pull requests and commits", "h3");
+        s6.append(wikiList(e.pull_requests, (p) => [ext(p.url, `PR #${p.number} ${p.title}`), ` · ${p.state}`], "No pull requests reference this epic or its children."));
+        s6.append(wikiList(e.commits, (c) => [ext(c.url, c.short), ` ${c.message}`], "No recent commits reference this epic."));
+        root.append(s6);
+        const s7 = wikiSection("Dependencies and blockers", "h3");
+        s7.append(wikiList(e.dependencies, (d) => [ext(d.url, `#${d.number} ${d.title}`), ` · ${d.state}${d.explicit_blocker ? " · blocker" : ""}`], "No dependencies recorded."));
+        if (e.related.length) { s7.append(el("h3", "", "Related")); s7.append(wikiList(e.related, issueRow, "")); }
+        root.append(s7);
+        const s8 = wikiSection("Acceptance and scope checklist (as written in the epic)", "h3");
+        s8.append(wikiList(e.checklist, (c) => [`${c.checked ? "☑" : "☐"} ${c.text}`, el("span", "wiki-meta", ` (${c.section || "no heading"})`)], "The epic has no checklist."));
+        root.append(s8);
+        const s9 = wikiSection("Maturity", "h3");
+        s9.append(wikiList(e.maturity, (m) => [el("strong", "", m.level), m.state === "evidenced" ? " — evidenced: " : " — not evidenced here. ", ...(m.evidence || []).map((x) => ext(x.url, x.claim))], ""));
+        s9.append(el("p", "wiki-method", "A closed issue or merged pull request does not prove deployment or live validation."));
+        root.append(s9);
+        const s10 = wikiSection("Documentation and ADRs", "h3");
+        const docsList = wikiList(e.docs, (d) => [wikiAnchor(`#wiki/docs/${d.path.split("/").map(encodeURIComponent).join("/")}`, d.title), ` · ${d.category}`], "No repository document is named in the epic.");
+        s10.append(docsList);
+        root.append(s10);
+        const s11 = wikiSection("Recent development activity", "h3");
+        s11.append(wikiList(e.activity, (a) => [`${wikiDate(a.date)} · ${a.kind.replace(/_/g, " ")} · `, ext(a.url, a.title)], "No activity found."));
+        root.append(s11);
+        const s12 = wikiSection("Suggested next engineering actions (derived from the data above)", "h3");
+        s12.append(wikiList(e.next_actions, (a) => [ext(a.url, a.text)], "Nothing outstanding is evidenced."));
+        root.append(s12);
+        const tl = el("p", "wiki-meta");
+        tl.append(wikiAnchor(`#wiki/timeline?epic=${e.number}`, "View this epic on the timeline"));
+        root.append(tl);
+        return root;
+      }
+
+      function renderInlines(parent, inlines) {
+        (inlines || []).forEach((n) => {
+          if (n.t === "text") parent.append(n.v);
+          else if (n.t === "code") parent.append(el("code", "", n.v));
+          else if (n.t === "link") {
+            if (n.wiki) parent.append(wikiAnchor(`#wiki/docs/${n.wiki.split("/").map(encodeURIComponent).join("/")}`, n.v));
+            else parent.append(ext(n.href, n.v));
+          } else {
+            const node = el(n.t === "strong" ? "strong" : "em");
+            if (n.v) node.append(n.v); else renderInlines(node, n.children);
+            parent.append(node);
+          }
+        });
+        return parent;
+      }
+      function renderBlocks(blocks) {
+        const root = el("div", "wiki-doc");
+        blocks.forEach((b) => {
+          if (b.type === "heading") root.append(renderInlines(el("h" + Math.min(Math.max(b.level + 1, 2), 6)), b.inlines));
+          else if (b.type === "paragraph") root.append(renderInlines(el("p"), b.inlines));
+          else if (b.type === "code") { const pre = el("pre"); pre.append(el("code", "", b.text)); root.append(pre); }
+          else if (b.type === "quote") root.append(renderInlines(el("blockquote"), b.inlines));
+          else if (b.type === "rule") root.append(el("hr"));
+          else if (b.type === "list") {
+            const list = el(b.ordered ? "ol" : "ul", "wiki-list");
+            b.items.forEach((item) => {
+              const li = el("li");
+              if (item.depth) li.style.marginLeft = `${item.depth * 18}px`;
+              if (item.checked !== undefined) li.append(item.checked ? "☑ " : "☐ ");
+              list.append(renderInlines(li, item.inlines));
+            });
+            root.append(list);
+          } else if (b.type === "table") {
+            const wrap = el("div", "table-wrap"); const table = el("table", "wiki-table");
+            const tr = el("tr"); b.head.forEach((c) => tr.append(renderInlines(el("th"), c))); table.append(tr);
+            b.rows.forEach((r) => { const row = el("tr"); r.forEach((c) => row.append(renderInlines(el("td"), c))); table.append(row); });
+            wrap.append(table); root.append(wrap);
+          }
+        });
+        return root;
+      }
+      function renderDocsIndex(data) {
+        const root = el("div");
+        root.append(el("p", "wiki-method", "These are the repository's own Markdown files, read from GitHub on the synchronized revision. Nothing is copied or rewritten here."));
+        data.categories.forEach((cat) => {
+          const section = wikiSection(cat.name);
+          section.append(wikiList(cat.documents, (d) => [wikiAnchor(`#wiki/docs/${d.path.split("/").map(encodeURIComponent).join("/")}`, d.title), el("span", "wiki-meta", ` ${d.path}`)], ""));
+          root.append(section);
+        });
+        if (!data.categories.length) root.append(el("p", "", "No documents were found."));
+        return root;
+      }
+      function renderDoc(doc) {
+        const root = el("div");
+        const back = el("p", "wiki-meta"); back.append(wikiAnchor("#wiki/docs", "← All documentation")); root.append(back);
+        root.append(el("h2", "", doc.title));
+        if (doc.error) { root.append(el("p", "", "This document could not be shown here. Open it on GitHub instead.")); }
+        const r = doc.revision;
+        if (r) {
+          const meta = el("p", "wiki-meta");
+          meta.append(`${doc.category} · ${doc.path} · revision ${String(r.commit_sha || "").slice(0, 7)} on ${r.branch} (blob ${String(r.blob_sha).slice(0, 7)}) · `, ext(r.source_url, "Source"), " · ", ext(r.history_url, "History"));
+          root.append(meta);
+        }
+        if (doc.blocks) root.append(renderBlocks(doc.blocks));
+        return root;
+      }
+      function renderTimeline(data, query) {
+        const root = el("div");
+        const filters = el("div", "wiki-filters");
+        const f = data.filters || {};
+        const make = (name, label, options) => {
+          const wrap = el("label", "", label);
+          const select = el("select");
+          select.setAttribute("aria-label", label);
+          const all = el("option", "", "All"); all.value = ""; select.append(all);
+          options.forEach(([value, text]) => { const o = el("option", "", text); o.value = value; if (String(query[name] || "") === String(value)) o.setAttribute("selected", "selected"); select.append(o); });
+          select.addEventListener("change", () => {
+            const next = { ...query, [name]: select.value };
+            const qs = Object.entries(next).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+            window.location.hash = `#wiki/timeline${qs ? "?" + qs : ""}`;
+          });
+          wrap.append(select); filters.append(wrap);
+        };
+        make("epic", "Epic", (f.epics || []).map((e) => [e.number, `#${e.number} ${e.title}`.slice(0, 70)]));
+        make("agent", "Agent", (f.agents || []).map((a) => [a, a]));
+        make("phase", "Phase", (f.phases || []).map((p) => [p, `Phase ${p}`]));
+        make("status", "Status", (f.statuses || []).map((s) => [s, s]));
+        root.append(filters);
+        if (data.note) root.append(el("p", "wiki-method", data.note));
+        const ol = el("ol", "wiki-tl");
+        (data.events || []).forEach((ev) => {
+          const li = el("li", ev.kind);
+          li.append(el("strong", "", wikiDate(ev.date)), ` · ${ev.kind.replace(/_/g, " ")} · `, ext(ev.url, ev.number ? `#${ev.number} ${ev.title}` : ev.title));
+          if (ev.epics.length) li.append(el("span", "wiki-meta", ` · epic ${ev.epics.map((n) => "#" + n).join(", ")}`));
+          ol.append(li);
+        });
+        root.append(ol);
+        if (!(data.events || []).length) root.append(el("p", "", "No events match."));
+        return root;
+      }
+
+      async function showWiki() {
+        if (!wikiPage || !wikiBody) return;
+        const token = ++wikiToken;
+        const raw = window.location.hash.replace(/^#wiki\/?/, "");
+        const [route, queryString = ""] = raw.split("?");
+        const query = {};
+        queryString.split("&").filter(Boolean).forEach((pair) => { const [k, v = ""] = pair.split("="); query[k] = decodeURIComponent(v); });
+        const tabs = { dashboard: "#wiki-tab-dashboard", docs: "#wiki-tab-docs", timeline: "#wiki-tab-timeline" };
+        const which = route.startsWith("docs") ? "docs" : route === "timeline" ? "timeline" : "dashboard";
+        Object.entries(tabs).forEach(([key, selector]) => {
+          const tab = document.querySelector(selector);
+          if (!tab) return;
+          if (key === which) tab.setAttribute("aria-current", "page"); else tab.removeAttribute("aria-current");
+        });
+        wikiBody.textContent = "";
+        if (wikiSync) wikiSync.textContent = "Loading…";
+        try {
+          let data; let view;
+          const epicMatch = route.match(/^epic\/(\d+)$/);
+          if (epicMatch) { data = await wikiFetch(`/api/development/epics/${epicMatch[1]}`); view = renderEpic(data); }
+          else if (route === "timeline") {
+            const qs = ["epic", "agent", "phase", "status"].filter((k) => query[k]).map((k) => `${k}=${encodeURIComponent(query[k])}`).join("&");
+            data = await wikiFetch(`/api/development/timeline${qs ? "?" + qs : ""}`); view = renderTimeline(data, query);
+          } else if (route.startsWith("docs/") && route.length > 5) {
+            const path = route.slice(5).split("/").map(decodeURIComponent).join("/");
+            data = await wikiFetch(`/api/development/docs/${path.split("/").map(encodeURIComponent).join("/")}`); view = renderDoc(data);
+          } else if (route === "docs") { data = await wikiFetch("/api/development/docs"); view = renderDocsIndex(data); }
+          else { data = await wikiFetch("/api/development/epics"); view = renderDashboard(data); }
+          if (token !== wikiToken) return;
+          wikiSyncBar(data.sync);
+          wikiBody.append(view);
+        } catch (error) {
+          if (token !== wikiToken) return;
+          wikiSyncBar(error.sync || (error.status === 404 ? null : { state: "unavailable" }));
+          if (error.status === 404 && wikiSync) { wikiSync.className = "wiki-sync"; wikiSync.textContent = "Not found."; }
+          wikiBody.append(el("p", "", error.message || "The Development Wiki is unavailable."));
+        }
+      }
       function showPage(initial) {
+        const onWiki = window.location.hash.startsWith("#wiki");
         const onTeam = window.location.hash === "#team";
-        chatPage.hidden = onTeam;
+        chatPage.hidden = onTeam || onWiki;
         teamPage.hidden = !onTeam;
-        document.title = onTeam ? "Meet the team \u00b7 ViharBot" : chatTitle;
+        if (wikiPage) wikiPage.hidden = !onWiki;
+        document.title = onWiki ? "Development Wiki \u00b7 ViharBot" : onTeam ? "Meet the team \u00b7 ViharBot" : chatTitle;
         if (onTeam) teamLink.setAttribute("aria-current", "page");
         else teamLink.removeAttribute("aria-current");
+        if (wikiLink) { if (onWiki) wikiLink.setAttribute("aria-current", "page"); else wikiLink.removeAttribute("aria-current"); }
         window.scrollTo(0, 0);
-        if (onTeam) {
+        if (onWiki && wikiPage) {
+          const heading = document.querySelector("#wiki-heading");
+          if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus({ preventScroll: true }); }
+          showWiki();
+        } else if (onTeam) {
           const heading = teamPage.querySelector("h1");
           heading.setAttribute("tabindex", "-1");
           heading.focus({ preventScroll: true });

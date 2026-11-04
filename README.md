@@ -103,6 +103,10 @@ python -m pytest -q
 
 Two environment notes. A local `.env` is loaded by python-dotenv and can flip the feature flags on, which makes about 15 tests fail; move `.env` aside when running tests. The Docker profile (`docker compose --profile tests run --build --rm tests`) does **not** run the full suite today: its image has no Node, no `compose.yaml`, no `.env.example` and no `images/`, so one test module fails to import and several others fail. See [development status](docs/development-status.md). Opt-in live checks (`RUN_LITELLM_INTEGRATION`, `RUN_LITELLM_INFERENCE`) and `scripts/fact_check_eval/run.py` make billable calls and are off by default.
 
+## Development Wiki
+
+The top bar's **Development Wiki** (`#wiki`) shows epic progress, a timeline and the repository's own documentation, read from GitHub. It is read-only, makes no model calls and needs `DEV_WIKI_GITHUB_TOKEN` (empty means "unavailable"). Percentages are derived from linked child issues and shown with their method; where nothing is linked they read *unknown*. See [Development Wiki](docs/development-wiki.md).
+
 ## Quality checks
 
 Every pull request and every push to `main` runs [GitHub Actions](https://github.com/vchokshi/viharbot/actions): Python tests on 3.12 and 3.13 with coverage, frontend tests on Node 24, Ruff, and a Docker build with a health smoke test (on pull requests only when a container definition or `src/` changes; always on `main`). CodeQL, dependency review and four security scanners run separately. The badges above come from those runs; none is hand-maintained. A green badge says the check ran and passed against the latest run on `main`. It does not prove the code has no bugs or vulnerabilities, and a badge can show an older successful run until the next one finishes.
@@ -129,7 +133,7 @@ Pushing to `main` updates source only; nothing deploys automatically.
 
 ## Security boundaries
 
-* All web routes except `/health` use the same shared Basic Auth when enabled (`/`, `/images/*`, `/api/chat`, `/api/chat/stream`). It is not per-user identity.
+* All web routes except `/health` use the same shared Basic Auth when enabled (`/`, `/images/*`, `/api/chat`, `/api/chat/stream`, `/api/development/*`). It is not per-user identity.
 * The six agents have **no authentication**; they rely on the private network. Do not publish their ports.
 * The browser never receives an agent key. Logs hold agent, request ID, destination, alias, duration and error type, never prompts, findings or keys.
 * Model output is untrusted: the page renders it with `textContent`, and Markdown answers produce no links or HTML.
@@ -147,4 +151,4 @@ ViharBot is personally owned and intended to remain proprietary. Public visibili
 
 ## Documentation
 
-[Contributing](CONTRIBUTING.md) · [Architecture](docs/architecture.md) · [Continuous integration](docs/continuous-integration.md) · [Development status](docs/development-status.md) · [Phase 6.5 audit](docs/audits/phase-6.5-architecture-audit.md) · [Live observability protocol](docs/live-observability.md) · [Iterative orchestration](docs/iterative-orchestration.md) · [Controlled delegation](docs/controlled-delegation.md) · [Identity execution](docs/identity-execution-integration.md) · [Personality-aware inference](docs/personality-aware-inference.md) · [Agent identities](docs/agent-identity-architecture.md) · [Skills registry](docs/skills-registry.md) · [Governance](docs/governance/agent-architecture-v1.1.md) · [Agent communication](docs/agent-communication.md) · [LiteLLM](docs/litellm-integration.md) · [Deployment](docs/deployment-strategy.md) · [Identity and security](docs/identity-and-security.md) · [Memory](docs/memory-architecture.md) · [Observability](docs/observability.md) · [AgentCore](deploy/agentcore/README.md)
+[Contributing](CONTRIBUTING.md) · [Architecture](docs/architecture.md) · [Continuous integration](docs/continuous-integration.md) · [Development status](docs/development-status.md) · [Development Wiki](docs/development-wiki.md) · [Phase 6.5 audit](docs/audits/phase-6.5-architecture-audit.md) · [Live observability protocol](docs/live-observability.md) · [Iterative orchestration](docs/iterative-orchestration.md) · [Controlled delegation](docs/controlled-delegation.md) · [Identity execution](docs/identity-execution-integration.md) · [Personality-aware inference](docs/personality-aware-inference.md) · [Agent identities](docs/agent-identity-architecture.md) · [Skills registry](docs/skills-registry.md) · [Governance](docs/governance/agent-architecture-v1.1.md) · [Agent communication](docs/agent-communication.md) · [LiteLLM](docs/litellm-integration.md) · [Deployment](docs/deployment-strategy.md) · [Identity and security](docs/identity-and-security.md) · [Memory](docs/memory-architecture.md) · [Observability](docs/observability.md) · [AgentCore](deploy/agentcore/README.md)
