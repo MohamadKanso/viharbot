@@ -40,7 +40,7 @@ def test_stop_keeps_the_record_and_delete_removes_it(world):
 def test_destroy_edge_cases(world):
     pending = submit(world, payload(1))
     assert reason_of(world.ctrl.destroy, pending["deployment_id"], caller="o", request_id="r",
-                     keep_record=True) == "no_app"
+                     keep_record=True) == "record_not_authoritative"
     dep = run_all(world.ctrl, payload(2))
     world.provider.fail_next("get", "before")
     assert reason_of(world.ctrl.destroy, dep["deployment_id"], caller="o", request_id="r",

@@ -284,7 +284,7 @@ def test_stop_marks_the_authoritative_record_and_leaves_history(world):
 def test_expiry_leaves_an_app_with_an_unresolved_record_for_a_person(tmp_path):
     world, running, _, done = race_world(tmp_path)
     world.clock.now += 3 * 3600
-    assert [r["action"] for r in world.ctrl.reconcile()] == ["alert"]
+    assert [r["action"] for r in world.ctrl.reconcile()] == ["refused:app_has_unresolved_outcome"]
     assert world.provider.apps  # not destroyed while any record of the app is unresolved
     assert world.ctrl.get(running["deployment_id"])["status"] == "running"
     assert world.ctrl.get(done["deployment_id"])["status"] == "failed_uncertain"

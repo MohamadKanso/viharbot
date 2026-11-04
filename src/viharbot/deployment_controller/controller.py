@@ -15,10 +15,12 @@ import copy
 import hmac
 import secrets
 import time
+from collections import deque
 from typing import Callable
 
 from pydantic import ValidationError
 
+from .app_safety import LIVE, UNRESOLVED, AppSafetyMixin
 from .audit import AuditLog
 from .markers import (
     BOUND_KEY, CLAIM_KEY, Claim, bound_entry, claim_entry, parse_claim, verified_bound,
@@ -27,14 +29,14 @@ from .policy import (
     DeploymentRequest, Policy, PolicyDenied, build_spec, request_hash,
 )
 from .provider import Provider, ProviderApp, ProviderError, ProviderTimeout, VersionConflict
-from .reconcile import LIVE, ReconcileMixin
+from .reconcile import ReconcileMixin
 from .replace import ReplaceMixin
 from .store import RecordStore, StoreError
 
 HOUR, DAY = 3600, 86400
 
 
-class DeploymentController(ReplaceMixin, ReconcileMixin):
+class DeploymentController(AppSafetyMixin, ReplaceMixin, ReconcileMixin):
     def __init__(
         self, *, provider: Provider, store: RecordStore, policy: Policy, marker_key: bytes,
         audit: AuditLog | None = None, clock: Callable[[], float] = time.time,
@@ -45,6 +47,7 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
         self.provider, self.store, self.policy = provider, store, policy
         self.audit = audit or AuditLog()
         self.alerts: list[dict] = []
+        self.guard_log: deque = deque(maxlen=256)  # recent guard decisions
         self._key, self._clock, self._instance = marker_key, clock, instance_id
 
     # --- helpers ---
@@ -237,6 +240,8 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
             )
             appr.update(state="reserved", claim_id=claim.claim_id)
             dep.update(status="reserved", expires_at=claim.expires_at)
+            if req.replaces:  # the target is durable before any provider call
+                dep["app_id"] = req.replaces.app_id
             action = {"ts": now, "kind": dep["kind"]}
             self._save(approvals={approval_id: appr}, deployments={dep["deployment_id"]: dep},
                        actions=[action])  # durable before any provider call
@@ -292,6 +297,10 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
         except ProviderError:
             self._alert("bind_pending", request_id=ctx["request_id"], dep=dep)
             return self._finish(appr, dep, "created_unbound", reason="bind_pending", **ctx)
+        decision = self._guard("bind", app.app_id, dep)
+        if not decision.allowed:
+            return self._uncertain(appr, dep, decision.reason, "bind_refused:" + decision.reason,
+                                   **ctx)
         mine = current is not None and (c := parse_claim(self._key, current.env)) is not None \
             and c.claim_id == claim.claim_id
         if not mine:
@@ -379,25 +388,18 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
             raw = text.encode("utf-8")[-self.policy.max_log_bytes:]
             return raw.decode("utf-8", errors="ignore")  # a split character is dropped
 
-    def _refuse_if_unresolved(self, dep: dict, action: str, caller: str, request_id: str) -> None:
-        """The uncertain-outcome safeguard belongs to the APP: any unresolved record of the app
-        (whichever generation the request came through) refuses every destructive action."""
-        if self._unresolved_for_app(dep.get("app_id")):
-            self._alert("destroy_refused:unresolved_outcome", request_id=request_id, dep=dep)
-            raise self._refuse(action, "app_has_unresolved_outcome", 409,
-                               request_id=request_id, caller=caller, dep=dep)
-
     def destroy(self, deployment_id: str, *, caller: str, request_id: str, keep_record: bool) -> dict:
         """Stop (keep the record) or delete, only for an app with verified ownership."""
         action = "stop" if keep_record else "delete"
         with self.store.locked():
             dep = self.get(deployment_id)
-            if dep["status"] in ("failed_uncertain", "failed", "expired"):
-                # Not the record that stands for the app (an unresolved conflict is resolved by a
-                # person, a failed or expired one never owned it): no destructive action through it.
-                raise self._refuse(action, "record_not_authoritative", 409,
+            decision = self._guard(action, dep.get("app_id"), dep)
+            if not decision.allowed:
+                if decision.reason == UNRESOLVED:
+                    self._alert("destroy_refused:unresolved_outcome", request_id=request_id,
+                                dep=dep)
+                raise self._refuse(action, decision.reason, 409,
                                    request_id=request_id, caller=caller, dep=dep)
-            self._refuse_if_unresolved(dep, action, caller, request_id)
             app = self._owned_app(dep, action, caller, request_id)
             try:
                 if app is not None:

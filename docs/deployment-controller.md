@@ -65,6 +65,18 @@ does and does not do.
   route. The manual step: a person inspects the app and then sets that record's status to `failed`
   (or `running`) in the store file while the controller is stopped; the refusal lifts on the next
   call. An expired app with an unresolved record is left running and alerted until then.
+- One guard decides all of this: `app_safety.py` (`_guard(action, app_id, record)`). It loads every
+  record that shares the app id or whose reservation targets it and returns `allowed` or a
+  refusal (`app_has_unresolved_outcome`, `record_not_authoritative`). The `ACTIONS` table in that
+  file is the only allow-list: it names the statuses of the record each action may go through
+  (`stop`, `delete`, `sweep_destroy`, `replace`, `bind`, `adopt`, `recover_create`,
+  `recover_replace`); `failed`, `expired` and a `failed_uncertain` record with a non-recoverable
+  reason are never revived by automation. Another record that is `failed_uncertain`, reserved or
+  `expiry_destroy_unknown` refuses everything except the sweep that retries the destroy. A
+  replacement records its target `app_id` at reservation, so a crash before it finishes still maps
+  to the app. Results and audit use one vocabulary: `adopted`, `left_uncertain`,
+  `recovery_rejected`, `refused:<reason>`. Every new path that acts on an app MUST call the guard
+  before any provider mutation; a test enumerates the public entry points and fails otherwise.
 - A destroy that raises during expiry is an unknown outcome: the app is read again. Gone means every
   record is finalized as `expired` once (audited); still present leaves the records for the next
   pass; a failed lookup alerts and marks the records `expiry_destroy_unknown` (never `expired` on a

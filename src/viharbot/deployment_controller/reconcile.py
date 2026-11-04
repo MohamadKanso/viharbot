@@ -15,16 +15,10 @@ from .markers import (
     BOUND_EXPIRED, BOUND_KEY, BOUND_LIVE, CLAIM_KEY, CLAIM_ONLY, Claim, bound_entry, claim_entry,
     classify, parse_claim,
 )
+from .app_safety import EXPIRY_UNKNOWN, LIVE
 from .policy import DeploymentRequest, build_spec
 from .provider import ProviderApp, ProviderError
 
-LIVE = ("running", "created_unbound", "reserved")  # a record that stands for its app right now
-# A create whose outcome was unknown for one of these reasons can still be resolved later with
-# provider-backed evidence. Replacement conflicts and duplicate claims never can.
-EXPIRY_UNKNOWN = "expiry_destroy_unknown"  # a destroy that raised, outcome not yet known
-RECOVERABLE = (
-    None, "bind_pending", "reconcile_unavailable", "no_candidate", "no_operation_evidence",
-)
 
 
 class ReconcileMixin:
@@ -113,24 +107,6 @@ class ReconcileMixin:
         return [d for d in self.store.all("deployments")
                 if app_id and d.get("app_id") == app_id and d["deployment_id"] != exclude]
 
-    def _unresolved_for_app(self, app_id: str | None) -> list[dict]:
-        """Every record that leaves the app's outcome unresolved: a failed_uncertain record that
-        names the app, or a still-reserved replacement that targets it (live or superseded
-        records of the same app do not matter: the safeguard is a property of the app)."""
-        if not app_id:
-            return []
-        found = [d for d in self._deps_for(app_id) if d["status"] in ("failed_uncertain", "reserved")]
-        for appr in self.store.all("approvals"):
-            if appr["state"] != "reserved":
-                continue
-            target = (appr["request"].get("replaces") or {}).get("app_id")
-            dep = self.store.get("deployments", appr["deployment_id"])
-            if app_id in (target, appr.get("app_id")) and dep and dep["status"] in (
-                "failed_uncertain", "reserved"
-            ) and dep not in found:
-                found.append(dep)
-        return found
-
     def _find_dep(self, app_id: str) -> dict | None:
         """The authoritative record for an app: the one record that is not history."""
         return next((d for d in self._deps_for(app_id) if d["status"] in LIVE), None)
@@ -145,10 +121,13 @@ class ReconcileMixin:
         return changed
 
     def _sweep_destroy(self, app: ProviderApp, request_id: str) -> str:
-        if self._unresolved_for_app(app.app_id):  # a person resolves it first, even past expiry
+        decision = self._guard("sweep_destroy", app.app_id)
+        if not decision.allowed:  # a person resolves it first, even past expiry
             self._alert("expired_destroy_skipped:unresolved_outcome", request_id=request_id,
                         app_id=app.app_id)
-            return "alert"
+            self.audit.emit("expire_destroy", "deny", reason=decision.reason,
+                            request_id=request_id, app_id=app.app_id)
+            return str(decision)
         try:  # the listing may be stale: revalidate ownership and expiry right before deleting
             current = self.provider.get_app(app.app_id)
             if current is None or classify(
@@ -220,14 +199,17 @@ class ReconcileMixin:
 
     def _adopt(self, app: ProviderApp, request_id: str) -> str:
         claim = parse_claim(self._key, app.env)
-        approvals, deployments, handled, rejected = {}, {}, False, False
+        approvals, deployments, handled, rejected, refused = {}, {}, False, False, False
         for appr in self.store.all("approvals"):  # crash after bind, before `executed` was saved
             if appr["state"] != "reserved" or appr["claim_id"] != claim.claim_id:
                 continue
-            owner = self.store.get("deployments", appr["deployment_id"])
-            if owner and owner["status"] == "failed_uncertain":
-                continue  # a detected conflict or unknown outcome is never promoted to executed
             handled = True
+            owner = self.store.get("deployments", appr["deployment_id"])
+            if owner and not self._guard(  # a conflict is never promoted to executed
+                "recover_replace" if owner["kind"] == "replace" else "adopt", app.app_id, owner
+            ).allowed:
+                refused = True
+                continue
             if owner and owner["kind"] == "replace" and not self._replacement_ok(appr, app, claim):
                 owner.update(status="failed_uncertain", reason="unexpected_writer")
                 self._alert("replace_failed_uncertain:unexpected_writer",
@@ -242,25 +224,24 @@ class ReconcileMixin:
                              expires_at=claim.expires_at)
                 deployments[owner["deployment_id"]] = owner
                 deployments.update(self._superseded(owner))
-        dep = self._find_dep(app.app_id)
-        if dep is None and not handled and not any(
-            d["status"] == "failed_uncertain" for d in self._deps_for(app.app_id)
-        ):
-            dep_id = "dep_" + secrets.token_hex(8)
-            deployments[dep_id] = {
-                "deployment_id": dep_id, "request_id": "adopted-" + app.app_id,
-                "approval_id": None, "status": "running", "requester": None, "name": app.name,
-                "image_digest": (app.spec.get("image") or {}).get("digest", ""),
-                "size": app.spec.get("size", ""), "region": app.spec.get("region", ""),
-                "ttl_minutes": max(0, (claim.expires_at - claim.created_at) // 60),
-                "request_hash": claim.request_hash, "app_id": app.app_id,
-                "expires_at": claim.expires_at, "reason": None, "kind": "adopted",
-            }
+        if not handled:
+            if not self._guard("adopt", app.app_id).allowed:
+                refused = True
+            elif self._find_dep(app.app_id) is None:
+                dep_id = "dep_" + secrets.token_hex(8)
+                deployments[dep_id] = {
+                    "deployment_id": dep_id, "request_id": "adopted-" + app.app_id,
+                    "approval_id": None, "status": "running", "requester": None, "name": app.name,
+                    "image_digest": (app.spec.get("image") or {}).get("digest", ""),
+                    "size": app.spec.get("size", ""), "region": app.spec.get("region", ""),
+                    "ttl_minutes": max(0, (claim.expires_at - claim.created_at) // 60),
+                    "request_hash": claim.request_hash, "app_id": app.app_id,
+                    "expires_at": claim.expires_at, "reason": None, "kind": "adopted",
+                }
         if approvals or deployments:
             self._save(approvals=approvals, deployments=deployments)  # one atomic commit
-        # The outcome is what really happened: never "adopted" over a record left uncertain.
-        uncertain = any(d["status"] == "failed_uncertain" for d in self._deps_for(app.app_id))
-        outcome = "recovery_rejected" if rejected else "left_uncertain" if uncertain else "adopted"
+        # The outcome is what really happened: never "adopted" over a refusal or a rejection.
+        outcome = "recovery_rejected" if rejected else "left_uncertain" if refused else "adopted"
         if outcome == "left_uncertain":
             self._alert("adopt_left_uncertain", request_id=request_id, app_id=app.app_id)
         self.audit.emit("adopt", "allow" if outcome == "adopted" else "deny", reason=outcome,
@@ -294,7 +275,8 @@ class ReconcileMixin:
             ):
                 continue
             dep = self.store.get("deployments", appr["deployment_id"])
-            if dep is None or dep["kind"] != "create" or dep.get("reason") not in RECOVERABLE:
+            if dep is None or dep["kind"] != "create" \
+                    or not self._guard("recover_create", app.app_id, dep).allowed:
                 return False
             ctx = dict(request_id=request_id, caller=None, started=time.perf_counter())
             if appr.get("app_id") == app.app_id:

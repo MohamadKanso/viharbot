@@ -20,6 +20,10 @@ class ReplaceMixin:
     def _preflight(self, appr: dict, req: DeploymentRequest) -> None:
         """Recheck the replacement target. Only a preflight: see ADR-007 on the race."""
         target = req.replaces
+        decision = self._guard("replace", target.app_id)
+        if not decision.allowed:  # an earlier replacement left this app unresolved
+            self._alert("replace_refused:unresolved_outcome", request_id="preflight")
+            raise PolicyDenied(decision.reason, 409)
         current = self.provider.get_app(target.app_id)
         if current is None:
             reason = "target_missing"
@@ -36,7 +40,6 @@ class ReplaceMixin:
 
     def _replace(self, appr, dep, req, claim, request_id, caller, started) -> dict:
         target, ctx = req.replaces, dict(request_id=request_id, caller=caller, started=started)
-        dep["app_id"] = target.app_id
         markers = {
             CLAIM_KEY: claim_entry(self._key, claim),
             BOUND_KEY: bound_entry(self._key, claim, target.app_id),
