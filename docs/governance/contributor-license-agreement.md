@@ -2,9 +2,9 @@
 
 **Legal-terms version: 1.0**
 **Editorial revision: 1**
-**Status: DRAFT. Not in force.**
+**Approved by the Owner on 2026-11-04. Not reviewed by counsel.**
 
-> **Review status.** This text implements the founder's twelve recorded policy decisions. **It has not had legal review and is not counsel-approved.** It is not a contract, not legal advice and not enforceable until: (1) counsel has reviewed it and the review is recorded in [`CLA-ACCEPTANCES.md`](../../CLA-ACCEPTANCES.md); (2) the founder has approved it; (3) the text is frozen (its SHA-256 recorded); and (4) the record's status is `in-force`. Items marked **[COUNSEL]** are provisions or blanks counsel must confirm or supply. Nothing in this draft should be described as counsel-reviewed or enforceable until the record says so. Process and activation steps: [CLA acceptance](cla-acceptance.md) and [activation checklist](cla-activation.md).
+> **Review status, stated plainly.** This text was approved by the Owner alone. **No lawyer has reviewed it.** The Owner chose to proceed without legal review and accepts that risk; the record in [`CLA-ACCEPTANCES.md`](../../CLA-ACCEPTANCES.md) says `Legal review: waived`. Nobody should treat this text as legal advice or as a guarantee that a court would enforce every term as written. It takes effect only while that record says `in-force` and the text matches its recorded SHA-256. Questions a lawyer would likely examine are listed under "Known legal risks" at the end. How acceptance works: [CLA acceptance](cla-acceptance.md).
 
 ## 1. Parties and definitions
 
@@ -33,7 +33,7 @@ Public visibility of the repository is not a licence to anyone else.
 
 Effective for each Covered Contribution on Submission, you grant the Owner and every Recipient a perpetual, worldwide, non-exclusive, royalty-free, fully paid-up, irrevocable (subject to section 10 and this section) licence under **every patent claim you own or have the right to license, now or later, that is necessarily infringed by** (a) the Covered Contribution alone, or (b) the Covered Contribution in combination with the Project, or with modifications of the Project, as the Contribution was Submitted or later developed, to make, have made, use, sell, offer to sell, import and otherwise transfer the Covered Contribution and works that include it. It does not extend to claims infringed only by combining the Contribution with something that is not part of the Project.
 
-**Defensive termination (scoped).** If an entity (a "Challenger") brings patent litigation, including a cross-claim or counterclaim, alleging that the Project, or a Covered Contribution as included in the Project, infringes a patent, then **the patent licences that you grant to that Challenger under this section** end on the date the litigation is filed, as to that Challenger only. It does not end the Owner's licence, any other Recipient's licence, or the licences you grant in section 3. **[COUNSEL: confirm the Challenger scope, whether affiliates of the Challenger are covered, and the interaction with the Owner's own claims.]**
+**Defensive termination (scoped).** If an entity (a "Challenger") brings patent litigation, including a cross-claim or counterclaim, alleging that the Project, or a Covered Contribution as included in the Project, infringes a patent, then **the patent licences that you grant to that Challenger under this section** end on the date the litigation is filed, as to that Challenger only. It does not end the Owner's licence, any other Recipient's licence, or the licences you grant in section 3. A Challenger's affiliates are not covered unless they are themselves a party to the litigation.
 
 ## 5. What you confirm
 
@@ -51,12 +51,12 @@ Tell the Owner promptly if any confirmation stops being true.
 ## 6. Who may contribute
 
 * **Individuals** may contribute in their own right.
-* **Employees and others with a third-party claim** may contribute only with the authorization the employer or third party requires. Where an entity owns or may own the Contribution, the Owner may require a **separate corporate agreement or equivalent written authorization** before accepting it, and may hold your contributions until it is recorded. **[COUNSEL: the corporate CLA does not exist yet and must be supplied.]**
+* **Employees and others with a third-party claim** may contribute only with the authorization the employer or third party requires. Where an entity owns or may own the Contribution, the Owner may require a **separate corporate agreement or equivalent written authorization** before accepting it, and may hold your contributions until it is recorded. No standard corporate agreement exists yet; the Owner may approve a written authorization from the employer case by case, and until one is recorded the Owner will not merge that Contribution.
 * **Minors** are not accepted by default. A Contribution from someone under 18 needs separate legal review and the Owner's express written approval, recorded as an exception.
 
 ## 7. No warranty, no obligation, moral rights
 
-To the maximum extent the law allows, you provide Contributions **"as is"**, without warranty of any kind, except for your confirmations in section 5. The Owner is not required to use, merge, credit or support any Contribution. To the extent the law allows, you waive, or agree not to assert, moral rights in your Contributions against the Owner and Recipients; where a waiver is not permitted, you grant the rights the Owner needs to use them as this agreement describes. **[COUNSEL: confirm the limitation of warranty and moral-rights wording for the Owner's and Contributors' jurisdictions.]**
+To the maximum extent the law allows, you provide Contributions **"as is"**, without warranty of any kind, except for your confirmations in section 5. The Owner is not required to use, merge, credit or support any Contribution. To the extent the law allows, you waive, or agree not to assert, moral rights in your Contributions against the Owner and Recipients; where a waiver is not permitted, you grant the rights the Owner needs to use them as this agreement describes.
 
 ## 8. How you accept
 
@@ -67,9 +67,6 @@ I have read the ViharBot Contributor License Agreement, legal-terms version <VER
 ```
 
 Your comment is a **request**. The Owner verifies that it is the unedited exact statement written by your own account, preserves the evidence privately, and records your numeric GitHub ID, your username at the time and this version in the public acceptance record through a merged, founder-approved change. **You are covered only once that record is merged into `main`.** Editing or deleting your comment afterwards does not undo a recorded Acceptance; the Owner's private snapshot of what was verified governs. If you want to stop contributing, use section 10, not deletion.
-
-**[COUNSEL: confirm that an exact-text GitHub comment, verified and recorded this way, is sufficient evidence of agreement in the Owner's and Contributors' jurisdictions.]**
-
 ## 9. Versions
 
 * A **material change** is any change to the rights granted, the confirmations, who may contribute, withdrawal, assignment, governing law or venue, or anything else affecting rights or obligations. It gets a new legal-terms version (for example 1.0 to 2.0) and **requires renewed Acceptance** before you Submit further Contributions.
@@ -86,7 +83,7 @@ Sections 2 to 5, 7, 10 and 12 to 15 survive withdrawal and any end of your parti
 
 ## 12. Notices
 
-Notice to the Owner: by the contact route on the Owner's GitHub profile, or by an issue titled "CLA notice" that contains no confidential information; legal notices to the address recorded in the repository's contribution policy. **[COUNSEL/FOUNDER: supply a legal notice address; none is published yet.]** Notice to you: by a comment mentioning your GitHub account, or by any contact route you have made public. Notices are effective when recorded or delivered.
+Notice to the Owner: by the contact route on the Owner's GitHub profile (`https://github.com/vchokshi`), or by an issue titled "CLA notice" in the repository that contains no confidential information. No separate postal or email address is published; the Owner may add one by notice in the repository. Notice to you: by a comment mentioning your GitHub account, or by any contact route you have made public. Notices are effective when the Owner records them or when delivered, whichever is earlier.
 
 ## 13. Assignment and succession
 
@@ -94,17 +91,18 @@ The Owner may transfer, assign or license all or any part of its rights and obli
 
 ## 14. Governing law and venue
 
-This agreement is governed by the laws of the **State of Arizona**, without regard to conflict-of-laws rules. The exclusive venue for a dispute is the state courts located in **Maricopa County, Arizona**, and the United States District Court for the District of Arizona sitting in Phoenix, and you and the Owner consent to their jurisdiction, **in each case subject to any mandatory rule of law that gives a party another forum or right.** **[COUNSEL: confirm the venue wording, any jury or dispute-resolution terms, and consumer or minor-protection overrides.]**
+This agreement is governed by the laws of the **State of Arizona**, without regard to conflict-of-laws rules. The exclusive venue for a dispute is the state courts located in **Maricopa County, Arizona**, and the United States District Court for the District of Arizona sitting in Phoenix, and you and the Owner consent to their jurisdiction, **in each case subject to any mandatory rule of law that gives a party another forum or right.**
 
 ## 15. General
 
-If any part of this agreement is held unenforceable, the rest remains in effect and the part is limited to the minimum extent needed. This agreement, together with any corporate agreement or written authorization under section 6 and any written approval under section 10, is the entire agreement on its subject and replaces earlier understandings about your Contributions to the Project. It may be changed only by a new version under section 9 or in a writing signed by the Owner and you. A failure to enforce a term is not a waiver. You agree that records kept by the Owner in electronic form are evidence of your Acceptance. **[COUNSEL: confirm these general provisions.]**
+If any part of this agreement is held unenforceable, the rest remains in effect and the part is limited to the minimum extent needed. This agreement, together with any corporate agreement or written authorization under section 6 and any written approval under section 10, is the entire agreement on its subject and replaces earlier understandings about your Contributions to the Project. It may be changed only by a new version under section 9 or in a writing signed by the Owner and you. A failure to enforce a term is not a waiver. You agree that records kept by the Owner in electronic form are evidence of your Acceptance.
 
-## Open items for counsel
+## Known legal risks
 
-* Sufficiency of acceptance by verified GitHub comment; electronic-records clause.
-* Patent grant breadth and the defensive-termination scope (section 4).
-* The corporate agreement and employer-authorization form (section 6); the approval process for minors.
-* Governing law, venue and mandatory-law carve-outs (section 14); notice address (section 12).
-* Whether Arizona's rules on assignment, minors and limitation of warranty require changes.
-* Data protection and retention for the acceptance record and the private evidence ([private evidence architecture](cla-private-evidence.md)).
+These are questions a lawyer would likely examine. They are recorded so nobody mistakes the absence of review for the absence of risk.
+
+* Whether an exact-text GitHub comment, verified and recorded as section 8 describes, is sufficient evidence of agreement in every Contributor's jurisdiction.
+* How far the patent grant and the defensive termination (section 4) hold, and whether they should be narrower or broader.
+* That there is no standard corporate agreement or employer-authorization form (section 6), and that approving minors case by case is untested.
+* Whether Arizona's rules on assignment, minors, limitation of warranty and moral rights require changes (sections 7, 13 and 14), and whether the venue clause survives mandatory consumer or local law.
+* Data protection and retention for the acceptance record and the [private evidence](cla-private-evidence.md); no retention period has been set by counsel.

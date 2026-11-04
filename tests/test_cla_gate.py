@@ -429,6 +429,60 @@ def test_bots_need_an_exception_and_it_must_be_authorized_by_the_founder():
     assert not result.ok and "not authorized by the founder" in errors_text(result)
 
 
+AI_TRAILER = "Fix\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+
+
+def attribution_row(scope="email:noreply@anthropic.com", expires="none", authorizer="founder"):
+    return exc_row("EX-003", (0, "-"), "attribution", scope, authorizer=authorizer,
+                   reason="Tool attribution trailer, not a person who can accept", expires=expires)
+
+
+def test_attribution_exception_excuses_only_the_named_co_author_trailer():
+    exc = exceptions(exc_row(), attribution_row())
+    founder_commit = commit(FOUNDER, message=AI_TRAILER)
+    assert judge(author=FOUNDER, commits=[founder_commit], exc=exc).ok
+    logged = judge(author=FOUNDER, commits=[founder_commit], exc=exc).exemptions
+    assert any("EX-003" in line and "attribution" in line for line in logged)
+    assert not judge(author=FOUNDER, commits=[founder_commit]).ok  # without the exception the trailer fails
+    other = commit(FOUNDER, message="Fix\n\nCo-authored-by: X <someone@anthropic.com>")
+    assert not judge(author=FOUNDER, commits=[other], exc=exc).ok  # a different address is not covered
+    shouting = commit(FOUNDER, message="Fix\n\nCO-AUTHORED-BY: Claude <NOREPLY@ANTHROPIC.COM>")
+    assert judge(author=FOUNDER, commits=[shouting], exc=exc).ok  # the address is matched case-insensitively
+
+
+def test_attribution_exception_cannot_excuse_an_unlinked_commit_author_or_committer():
+    exc = exceptions(exc_row(), attribution_row())
+    unlinked_author = commit(None, message=AI_TRAILER)
+    result = judge(author=FOUNDER, commits=[unlinked_author], exc=exc)
+    assert not result.ok and "unlinked commit author" in errors_text(result)
+
+
+def test_attribution_exception_must_be_unexpired_and_founder_authorized():
+    for bad in (attribution_row(expires="2026-11-09"), attribution_row(authorizer="mallory")):
+        result = judge(author=FOUNDER, commits=[commit(FOUNDER, message=AI_TRAILER)], exc=exceptions(exc_row(), bad))
+        assert not result.ok, bad
+
+
+@pytest.mark.parametrize("bad", [
+    exc_row("EX-003", (5, "-"), "attribution", "email:a@b.example", reason="Tool attribution, not a person"),
+    exc_row("EX-003", (0, "x"), "attribution", "email:a@b.example", reason="Tool attribution, not a person"),
+    exc_row("EX-003", (0, "-"), "attribution", "commits", reason="Tool attribution, not a person"),
+    exc_row("EX-003", (0, "-"), "attribution", "email:not-an-address", reason="Tool attribution, not a person"),
+    exc_row("EX-003", (0, "-"), "attribution", "email:a@b.example", reason="Tool attribution, not a person",
+            expires="someday"),
+])
+def test_malformed_attribution_exceptions_are_rejected(bad):
+    assert cla.parse_exceptions(exceptions(bad))[1]
+
+
+def test_unlinked_commit_email_fails_even_for_a_founder_authored_pull_request():
+    # The machine-default email is not linked to a GitHub account, so authorship cannot be checked.
+    result = judge(author=FOUNDER, commits=[commit(None, email="vihar@host.local")])
+    assert not result.ok and "unlinked commit author" in errors_text(result)
+    linked = commit(None, email="1+founder@users.noreply.github.com")  # noreply address carries the ID
+    assert judge(author=FOUNDER, commits=[linked]).ok
+
+
 def test_exemptions_are_logged_with_reason_authorizer_and_scope():
     result = judge(author=DEPENDABOT, commits=[commit(DEPENDABOT)])
     report = cla.render(result)
@@ -805,8 +859,9 @@ def test_shipped_record_and_exceptions_are_valid_and_consistent_with_the_agreeme
     if terms.in_force:  # activation must come with every prerequisite and the frozen hash
         assert terms.gaps() == [] and cla.sha256_text(agreement) == terms.sha
     rules_, rule_errors = cla.parse_exceptions(shipped("CLA-EXCEPTIONS.md"))
-    assert rule_errors == [] and {r.username for r in rules_} == {"dependabot[bot]", "web-flow"}
+    assert rule_errors == [] and {r.username for r in rules_} == {"dependabot[bot]", "web-flow", "-"}
     assert all(r.authorizer == "vchokshi" for r in rules_)
+    assert [r.scope for r in rules_ if r.kind == "attribution"] == ["email:noreply@anthropic.com"]
 
 
 def test_shipped_agreement_states_the_decisions():
@@ -815,24 +870,38 @@ def test_shipped_agreement_states_the_decisions():
     assert template == cla.statement("<VERSION>")
     for needle in ("Vihar Chokshi, an individual", "State of Arizona", "Maricopa County", "at least 18",
                    "Nothing in this agreement assigns", "Successor", "irrevocable", "renewed Acceptance",
-                   "Editorial revision", "Withdrawal is prospective only", "not counsel-approved"):
+                   "Editorial revision", "Withdrawal is prospective only", "Not reviewed by counsel",
+                   "No lawyer has reviewed it"):
         assert needle in text, needle
-    assert "counsel-reviewed" not in text.replace("not counsel-reviewed", "").replace("described as counsel-reviewed", "")
+    assert "[COUNSEL" not in text and "DECISION:" not in text  # no unresolved blanks in a frozen text
+    assert "counsel-approved" not in text.replace("Not reviewed by counsel", "")
 
 
-def test_shipped_state_is_draft_so_an_external_pull_request_fails_and_the_founder_passes():
+def test_shipped_state_refuses_an_unaccepted_external_pull_request_and_admits_the_founder():
     files = cla.Files(shipped("CLA-ACCEPTANCES.md"), shipped("CLA-EXCEPTIONS.md"), shipped("CONTRIBUTORS.md"),
                       shipped(cla.AGREEMENT_PATH))
     terms = cla.parse_record(files.base_record)[0]
     external = cla.evaluate(files, make_pr(BOB), lambda x: None, TODAY)
+    assert not external.ok  # draft: "none is in force"; in force: "no recorded acceptance"
+    assert "none is in force" in errors_text(external) or "no recorded acceptance" in errors_text(external)
     founders, _ = cla.founders_from(files.base_registry)
     founder = next(iter(founders.items()))
-    own = cla.evaluate(files, make_pr(founder), lambda x: None, TODAY)
-    if not terms.in_force:
-        assert not external.ok and "none is in force" in errors_text(external)
-    assert own.ok
-    bot = cla.evaluate(files, make_pr(DEPENDABOT), lambda x: None, TODAY)
-    assert bot.ok
+    assert cla.evaluate(files, make_pr(founder), lambda x: None, TODAY).ok
+    assert cla.evaluate(files, make_pr(DEPENDABOT), lambda x: None, TODAY).ok
+    report = cla.render(cla.evaluate(files, make_pr(BOB), lambda x: None, TODAY))
+    assert ("not been reviewed by counsel" in report) == terms.review_waived
+
+
+def test_waived_legal_review_is_allowed_only_explicitly_and_is_always_disclosed():
+    waived = record(status="in-force", sha=cla.sha256_text(AGREEMENT), review="waived: founder decision, risk accepted",
+                    approval="approved: founder", storage="verified: ok", ruleset="verified: ok")
+    terms, _, errors = cla.parse_record(waived)
+    assert errors == [] and terms.review_waived and terms.gaps() == []
+    assert "not been reviewed by counsel" in cla.render(judge(rec=waived))
+    assert "not been reviewed by counsel" not in cla.render(judge(rec=IN_FORCE))
+    for bad in ("waived", "waived:", "skipped: yes", "pending"):
+        text = waived.replace("waived: founder decision, risk accepted", bad)
+        assert cla.parse_record(text)[2], bad  # bare or unknown values are invalid, pending blocks in-force
 
 
 # ---- workflow, ruleset and ownership guardrails -----------------------------------------------

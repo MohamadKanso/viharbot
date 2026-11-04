@@ -1,63 +1,64 @@
-# CLA activation checklist
+# CLA activation record
 
-The ordered steps that take the contribution agreement from draft to `in-force`, what is done, what is blocked and why, and how to back out. **Nothing is activated.** The record says `draft`, and the `in-force` status is rejected by the check unless every prerequisite line in it is recorded as complete. Do not set it early. This checklist is the founder's; no tool completes legal review or private storage for you.
+What was done to activate the contribution agreement, what was verified and how, what was not, and how to back out. Written 2026-11-04. The record file, not this document, is what the check reads; this explains it.
 
-## Live repository settings (read-only, 2026-11-04)
+## Decisions taken by the founder
 
-Read with `gh api repos/vchokshi/viharbot/rules/branches/main`. Re-run `cla_gate.py activation-check` for the current state.
+* **Legal review is waived.** The founder approved the agreement alone. No lawyer has reviewed it. The record says `Legal review: waived`, the agreement says "Not reviewed by counsel", and every check report repeats it. "Known legal risks" at the end of the agreement lists what a lawyer would likely examine.
+* The agreement text was frozen at legal-terms version 1.0, editorial revision 1, SHA-256 `8e49e4e6632529764659cec94877c7fbb7631114e4a448c8c5473b49ebac9396` (`cla_gate.py hash-agreement`). The check rejects the record if the text no longer matches.
+* The status in the record is `in-force`, set in this pull request. **It takes effect when the pull request is merged**, because the check reads the record from `main`.
 
-* Two active rulesets apply to `main`: **"Ruleset"** (id 26066523) and **`protect-main`** (id 26490874). Together they block deletion and force-push, require a pull request with one approval, and **"Ruleset" requires code-owner review** and a set of checks pinned to the Actions app.
-* **`CLA acceptance` is not a required check on GitHub.** `protect-main` requires `CI result`, `Contributor registry` and `Dependency review` only. The checked-in `protect-main.json` now lists `CLA acceptance` (pinned to the Actions app, id 15368), but **a file in the repository enables nothing.** It must be applied in Settings > Rules and then verified live.
+## Prerequisites and how each was verified
 
-## Sequence
+| Prerequisite | Result | How it was verified, and the limits |
+|---|---|---|
+| Final text, frozen | Done | Hash recorded; any later edit must raise the version or revision (the check enforces it) |
+| Legal review | **Waived** | Founder's decision; not a verification of the text |
+| Founder approval | Done | The founder's instruction on 2026-11-04 |
+| Private evidence store | **Done, with listed gaps** | Private repository `vchokshi/viharbot-cla-evidence`, read through the API: private, one collaborator (the founder), Actions disabled, no webhooks, no deploy keys, no pending invitations, issues and wiki off. An append-only ruleset (id 26567016: no deletion, no force-push) is live on its `main`; **its rejection of a force-push was not tested** (the test was blocked), so it is confirmed by reading the rules only. Forking cannot be switched off for a personal private repository; only people with access can fork it, and only the founder has access. An encrypted archive was created and restored into scratch space, and the restored tree is byte-identical (`diff -r`). **Gaps:** the archive and its key (`~/.viharbot/`) are on one machine, so there is no offsite or offline second copy yet, and a restore test of a store holding real evidence cannot happen until the first acceptance exists |
+| Required ruleset | Done (live) | `protect-main` (ruleset 26490874) was updated through the API to require `CLA acceptance` pinned to the GitHub Actions app, and code-owner review. `cla_gate.py activation-check --repo vchokshi/viharbot` then read the **live** rules and passed every automated line. A second, older ruleset ("Ruleset", id 26066523) already applies and is unchanged |
+| Negative test on real data | Done (offline) | The gate was run against the real pull request #179 using the live GitHub API and the post-merge files. It failed #179 as intended and resolved the author to account 91088196 |
+| Negative test through GitHub's merge protection | **Not done** | The workflow runs from the base branch and does not exist on `main` until this pull request is merged. A throwaway sandbox repository for a real Actions run was not created (blocked). **The workflow has never run on GitHub Actions.** The first real run is the first pull request after merge |
 
-| # | Step | Status | Who / how |
-|---|---|---|---|
-| 1 | Complete the final legal text | **Drafted, not final.** Open items are marked `[COUNSEL]` in the agreement | Founder and counsel |
-| 2 | Documented legal review and founder approval | **Blocked: not done** | Counsel's written review recorded as `Legal review: complete: <reference>`; founder as `Founder approval: approved: <reference>` |
-| 3 | Freeze and identify the initial binding version | Blocked by 1-2 | Run `cla_gate.py hash-agreement`; record `CLA text SHA-256`, the legal-terms version and editorial revision. Any later text change must follow the version rules |
-| 4 | Configure private evidence storage and verify access controls | **Blocked: not created** | [Private evidence architecture](cla-private-evidence.md); then `Private evidence storage: verified: <ref>` |
-| 5 | Publish the agreement and acceptance instructions | Written (this PR) | Merge of this PR publishes them; they say the agreement is not yet in force |
-| 6 | Test the acceptance workflow against the frozen agreement | Offline tests pass. **Live test blocked** until step 3 and the workflow is on `main` | Use a test account: post the statement, run `verify-comment` and `audit` into the real store, merge a record row, confirm the check passes |
-| 7 | Enable and verify the required ruleset and check | **Blocked: see "Circularity" below** | Settings > Rules: add `CLA acceptance`, source GitHub Actions; run `activation-check`; record `Required ruleset: verified: <ref>` |
-| 8 | Verify it fails closed for an unaccepted external contribution | **Blocked** until the workflow exists on `main` | Open a pull request from an unaccepted account; confirm `CLA acceptance` fails and the merge button is blocked |
-| 9 | Set the status to `in-force` | **Not done** | One founder-approved change setting `CLA status: in-force` once every prerequisite line is complete (the check rejects it otherwise) |
-| 10 | Merge pull request #181 | **Not done; do not merge before steps 1-9 unless you choose the two-phase path below** | Founder |
+## What this means for pull requests right now
 
-## Circularity, and a decision for the founder
-
-Steps 6-8 need the `CLA acceptance` workflow to be running on pull requests. A `pull_request_target` workflow runs from the **base branch**, so it does not exist until #181 (or something containing it) is merged. Requiring the check first would leave every pull request, including #181, waiting for a check that cannot report. The assignment's sequence therefore cannot be completed in the stated order.
-
-**Recommended (needs founder approval): two phases.**
-
-1. **Phase 1, merge #181 with `CLA status: draft`.** That is safe and already the policy: in draft the check fails every non-exempt contributor. Nothing is activated; the workflow, record and docs go live.
-2. **Verify live** (steps 6-8) using the now-running workflow and test accounts, add the required check, and run `activation-check`.
-3. **Phase 2: a small activation pull request** records the legal review, approval, frozen hash, storage and ruleset lines and sets `in-force` (step 9).
-
-**As specified (#181 flips to `in-force` itself):** possible only if steps 6-8 are completed some other way first, for example in a private test repository carrying the same workflow, which proves the code but **not** this repository's live protections. The founder's admin bypass could also merge #181 past a required check that cannot yet report; that is exactly the bypass the docs say not to rely on. This conflicts with "verify before activating" and needs your explicit choice.
+* **Every open and new pull request now waits for `CLA acceptance`, including this one.** The check cannot report on a pull request until the workflow is on `main`. Merging this pull request therefore needs the founder's admin bypass ("merge without waiting for requirements", ruleset bypass mode `pull_request`). That is the intended use of the bypass here and should not be used for external code.
+* **Commit identity.** The check resolves every commit author, committer and co-author to a numeric GitHub ID and fails closed on any it cannot. Commits made on this machine carry the machine-default email `vihar.chokshi@vihar.chokshi-L9KP6LY7M7`, which GitHub does not link to an account, so their author is unresolved. This affects #181 and #184 (checked against the real API). Fix it for future work with `git config --global user.email 8943966+vchokshi@users.noreply.github.com`. Existing commits keep the old email unless their authorship is rewritten, which was not done. After the merge, #184 will fail the check until its commits are fixed or the founder merges with the bypass.
+* **AI attribution.** `Co-Authored-By: ... <noreply@anthropic.com>` trailers are excused by logged exception EX-003, which matches that exact address in co-author trailers only.
 
 ## Readiness commands
 
 ```bash
-python3 .github/scripts/cla_gate.py hash-agreement                       # the value for CLA text SHA-256
+python3 .github/scripts/cla_gate.py hash-agreement
 python3 .github/scripts/cla_gate.py activation-check --repo vchokshi/viharbot
-python3 .github/scripts/cla_gate.py audit --repo vchokshi/viharbot --evidence-dir /path/to/restored/store
+python3 .github/scripts/cla_gate.py audit --repo vchokshi/viharbot --evidence-dir <path>/viharbot-cla-evidence/evidence
 ```
 
-`activation-check` reads the live rules (and needs no secret for a public repository). It checks that `CLA acceptance` is a required check pinned to the Actions app, that a pull request with approval and code-owner review is required, that deletion and force-push are blocked, and that the record's prerequisites are recorded. It lists legal review, private storage, a real negative test and the bypass decision as **MANUAL**, and exits non-zero until the automated ones pass. **A passing run is not proof that protection is live for every pull request; the negative test in step 8 is.**
+`activation-check` reads the live rules. A passing run is not proof that protection holds for every pull request; only a pull request from an unaccepted account being blocked is.
 
-## Migration
+## After the merge: verify live (do this first)
 
-* Existing open external pull requests (for example #179) are unaffected until the check is required. Once it runs, they fail while the status is `draft`. After activation, each contributor posts the statement and the founder records it (see [CLA acceptance](cla-acceptance.md)); re-run the check.
-* A pull request opened before a contributor withdraws is admitted only by a one-pull-request exception.
-* The initial exceptions (`dependabot[bot]`, `web-flow`) are proposed in this PR; the merge is the founder's approval of them.
+1. Open any pull request and confirm a check named `CLA acceptance` appears and reports. If it is missing or errors, **use the rollback below immediately**: a required check that cannot report blocks every pull request.
+2. From an account that has not accepted, open a pull request and confirm it fails and cannot merge.
+3. Ask a contributor (for example the author of #179) to post the acceptance statement, then record it ([CLA acceptance](cla-acceptance.md)), and confirm the check passes for them.
 
 ## Rollback
 
-Choose by what went wrong.
+* **The check blocks legitimate work or cannot report:** remove `CLA acceptance` from the required checks. The pre-change ruleset is saved at `~/.viharbot/ruleset-rollback/protect-main.before.json`, with a ready payload `protect-main.rollback-payload.json`:
 
-* **The check wrongly blocks legitimate work** (outage, bug, mistaken record): remove `CLA acceptance` from the required checks in Settings > Rules (this unblocks immediately and is reversible), fix the cause, re-add. For one stuck pull request, add a one-pull-request exception instead. Do not edit the workflow from a pull request; only the founder changes it.
-* **The check wrongly lets something through** (a bug found after activation): set `CLA status: draft` in a founder pull request. Draft fails every non-exempt contributor, which is the safe direction, and then fix and test before reactivating. Review what merged in the window using the check's logs.
-* **A wrongly recorded acceptance:** do not delete the row. Set it to `withdrawn` (or `hold-corporate`/`hold-minor` for eligibility problems) and add a new correcting evidence file in the private store.
-* **The whole change should be undone:** revert #181. That removes the workflow, record, exceptions and docs; the ruleset change in GitHub must be reverted by hand, and the history of any recorded acceptances and the private store are kept.
-* **If the private store is lost:** see its recovery section; hold affected contributors until restored.
+  ```bash
+  gh api -X PUT repos/vchokshi/viharbot/rulesets/26490874 --input ~/.viharbot/ruleset-rollback/protect-main.rollback-payload.json
+  ```
+
+  This also restores the earlier code-owner setting. For one stuck pull request, add a one-pull-request exception instead.
+* **The check wrongly lets something through:** set `CLA status: draft` in a founder pull request. Draft fails every non-exempt contributor. Fix, test, then reactivate. Review what merged in the window.
+* **A wrongly recorded acceptance:** never delete the row. Set it to `withdrawn` (or `hold-corporate` or `hold-minor`) and add a correcting file to the private store.
+* **Undo the whole change:** revert this pull request and restore the ruleset as above. The private store and any recorded acceptances are kept.
+* **The private store is lost:** restore the newest archive (`openssl enc -d -aes-256-cbc -pbkdf2 -pass file:<key> -in <archive> | tar -xz`), run `audit`, and hold affected contributors until it passes.
+
+## Still open
+
+* Counsel has not reviewed the agreement (waived, not resolved).
+* An offsite or offline second backup copy, and key custody beyond this machine.
+* The force-push protection on the evidence store has not been exercised.
+* The workflow's first real GitHub Actions run, and the live negative test.

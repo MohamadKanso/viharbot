@@ -1,12 +1,12 @@
 # CLA acceptance
 
-How contributors accept the [Contributor License Agreement](contributor-license-agreement.md), how that acceptance is recorded and audited, and how the `CLA acceptance` check gates merges. Read "What is enforced" first. **The agreement is a draft and nothing here is active.** Activation steps and blockers are in the [activation checklist](cla-activation.md); where evidence is kept is in [private evidence architecture](cla-private-evidence.md).
+How contributors accept the [Contributor License Agreement](contributor-license-agreement.md), how that acceptance is recorded and audited, and how the `CLA acceptance` check gates merges. Read "What is enforced" first. **The record says `in-force`, which takes effect when the pull request that sets it is merged to `main`. The agreement has not been reviewed by a lawyer; the founder waived legal review.** What was verified before activation, and what was not, is in the [activation record](cla-activation.md); where evidence is kept is in [private evidence architecture](cla-private-evidence.md).
 
 ## What is enforced
 
 | Thing | Enforced by | State |
 |---|---|---|
-| No merge of external code without a recorded acceptance | The `CLA acceptance` check, **once GitHub requires it** | Written and tested offline. **Not required on GitHub today** (see the checklist for the live settings) |
+| No merge of external code without a recorded acceptance | The `CLA acceptance` check, required by the live `protect-main` ruleset (applied 2026-11-04) | The ruleset is live. **The workflow has never run on GitHub Actions**: it is not on `main` until the merge |
 | Only the founder changes the agreement, record, exceptions or enforcement | The check fails a non-founder who touches a protected file; `CODEOWNERS` plus required code-owner review | Check: yes. Code-owner review: required by one live ruleset, and set in `protect-main.json` |
 | Acceptances are never deleted or rewritten | The check rejects any change that removes a row or edits an immutable column, even from the founder | Yes, in the check |
 | The agreement's legal sufficiency | Counsel | **Not done.** Nothing here is legal advice |
@@ -75,6 +75,10 @@ Everything else fails, including: no acceptance, an older version after a materi
 
 Identity is by numeric ID. A renamed account keeps its acceptance, and the report notes the change.
 
+**Commit identity.** Commit with an email linked to your GitHub account; GitHub's noreply address (`<id>+<login>@users.noreply.github.com`) works. A commit whose author GitHub cannot link to an account is unresolved and fails the check, for everyone including the founder. The one narrow exception is a logged `attribution` row in `CLA-EXCEPTIONS.md` for an exact `Co-authored-by` trailer address that is a tool's attribution rather than a person (currently `noreply@anthropic.com`); it never excuses a commit author or committer.
+
+**Waived legal review.** The record may say `Legal review: waived: <reason>` only as an explicit founder decision. Every check report then states that the agreement has not been reviewed by counsel.
+
 ## API handling
 
 The check reads the pull request's commits and files with the read-only token. It paginates, retries transient errors (5xx, network) with backoff, waits at most 60 seconds for a rate limit and otherwise fails with "re-run", and **fails closed on any GitHub error**. It also fails a pull request it cannot read in full: over 250 commits or 3000 files (GitHub's listing limits), or a list shorter than the count GitHub reports. Re-running fixes transient failures; splitting fixes large pull requests.
@@ -97,7 +101,7 @@ Only the founder may change: the record, the exceptions, the agreement, the thre
 
 ## Known limitations
 
-* **Nothing is live.** The check has run only offline against fixtures. GitHub's live protection is verified by `activation-check` and by a real negative test, not by these tests.
+* **The workflow has not run on GitHub yet.** The logic has run offline against fixtures and against real pull requests #179, #181 and #184 through the live API, but the workflow file itself first runs on the first pull request after the merge. The ruleset was verified live with `activation-check`; the end-to-end block of an unaccepted pull request still needs its first real test (see the [activation record](cla-activation.md)).
 * The check trusts the founder-approved public record and cannot read the private store; `audit` is how the two are compared, and only when the founder runs it.
 * Authorship evidence is what GitHub reports: commit authors, committers and noreply trailers. A contributor can be omitted by copying code without attribution; the contributor's section 5 confirmations and review are the safeguard.
 * Material-versus-editorial classification is a human judgement (above).

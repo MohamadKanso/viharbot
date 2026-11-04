@@ -100,6 +100,7 @@ NOREPLY_ID = re.compile(r"^([0-9]+)\+([A-Za-z0-9-]+(?:\[bot\])?)@users\.noreply\
 NOREPLY_LOGIN = re.compile(r"^([A-Za-z0-9-]+)@users\.noreply\.github\.com$")
 TRAILER = re.compile(r"(?im)^co-authored-by:[ \t]*.*?<([^<>\s]+)>[ \t]*$")
 SHA = re.compile(r"^[0-9a-f]{7,40}$")
+ATTRIBUTION_SCOPE = re.compile(r"^email:[^\s<>@|]+@[^\s<>@|]+$")
 HEADER_VERSION = re.compile(r"\*\*Legal-terms version: ([0-9]+\.[0-9]+)\*\*")
 HEADER_REVISION = re.compile(r"\*\*Editorial revision: ([0-9]+)\*\*")
 
@@ -108,7 +109,7 @@ STATUS_FIELDS = {
     "CLA legal-terms version": r"[0-9]+\.[0-9]+",
     "CLA editorial revision": r"[0-9]+",
     "CLA text SHA-256": r"unfrozen|[0-9a-f]{64}",
-    "Legal review": r"pending|complete: \S.{0,200}",
+    "Legal review": r"pending|complete: \S.{0,200}|waived: \S.{0,200}",
     "Founder approval": r"pending|approved: \S.{0,200}",
     "Private evidence storage": r"not-verified|verified: \S.{0,200}",
     "Required ruleset": r"not-verified|verified: \S.{0,200}",
@@ -187,14 +188,18 @@ class Terms:
         if not self.frozen:
             gaps.append("the agreement text is not frozen (CLA text SHA-256)")
         for name, value, done in (
-            ("legal review", self.review, "complete"),
-            ("founder approval", self.approval, "approved"),
-            ("private evidence storage", self.storage, "verified"),
-            ("required ruleset", self.ruleset, "verified"),
+            ("legal review", self.review, ("complete", "waived")),
+            ("founder approval", self.approval, ("approved",)),
+            ("private evidence storage", self.storage, ("verified",)),
+            ("required ruleset", self.ruleset, ("verified",)),
         ):
-            if not value.startswith(done):
+            if not value.startswith(tuple(f"{d}:" for d in done)):
                 gaps.append(f"{name} is {value}")
         return gaps
+
+    @property
+    def review_waived(self) -> bool:
+        return self.review.startswith("waived:")
 
 
 @dataclass(frozen=True)
@@ -403,12 +408,18 @@ def parse_exceptions(text: str) -> tuple[list[Exemption], list[str]]:
         problems = []
         if not EXCEPTION_ID.match(ex_id) or ex_id in seen_ids:
             problems.append("the exception ID must be a unique EX-<number>")
-        if not registry.ACCOUNT_ID.match(raw_id):
-            problems.append("the numeric ID must be a positive whole number")
-        if not registry.USERNAME.match(user.removesuffix("[bot]")):
-            problems.append("the username is not a valid GitHub login")
-        if kind not in {"automation", "approved-case"}:
-            problems.append("Kind must be `automation` or `approved-case`")
+        if kind == "attribution":
+            if raw_id != "0" or user != "-":
+                problems.append("an attribution exception has numeric ID `0` and username `-`")
+            if not ATTRIBUTION_SCOPE.match(scope):
+                problems.append("an attribution exception has scope `email:<address>` for one trailer address")
+        else:
+            if not registry.ACCOUNT_ID.match(raw_id):
+                problems.append("the numeric ID must be a positive whole number")
+            if not registry.USERNAME.match(user.removesuffix("[bot]")):
+                problems.append("the username is not a valid GitHub login")
+        if kind not in {"automation", "approved-case", "attribution"}:
+            problems.append("Kind must be `automation`, `approved-case` or `attribution`")
         if kind == "automation" and scope != "commits":
             problems.append("an automation exception has scope `commits`")
         if kind == "approved-case" and not re.fullmatch(r"pr:[1-9][0-9]*", scope):
@@ -419,8 +430,8 @@ def parse_exceptions(text: str) -> tuple[list[Exemption], list[str]]:
             problems.append("the authorizer must be a GitHub username")
         if not _real_date(approved):
             problems.append("'Approved on' must be a real date, YYYY-MM-DD")
-        if not (_real_date(expires) or (expires == "none" and kind == "automation")):
-            problems.append("an approved case needs a real expiry date (only automation may use `none`)")
+        if not (_real_date(expires) or (expires == "none" and kind in {"automation", "attribution"})):
+            problems.append("an approved case needs a real expiry date (only automation and attribution may use `none`)")
         if kind == "approved-case" and not REFERENCE.match(ref):
             problems.append("an approved case needs a GitHub issue or pull request URL as its reference")
         if problems:
@@ -439,6 +450,7 @@ class Person:
     kind: str = "User"
     source: str = "commit author"
     sha: str | None = None
+    email: str | None = None
 
     def label(self) -> str:
         if self.login and self.account_id is not None:
@@ -485,7 +497,7 @@ def attributions(pr: dict, resolve: Resolver) -> list[Person]:
                 people.append(Person(account_id, by_login.group(1) if account_id else None, "User",
                                      "co-author", sha))
             else:
-                people.append(Person(None, None, "User", "co-author", sha))
+                people.append(Person(None, None, "User", "co-author", sha, email.lower()))
     unique: dict[object, Person] = {}
     for index, person in enumerate(people):
         key = person.account_id if person.account_id is not None else (index, person.sha, person.source)
@@ -605,6 +617,14 @@ def judge_person(person: Person, pr: dict, terms: Terms, rows: list[Acceptance],
                  founder_names: set[str], today: datetime.date, result: Result) -> None:
     label = person.label()
     if person.account_id is None:
+        # The one thing an unresolved identity can be excused by: an exact co-author trailer
+        # address the founder has logged as tool attribution. Never a commit author or committer.
+        for rule in exemptions.get(0, []):
+            if (rule.kind == "attribution" and person.source == "co-author" and person.email
+                    and rule.scope == f"email:{person.email}" and rule.active(today)
+                    and rule.authorizer.lower() in founder_names):
+                result.exemptions.append(f"{label}: {rule.describe()}")
+                return
         result.errors.append(
             f"{label} cannot be matched to a GitHub account, so its acceptance cannot be checked. "
             "Link the commit email to your GitHub account, or remove the trailer."
@@ -666,6 +686,8 @@ def render(result: Result) -> str:
         lines.append(f"* Agreement on the protected base branch: `{t.status}`, legal-terms version "
                      f"`{t.legal}`, editorial revision `{t.editorial}`")
     lines += ["", "Passing means every contributor is covered. It is not a code review and not approval to merge."]
+    if result.terms and result.terms.review_waived:
+        lines += ["", "Note: the founder waived legal review. This agreement has not been reviewed by counsel."]
     for title, items in (("Covered", result.covered), ("Exemptions applied (audit log)", result.exemptions),
                          ("Notes", result.notices)):
         if items:
@@ -1013,7 +1035,7 @@ def activation_report(repo: str, branch: str, record_text: str | None, gh: GitHu
 
 
 MANUAL_ITEMS = (
-    "legal review of the agreement is complete and recorded",
+    "legal review is complete, or the founder has knowingly waived it and accepted the risk",
     "the private evidence store exists, access is verified, and a restore test passed",
     "a real pull request from an unaccepted account failed `CLA acceptance` and could not merge",
     "the founder's admin bypass is understood and will not be used for external code",
