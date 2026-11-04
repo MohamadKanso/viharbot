@@ -105,8 +105,44 @@ Not wired:
   upper-cased and an escape of an unreserved character is rejected. An empty query (`/x?`) is signed
   as no query because ASGI does not distinguish it. A space or a `#` in the target is rejected.
 - Plaintext HTTP on a private network is still an accepted interception risk (ADR-006, Transport).
-- **No body-size cap before authentication.** The request body is buffered before the assertion is
-  checked (the assertion binds a hash of the body, so it must be read first), and no body-size cap
-  exists before authentication. This is tracked in
-  https://github.com/vchokshi/viharbot/issues/101 and must be settled before authentication is
-  enabled on any service reachable beyond the private network. It is not implemented in this PR.
+- **Body-size cap (issue #101): covered in the application, proxy limits unverified.** The cap
+  below refuses an over-limit request to `/process` or `/invocations` with 413 before the assertion
+  is checked, so an unauthenticated caller cannot make the specialist buffer more than the limit
+  (plus one chunk). It applies only to those two POST routes and only when authentication is on;
+  `/health`, `/ping` and `/model` and the other services (Pixel, Sage, Research, Security) are not
+  covered. What remains an assumption: whatever proxy sits in front of each runtime may buffer or
+  cap bodies itself before the request reaches the app, and I have **not verified** the limits or
+  buffering behavior of DigitalOcean App Platform, Amazon Bedrock AgentCore Runtime or any
+  load balancer. Treat the in-app cap as the only guarantee and the proxy as unknown.
+
+## Request body size cap
+
+Code: `src/viharbot/body_limit.py` (pure ASGI middleware, installed by the specialist factory only
+when `VIHARBOT_SERVICE_AUTH` is on; nothing changes when it is off).
+
+- A request whose `Content-Length` exceeds the limit is answered `413` immediately, before the
+  assertion check and without reading any of the body.
+- Otherwise bytes are counted as the body streams (chunked or understated `Content-Length`); the
+  moment the total crosses the limit the service answers `413` and stops reading. A body of exactly
+  the limit passes.
+- The 413 body is the generic `{"detail": "request body too large"}`. The log line records the
+  agent, reason and limit only, never body, headers or token.
+- Setting: `VIHARBOT_MAX_BODY_BYTES`, an integer from 1024 to 16777216 (invalid values stop startup).
+  Default **262144 (256 KiB)**.
+
+Default rationale: the largest legitimate specialist request is the synthesis call, which carries
+the question (at most 6000 characters, so at most 24,000 bytes of UTF-8) plus the structured
+results of the other agents in `context` (research findings, security, fact-check, source-quality,
+privacy and Sage; the Sage analysis alone is bounded to roughly 40 KB by its field limits).
+The research findings and other results are not length-bounded by their schemas, so this is an
+estimate, not a proof; 256 KiB is several times the expected size and small enough to be cheap to
+buffer. Raise it per service if a real request is refused.
+
+Per runtime (same in-app limit everywhere; the proxy limits are unverified, see above):
+
+| Runtime | In-app limit | Proxy in front |
+| --- | --- | --- |
+| Local Docker Compose (dev) | `VIHARBOT_MAX_BODY_BYTES`, default 256 KiB | none |
+| DigitalOcean App Platform (Stage) | same | not verified |
+| AgentCore Runtime | same, on `/invocations` | not verified |
+| Fargate or other load balancer | same | not verified |
