@@ -287,16 +287,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.tests
+    # Offline and hermetic. Every value is a literal: nothing is interpolated from the shell or a
+    # developer's .env, so no LiteLLM key, token or model alias can reach this container, and the
+    # opt-in live checks cannot be switched on from here. The container has no network at run time
+    # (loopback only, which the streaming tests use); images are built, with network, beforehand.
+    # The opt-in live checks (billable) are run on the host with their variables set, not here.
     environment:
       MEMORY_DIR: /tmp/viharbot-test-memory
-      LITELLM_BASE_URL: ${LITELLM_BASE_URL:-https://litellm.viharchokshi.com}
-      LITELLM_API_KEY: ${LITELLM_API_KEY:-}
-      RESEARCH_MODEL: ${RESEARCH_MODEL:-}
-      SECURITY_MODEL: ${SECURITY_MODEL:-}
-      RUN_LITELLM_INTEGRATION: ${RUN_LITELLM_INTEGRATION:-0}
-      RUN_LITELLM_INFERENCE: ${RUN_LITELLM_INFERENCE:-0}
-    networks:
-      - agent-network
+      RUN_LITELLM_INTEGRATION: "0"
+      RUN_LITELLM_INFERENCE: "0"
+    network_mode: none
 
 networks:
   agent-network:
