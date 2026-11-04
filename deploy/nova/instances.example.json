@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "logical_agent": "nova",
+  "instances": [
+    {
+      "instance_id": "nova-agentcore-01",
+      "runtime_kind": "agentcore",
+      "priority": 0,
+      "arn": "arn:aws:bedrock-agentcore:us-east-1:000000000000:runtime/EXAMPLE_PLACEHOLDER_NOT_REAL",
+      "auth_type": "sigv4",
+      "region": "us-east-1",
+      "contract_version": "1",
+      "operation_classes": ["read_only"],
+      "budget_enforcement": "none"
+    },
+    {
+      "instance_id": "nova-fargate-01",
+      "runtime_kind": "fargate",
+      "priority": 1,
+      "endpoint": "https://nova-fargate.example.invalid",
+      "auth_type": "bearer",
+      "region": "us-east-1",
+      "contract_version": "1",
+      "operation_classes": ["read_only"],
+      "budget_enforcement": "none"
+    }
+  ]
+}
