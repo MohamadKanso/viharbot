@@ -43,10 +43,65 @@ A caller mints a token with `service_auth.mint_assertion(...)`, which loads the 
 time from a file path or `VIHARBOT_SIGNING_KEY` (PEM or base64url seed). Keys are never in source;
 inject them from the platform secret store.
 
+## Outbound assertions (A2b)
+
+**Status: implemented for plain HTTP calls through `demo.post_json`, off by default.** Code:
+`src/viharbot/outbound_auth.py`.
+
+**Issuer location:** option A is accepted; see "Issuer-key location" below. `AssertionIssuer` is a
+one-method interface and `InProcessIssuer` is its only implementation.
+
+Each call mints one token from the actual request: `mth` (POST), `tgt` (the URL's path and query as
+sent, canonicalized by `service_auth.canonical_target`), `req_sha256` (the exact body bytes),
+`aud` (the destination service name), `cap` (the capability that service's route requires),
+`exp` 30 s after `iat`, a fresh `jti`. It is sent in `X-Viharbot-Assertion`, never `Authorization`.
+
+Configuration (all unset means off; requests are byte-for-byte unchanged):
+
+- `VIHARBOT_OUTBOUND_AUTH=on`
+- `VIHARBOT_SIGNING_KID`: the `kid` the callee registry holds for this service.
+- `VIHARBOT_SERVICE_SUBJECT`: the `sub` (default `web`).
+- `VIHARBOT_SIGNING_KEY_FILE` (a path) or `VIHARBOT_SIGNING_KEY` (PEM or base64url seed), read on
+  every call and never logged.
+
+When on and the key is unreadable, the kid is missing, or signing fails, the call raises and nothing
+is sent (fail closed; no unauthenticated fallback).
+
+Wired: every `demo.post_json` call to `fact-check`, `source-quality`, `privacy-review` and
+`synthesis` (capability `specialist.process`), which covers the iterative and identity-execution
+paths because they use `post_json`.
+
+Not wired:
+
+- `research`, `security` and `pixel` via `post_json`: those services do not verify assertions yet and
+  define no route capability, so no token is minted for them.
+- `security_client.send_findings_to_security` (Research to Security) and `pixel_execution.fetch_deck`
+  (GET, no body): not wired. The Research process would need its own key and `sub` and Security has no
+  verifier yet.
+- AgentCore (`agentcore://`): untouched; the SigV4-plus-assertion carrier is separate work.
+- No Sage client exists in `src`; Sage is not called by the web tier.
+- Redirects: a signed request is sent through the no-redirect opener (`litellm_client.urlopen`), so the token is never forwarded to another origin; a redirecting callee surfaces as the 3xx `HTTPError`, and a loopback test with a real 302 asserts the target is never contacted. Unsigned calls keep the default behavior.
+- `eng` and `cls` are fixed placeholders (`unscoped`, `unclassified`); there is no `dlg` (A3).
+- No rotation tooling, no separate signer, no per-user identity.
+- ADR-006's text still recommends option B before any AWS deployment; a follow-up must update it (see below).
+
+### Issuer-key location (founder decision, 2026-11-03)
+
+Option A (ADR-006) is accepted: the web process holds the signing key and mints assertions. This is a
+lab. The same holds if the web service runs in AWS, where the key would be stored in AWS Secrets
+Manager and injected into the web service (not verified or provisioned here). Keys are separate per
+environment: a Stage key must never be accepted in production. Rotation is every 30 to 90 days with
+an overlap window, per ADR-006. The `AssertionIssuer` interface is kept so a separate signer
+(option B) can replace `InProcessIssuer` later.
+
+What this does not change: a secret store protects storage and rotation, but the web process still
+reads the key at runtime, so compromise of the web process still lets an attacker mint assertions for
+every agent. It also relaxes ADR-006's recommendation to move to option B before any AWS deployment.
+The ADR text is not updated in this PR; a follow-up is needed.
+
 ## Known limitations of A2
 
-- **Enabling it today breaks the web tier's calls to that agent**: outbound token minting is not
-  wired into `demo.py` or the orchestrator yet, so only a caller that mints tokens can reach it.
+- **Outbound minting is partial** (see "Outbound assertions (A2b)"). Enabling authentication on a specialist works only while the caller also has outbound minting on.
 - Only the shared specialist factory is wired (`/process` and `/invocations`). `/health`, `/ping`
   and `/model` stay open. Follow-ups: `/model`, Pixel, Sage, Research and Security services.
 - `dlg` is optional and ignored; there is no grant, scope, redelegation or engagement/classification
