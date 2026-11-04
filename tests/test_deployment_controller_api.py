@@ -135,8 +135,9 @@ def test_policy_denials_and_state_errors_map_to_http_statuses(api):
     assert bad.status_code == 422 and bad.json()["detail"] == "invalid_request"
     dep = call(api, "orbit", "POST", "/v1/deployments", payload())[0].json()
     target = f"/v1/approvals/{dep['approval_id']}:approve"
-    assert call(api, "approver", "POST", target, {"request_hash": "wrong"})[0].status_code == 409
-    assert call(api, "approver", "POST", target, {})[0].status_code == 409
+    assert call(api, "approver", "POST", target, {"request_hash": "0" * 64})[0].status_code == 409
+    assert call(api, "approver", "POST", target, {"request_hash": "wrong"})[0].status_code == 422
+    assert call(api, "approver", "POST", target, {})[0].status_code == 422
     assert call(api, "approver", "POST", "/v1/approvals/apr_none:approve",
                 {"request_hash": "x"})[0].status_code == 404
     assert call(api, "approver", "GET", "/v1/approvals/apr_none")[0].status_code == 404
@@ -146,3 +147,19 @@ def test_policy_denials_and_state_errors_map_to_http_statuses(api):
     assert replay.status_code == 409  # a consumed approval cannot be replayed
     assert call(api, "orbit", "GET", "/v1/deployments/dep_none")[0].status_code == 404
 
+
+def test_a_malformed_request_hash_is_a_clean_422_and_is_audited(api, caplog):
+    caplog.set_level(logging.INFO)
+    dep = call(api, "orbit", "POST", "/v1/deployments", payload())[0].json()
+    target = f"/v1/approvals/{dep['approval_id']}:approve"
+    good = dep["request_hash"]
+    for bad in ("\u00e9" * 64, good.upper(), good[:-1], good + "0", 7, None, [good]):
+        got = call(api, "approver", "POST", target, {"request_hash": bad})[0]
+        assert got.status_code == 422 and got.json()["detail"] == "invalid_request_hash", bad
+        denied = api.world.ctrl.audit.events[-1]
+        assert (denied["action"], denied["reason"]) == ("approve", "invalid_request_hash")
+    assert not api.world.provider.apps
+    logged = caplog.text + json.dumps(api.world.ctrl.audit.events, ensure_ascii=False)
+    assert "\u00e9" * 64 not in logged and good.upper() not in logged  # never the input
+    ok = call(api, "approver", "POST", target, {"request_hash": good})[0]
+    assert ok.status_code == 200 and ok.json()["status"] == "running"

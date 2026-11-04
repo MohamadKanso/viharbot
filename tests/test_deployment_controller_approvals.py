@@ -37,6 +37,23 @@ def test_approval_of_a_different_request_hash_is_refused(world):
     assert reason_of(execute, world, dep) == "not_approved"
 
 
+@pytest.mark.parametrize("reviewed", [
+    "\u00e9" * 64,  # non-ASCII: compare_digest on str raised TypeError, a 500 (#176)
+    "\u0661" * 64,  # Arabic-Indic digits, which \d would have let through
+    "A" * 64, "a" * 63, "a" * 65, "g" * 64, "a" * 64 + "\n", "", None, 64, ["a" * 64],
+])
+def test_a_malformed_request_hash_is_refused_and_audited_not_a_crash(world, reviewed):
+    dep = submit(world, payload())
+    assert reason_of(world.ctrl.approve, dep["approval_id"], approver="approver",
+                     reviewed_hash=reviewed, request_id="r") == "invalid_request_hash"
+    denied = world.ctrl.audit.events[-1]
+    assert (denied["action"], denied["decision"], denied["reason"]) == (
+        "approve", "deny", "invalid_request_hash")
+    assert denied["request_hash"] == dep["request_hash"]  # the stored hash, never the input
+    assert world.ctrl.store.get("approvals", dep["approval_id"])["approver"] is None
+    approve(world.ctrl, dep)  # nothing was consumed, so the reviewed hash still approves
+
+
 def test_unauthorized_approver_and_orbit_cannot_approve(world):
     dep = submit(world, payload())
     for who in ("intruder", "orbit"):
@@ -76,7 +93,7 @@ def test_approving_again_is_a_safe_retry_only_for_the_same_approver_and_hash(wor
     dep = submit_approved(world.ctrl, payload())
     approve(world.ctrl, dep)  # same approver, same hash, still pending
     assert reason_of(world.ctrl.approve, dep["approval_id"], approver="approver",
-                     reviewed_hash="wrong", request_id="r") == "request_hash_mismatch"
+                     reviewed_hash="0" * 64, request_id="r") == "request_hash_mismatch"
     other = world.ctrl.store.get("approvals", dep["approval_id"])
     other["approver"] = "someone-else"
     world.ctrl.store.commit(approvals={dep["approval_id"]: other})

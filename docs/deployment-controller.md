@@ -52,6 +52,8 @@ does and does not do.
   routes (`GET /v1/approvals/{id}`,
   `POST /v1/approvals/{id}:approve`) are a minimal interface for the approval channel that ADR-007
   leaves open; the approver sends the request hash it reviewed, and approval then executes.
+  A missing or malformed hash (anything but 64 lowercase hex digits) is a 422
+  `invalid_request_hash`; a well-formed hash for a different request is a 409.
 
 ## What is mocked
 

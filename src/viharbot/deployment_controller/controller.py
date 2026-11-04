@@ -24,7 +24,7 @@ from .markers import (
     BOUND_KEY, CLAIM_KEY, Claim, bound_entry, claim_entry, parse_claim, verified_bound,
 )
 from .policy import (
-    DeploymentRequest, Policy, PolicyDenied, build_spec, request_hash,
+    DeploymentRequest, Policy, PolicyDenied, build_spec, is_request_hash, request_hash,
 )
 from .provider import Provider, ProviderApp, ProviderError, ProviderTimeout, VersionConflict
 from .store import RecordStore, StoreError
@@ -153,7 +153,9 @@ class DeploymentController:
             deployments = {dep["deployment_id"]: dep}
         self._save(approvals={appr["approval_id"]: appr}, deployments=deployments)
 
-    def approve(self, approval_id: str, *, approver: str, reviewed_hash: str, request_id: str) -> dict:
+    def approve(
+        self, approval_id: str, *, approver: str, reviewed_hash: object, request_id: str,
+    ) -> dict:
         """Accept the exact request whose hash the approver reviewed. Does not execute."""
         refuse = lambda reason, status, dep=None: self._refuse(  # noqa: E731
             "approve", reason, status, request_id=request_id, caller=approver, dep=dep)
@@ -171,7 +173,11 @@ class DeploymentController:
             if self._clock() >= appr["expires_at"]:
                 self._expire(appr, "approval_expired")
                 raise refuse("approval_expired", 409, dep)
-            if not hmac.compare_digest(str(reviewed_hash), appr["request_hash"]):
+            # raw from the body: refuse anything malformed before compare_digest, here rather
+            # than in the API so the refusal is audited with the deployment's fields (#176)
+            if not is_request_hash(reviewed_hash):
+                raise refuse("invalid_request_hash", 422, dep)
+            if not hmac.compare_digest(reviewed_hash.encode(), appr["request_hash"].encode()):
                 raise refuse("request_hash_mismatch", 409, dep)
             if appr["approver"]:
                 return appr  # same approver, same hash, still pending: a retry after a 429 or 502

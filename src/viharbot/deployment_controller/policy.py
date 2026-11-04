@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 TEMPLATE_VERSION = "orbit-app-v1"
 RESERVED_ENV_PREFIX = "ORBIT_"  # marker entries live here; a request may never set them
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
+_REQUEST_HASH = re.compile(r"[0-9a-f]{64}")  # what request_hash() returns
 _NAME_SUFFIX = re.compile(r"[a-z0-9][a-z0-9-]{0,31}")
 _REPOSITORY = re.compile(r"[a-z0-9/_.-]+")
 _ENV_VALUE = re.compile(r"[A-Za-z0-9._:/@+-]{0,128}")
@@ -116,6 +117,11 @@ def canonical_request(req: DeploymentRequest, team_id: str) -> str:
 
 def request_hash(req: DeploymentRequest, team_id: str) -> str:
     return hashlib.sha256(canonical_request(req, team_id).encode()).hexdigest()
+
+
+def is_request_hash(value: object) -> bool:
+    """True only for a string shaped like ``request_hash()`` output: 64 lowercase hex digits."""
+    return isinstance(value, str) and _REQUEST_HASH.fullmatch(value) is not None
 
 
 def build_spec(req: DeploymentRequest, marker_env: dict[str, str]) -> dict:

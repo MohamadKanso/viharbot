@@ -101,7 +101,7 @@ def create_app(controller: DeploymentController, authenticator: ServiceAuthentic
         """Approve exactly the request whose hash the approver reviewed, then execute it."""
         def go() -> dict:
             controller.approve(approval_id, approver=approver,
-                               reviewed_hash=str(payload.get("request_hash", "")),
+                               reviewed_hash=payload.get("request_hash"),
                                request_id=request_id)
             return controller.execute(approval_id, caller=approver, request_id=request_id)
 
