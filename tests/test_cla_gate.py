@@ -901,7 +901,10 @@ def shipped(name):
 
 def test_shipped_record_and_exceptions_are_valid_and_consistent_with_the_agreement():
     terms, rows, errors = cla.parse_record(shipped("CLA-ACCEPTANCES.md"))
-    assert errors == [] and rows == []
+    # Rows are added over time (never removed), so assert they are well formed, not that none exist.
+    assert errors == []
+    assert len({r.account_id for r in rows}) == len(rows)  # one row per account
+    assert all(r.evidence_id and len(r.evidence_sha) == 64 for r in rows)  # older versions stay valid rows
     agreement = shipped(cla.AGREEMENT_PATH)
     assert cla.agreement_header(agreement) == (terms.legal, terms.editorial)
     if terms.in_force:  # activation must come with every prerequisite and the frozen hash
