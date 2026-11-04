@@ -465,9 +465,7 @@ class NovaRouter:
                 return True
             if holder is primary:
                 return self._shares_state(other)
-            if other is primary:
-                return self._shares_state(holder)
-            return self._shares_state(holder) and self._shares_state(other)
+            return self._shares_state(holder)  # a manifest has at most two: other is the primary
 
         # Eligibility is evaluated per request and instance, so failover never widens it.
         # Stateful work may start on a non-primary only if it shares the primary's state.
