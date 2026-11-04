@@ -167,3 +167,17 @@ def test_startup_reconciliation_failure_raises_an_alert_and_the_service_still_st
     with TestClient(api.app) as client:
         assert client.get("/health").status_code == 200
     assert "startup_reconcile_failed" in [a["reason"] for a in api.world.ctrl.alerts]
+
+
+def test_operation_lookup_failure_during_immediate_recovery_returns_a_normal_response(api):
+    created = call(api, "orbit", "POST", "/v1/deployments", payload())[0].json()
+    api.world.provider.fail_next("create", "after")
+    api.world.provider.fail_next("find", "before")
+    response, _ = call(api, "approver", "POST", f"/v1/approvals/{created['approval_id']}:approve",
+                       {"request_hash": created["request_hash"]})
+    assert response.status_code == 200
+    assert response.json()["status"] == "failed_uncertain"
+    assert response.json()["reason"] == "reconcile_unavailable"
+    assert "create_outcome_unknown:reconcile_unavailable" in [
+        a["reason"] for a in api.world.ctrl.alerts]
+    assert api.world.provider.calls.count("create") == 1

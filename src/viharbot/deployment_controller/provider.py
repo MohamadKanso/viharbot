@@ -39,7 +39,11 @@ class ProviderApp:
 
 class Provider(Protocol):
     team_id: str
-    conditional_update: bool  # True only if the provider enforces expected_version itself
+    # True only if the provider enforces expected_version itself. The controller then passes the
+    # just-read version on EVERY update (bind and replace) and never writes unconditionally. If
+    # False it writes unconditionally under the store lock and verifies by read-back: a foreign
+    # version means failed_uncertain plus an alert (detection, not prevention; ADR-007).
+    conditional_update: bool
 
     def create_app(self, name: str, spec: dict) -> ProviderApp: ...
     def get_app(self, app_id: str) -> ProviderApp | None: ...
@@ -142,6 +146,8 @@ class FakeProvider:
         return [copy.deepcopy(app) for app in self.apps.values()]
 
     def find_operation(self, claim_id: str) -> str | None:
+        if self._faults.pop("find", None):
+            raise ProviderTimeout("find")
         return self._operations.get(claim_id) if self.operation_lookup else None
 
     # --- test helpers: situations the controller must survive ---------------------------------

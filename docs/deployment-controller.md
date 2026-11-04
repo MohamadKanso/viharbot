@@ -20,6 +20,17 @@ does not do.
   replacement preflight plus a conditional update, with read-back detection when the provider has no
   conditional update; stop, delete and capped logs, each only for an app whose bound marker
   verifies; and `reconcile`, which is both the startup pass and the TTL sweep.
+  Binding re-reads the app immediately before the bound-marker write and never writes over a stale
+  copy: with a conditional provider the just-read version is the condition (a conflict is
+  `failed_uncertain` plus an alert, never retried); without one (`Provider.conditional_update` is
+  false) the controller writes under the store lock and verifies by read-back, and a foreign
+  version is `failed_uncertain` plus an alert (detection, not prevention, per ADR-007). The claim
+  expiry is rechecked with the clock immediately before every bind and replacement write; an
+  expired claim is never bound, is alerted as `bind_refused:claim_expired`, and its record is
+  `failed_uncertain` (the app is left untouched). A lookup failure during immediate timeout
+  recovery keeps the reservation and records `failed_uncertain` with an alert. The log limit
+  counts UTF-8 bytes of the returned text (not the serialized response) and never splits a
+  character.
 - `markers.py`: the two-phase HMAC ownership marker (claim, then bound to the app id and team) and
   the classifier. Only a verified bound marker authorizes anything; a copied marker, a claim-only
   app, a foreign team or a tampered marker is left alone and alerted. A claim is bound only with

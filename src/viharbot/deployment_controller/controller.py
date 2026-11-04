@@ -291,14 +291,57 @@ class DeploymentController:
         self._save(approvals={appr["approval_id"]: appr}, deployments={dep["deployment_id"]: dep})
         return self._bind(appr, dep, app, claim, **ctx)
 
+    def _uncertain(self, appr, dep, reason: str, alert: str, **ctx) -> dict:
+        """A bind that cannot be shown safe: never executed, alerted, never retried blindly."""
+        self._alert(alert, request_id=ctx["request_id"], dep=dep)
+        return self._finish(appr, dep, "failed_uncertain", reason=reason, **ctx)
+
+    def _claim_expired(self, appr, dep, claim: Claim, **ctx) -> dict | None:
+        """The no-binding-after-expiry guard, run immediately before every bound-marker write."""
+        if self._clock() < claim.expires_at:
+            return None
+        return self._uncertain(appr, dep, "claim_expired", "bind_refused:claim_expired", **ctx)
+
     def _bind(self, appr, dep, app: ProviderApp, claim: Claim, **ctx) -> dict:
-        spec = copy.deepcopy(app.spec)
-        spec["env"][BOUND_KEY] = bound_entry(self._key, claim, app.app_id)
+        """Write the bound marker onto the app's CURRENT spec, never over a stale copy.
+
+        An expired claim is never bound. The app is read again immediately before the write; a
+        provider with conditional updates gets that version as the condition, so a writer that
+        slipped in is refused (never replayed or retried). Without conditional updates the write is
+        verified by a read-back and a foreign version means failed_uncertain (detection only).
+        """
+        if (refused := self._claim_expired(appr, dep, claim, **ctx)) is not None:
+            return refused
         try:
-            self.provider.update_app(app.app_id, spec, None)
+            current = self.provider.get_app(app.app_id)
         except ProviderError:
             self._alert("bind_pending", request_id=ctx["request_id"], dep=dep)
             return self._finish(appr, dep, "created_unbound", reason="bind_pending", **ctx)
+        mine = current is not None and (c := parse_claim(self._key, current.env)) is not None \
+            and c.claim_id == claim.claim_id
+        if not mine:
+            return self._uncertain(appr, dep, "unexpected_writer", "bind_failed_uncertain", **ctx)
+        spec = copy.deepcopy(current.spec)
+        spec["env"][BOUND_KEY] = bound_entry(self._key, claim, app.app_id)
+        conditional = self.provider.conditional_update
+        try:
+            result = self.provider.update_app(
+                app.app_id, spec, current.version if conditional else None)
+        except VersionConflict:
+            return self._uncertain(appr, dep, "bind_version_conflict",
+                                   "bind_failed_uncertain:version_conflict", **ctx)
+        except ProviderError:
+            self._alert("bind_pending", request_id=ctx["request_id"], dep=dep)
+            return self._finish(appr, dep, "created_unbound", reason="bind_pending", **ctx)
+        if not conditional:
+            try:
+                result = self.provider.get_app(app.app_id)
+            except ProviderError:
+                result = None
+            if result is None or result.version != current.version + 1 \
+                    or verified_bound(self._key, result, self.team_id) is None:
+                return self._uncertain(appr, dep, "unexpected_writer",
+                                       "bind_failed_uncertain:unverified", **ctx)
         return self._finish(appr, dep, "running", approval_state="executed", **ctx)
 
     def _resolve_unknown_create(self, appr, dep, claim: Claim, **ctx) -> dict:
@@ -311,10 +354,16 @@ class DeploymentController:
             a for a in apps or []
             if (c := parse_claim(self._key, a.env)) and c.claim_id == claim.claim_id
         ]
-        if len(found) == 1 and self.provider.find_operation(claim.claim_id) == found[0].app_id:
-            return self._record_evidence_and_bind(appr, dep, found[0], claim, **ctx)
+        lookup_failed = False
+        if len(found) == 1:
+            try:
+                if self.provider.find_operation(claim.claim_id) == found[0].app_id:
+                    return self._record_evidence_and_bind(appr, dep, found[0], claim, **ctx)
+            except ProviderError:
+                lookup_failed = True  # the reservation stays: no second create, retry on reconcile
         reason = (
-            "reconcile_unavailable" if apps is None else "duplicate_claims" if len(found) > 1
+            "reconcile_unavailable" if apps is None or lookup_failed
+            else "duplicate_claims" if len(found) > 1
             else "no_candidate" if not found else "no_operation_evidence"
         )
         self._alert("create_outcome_unknown:" + reason, request_id=ctx["request_id"], dep=dep)
@@ -328,6 +377,8 @@ class DeploymentController:
             BOUND_KEY: bound_entry(self._key, claim, target.app_id),
         }
         expected = target.expected_version if self.provider.conditional_update else None
+        if (refused := self._claim_expired(appr, dep, claim, **ctx)) is not None:
+            return refused
         try:
             result = self.provider.update_app(target.app_id, build_spec(req, markers), expected)
         except VersionConflict:
@@ -392,7 +443,8 @@ class DeploymentController:
                                    caller=caller, dep=dep) from None
             self.audit.emit("logs", "allow", request_id=request_id, caller=caller,
                             **self._fields(dep))
-            return text[-self.policy.max_log_bytes:]
+            raw = text.encode("utf-8")[-self.policy.max_log_bytes:]
+            return raw.decode("utf-8", errors="ignore")  # a cut through a character drops it
 
     def destroy(self, deployment_id: str, *, caller: str, request_id: str, keep_record: bool) -> dict:
         """Stop (keep the record) or delete. Only an app with verified ownership is destroyed."""
