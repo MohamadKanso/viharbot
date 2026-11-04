@@ -58,6 +58,11 @@ class ReplaceMixin:
         else:
             if not conditional:  # the response alone is not evidence: nothing prevented a writer
                 read_back, result = True, self._read(target.app_id)
+        if result is not None and (
+            result.app_id != target.app_id or not result.team_id or result.team_id != self.team_id
+        ):
+            self._alert("replace_failed_uncertain:foreign_team", request_id=request_id, dep=dep)
+            return self._finish(appr, dep, "failed_uncertain", reason="foreign_team", **ctx)
         landed = result is not None and (c := parse_claim(self._key, result.env)) is not None \
             and c.claim_id == claim.claim_id
         explained = result is not None and (not read_back or result.spec == spec)

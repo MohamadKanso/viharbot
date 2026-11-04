@@ -266,6 +266,7 @@ def test_stopping_by_an_earlier_generation_stops_the_authoritative_record_too(wo
 
 
 def test_expiry_before_a_replacement_update_is_never_written(world):
+    world.ctrl = controller(world, approval_ttl_seconds=3 * TWO_HOURS)  # approval outlives the claim
     running, dep = replacement(world)
     original = world.ctrl.store.commit
 

@@ -62,7 +62,8 @@ class FakeProvider:
     """Deterministic in-memory provider with fault injection.
 
     ``fail_next(op, "before" | "after")`` raises ProviderTimeout once for the next ``op``: "before"
-    without applying it, "after" after applying it (a lost response).
+    without applying it, "after" after applying it (a lost response). This holds for every
+    operation. ``on_call(op)``, if set, runs at the start of every call (a slow-call hook).
     """
 
     def __init__(
@@ -77,6 +78,7 @@ class FakeProvider:
         self.logs: dict[str, str] = {}
         self.before_update: Callable[[FakeProvider, str], None] | None = None
         self._operations: dict[str, str] = {}
+        self.on_call: Callable[[str], None] | None = None
         self._faults: dict[str, str] = {}
         self._counter = 0
 
@@ -85,6 +87,8 @@ class FakeProvider:
 
     def _enter(self, op: str) -> str | None:
         self.calls.append(op)
+        if self.on_call:
+            self.on_call(op)
         fault = self._faults.pop(op, None)
         if fault == "before":
             raise ProviderTimeout(op)
@@ -111,12 +115,16 @@ class FakeProvider:
         return copy.deepcopy(app)
 
     def get_app(self, app_id: str) -> ProviderApp | None:
-        self._enter("get")
-        app = self.apps.get(app_id)
-        return copy.deepcopy(app) if app else None
+        fault = self._enter("get")
+        app = copy.deepcopy(self.apps.get(app_id))
+        if fault == "after":
+            raise ProviderTimeout("get")
+        return app
 
     def read_logs(self, app_id: str, lines: int) -> str:
-        self._enter("logs")
+        fault = self._enter("logs")
+        if fault == "after":
+            raise ProviderTimeout("logs")
         return "\n".join(self.logs.get(app_id, "").splitlines()[-lines:])
 
     def update_app(
@@ -137,13 +145,18 @@ class FakeProvider:
         return copy.deepcopy(app)
 
     def destroy_app(self, app_id: str) -> None:
-        self._enter("destroy")
+        fault = self._enter("destroy")
         if self.apps.pop(app_id, None) is None:
             raise ProviderError("not_found")
+        if fault == "after":
+            raise ProviderTimeout("destroy")
 
     def list_apps(self) -> list[ProviderApp]:
-        self._enter("list")
-        return [copy.deepcopy(app) for app in self.apps.values()]
+        fault = self._enter("list")
+        apps = [copy.deepcopy(app) for app in self.apps.values()]
+        if fault == "after":
+            raise ProviderTimeout("list")
+        return apps
 
     def find_operation(self, claim_id: str) -> str | None:
         if self._faults.pop("find", None):

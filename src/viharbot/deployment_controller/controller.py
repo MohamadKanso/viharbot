@@ -220,6 +220,12 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
                 raise refuse(denied.reason, denied.status) from None
             except ProviderError:
                 raise refuse("provider_unavailable", 502) from None
+            # The quota read may be slow: take a fresh timestamp and recheck expiry right before
+            # the durable reservation, so an approval that expired meanwhile reserves nothing.
+            now = self._clock()
+            if now >= appr["expires_at"]:
+                self._expire(appr, "approval_expired")
+                raise refuse("approval_expired", 409)
             claim = Claim(
                 secrets.token_hex(16), self._instance, self.team_id, int(now),
                 int(now) + req.ttl_minutes * 60, appr["request_hash"],
@@ -229,6 +235,10 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
             action = {"ts": now, "kind": dep["kind"]}
             self._save(approvals={approval_id: appr}, deployments={dep["deployment_id"]: dep},
                        actions=[action])  # durable before any provider call
+            if self._clock() >= appr["expires_at"]:  # expired during the durable write
+                return self._finish(  # the reservation stays consumed (terminal), never retryable
+                    appr, dep, "expired", approval_state="expired", reason="approval_expired",
+                    request_id=request_id, caller=caller, started=started, decision="deny")
             args = (appr, dep, req, claim, request_id, caller, started)
             return self._replace(*args) if req.replaces else self._create(*args)
 
@@ -281,6 +291,8 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
             and c.claim_id == claim.claim_id
         if not mine:
             return self._uncertain(appr, dep, "unexpected_writer", "bind_failed_uncertain", **ctx)
+        if current.app_id != app.app_id or not current.team_id or current.team_id != self.team_id:
+            return self._uncertain(appr, dep, "foreign_team", "bind_refused:foreign_team", **ctx)
         approved = build_spec(
             DeploymentRequest.model_validate(appr["request"]),
             {CLAIM_KEY: claim_entry(self._key, claim)})
@@ -301,6 +313,9 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
         except ProviderError:
             self._alert("bind_pending", request_id=ctx["request_id"], dep=dep)
             return self._finish(appr, dep, "created_unbound", reason="bind_pending", **ctx)
+        if result.app_id != app.app_id or not result.team_id or result.team_id != self.team_id:
+            return self._uncertain(appr, dep, "foreign_team", "bind_failed_uncertain:foreign_team",
+                                   **ctx)
         if not conditional:
             try:
                 result = self.provider.get_app(app.app_id)
