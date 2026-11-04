@@ -58,6 +58,20 @@ does and does not do.
   `no_candidate`, `no_operation_evidence`): a later pass may resolve it, but only with
   provider-backed `find_operation` evidence of the exact app id. Duplicate claims, replacement
   conflicts, foreign teams and unexplained specs are human-only.
+- The uncertain-outcome safeguard belongs to the app, not to one record. Stop, delete and the TTL
+  sweep refuse (`app_has_unresolved_outcome`, an audit deny and an alert) while any record of the
+  same app id, from any generation, is `failed_uncertain` or a still-reserved replacement, and a
+  `failed`, `expired` or `failed_uncertain` record can never destroy an app. There is no resolve
+  route. The manual step: a person inspects the app and then sets that record's status to `failed`
+  (or `running`) in the store file while the controller is stopped; the refusal lifts on the next
+  call. An expired app with an unresolved record is left running and alerted until then.
+- A destroy that raises during expiry is an unknown outcome: the app is read again. Gone means every
+  record is finalized as `expired` once (audited); still present leaves the records for the next
+  pass; a failed lookup alerts and marks the records `expiry_destroy_unknown` (never `expired` on a
+  guess), and a later pass finalizes only after a direct read confirms the app is gone.
+- `reconcile` reports and audits what really happened for an app: `adopted` only when adoption
+  or confirmation of a valid record happened, otherwise `left_uncertain` or `recovery_rejected`
+  (audited as a deny, with an alert). The `execute` audit decision is `allow` only for `running`.
 - Expiry destruction re-reads the app and revalidates ownership and expiry immediately before
   `destroy_app`. The provider has no conditional delete, so a writer renewing the app between that
   read and the delete is a residual race (detection and alerting, not prevention; ADR-007).

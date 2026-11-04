@@ -21,6 +21,7 @@ from .provider import ProviderApp, ProviderError
 LIVE = ("running", "created_unbound", "reserved")  # a record that stands for its app right now
 # A create whose outcome was unknown for one of these reasons can still be resolved later with
 # provider-backed evidence. Replacement conflicts and duplicate claims never can.
+EXPIRY_UNKNOWN = "expiry_destroy_unknown"  # a destroy that raised, outcome not yet known
 RECOVERABLE = (
     None, "bind_pending", "reconcile_unavailable", "no_candidate", "no_operation_evidence",
 )
@@ -95,6 +96,7 @@ class ReconcileMixin:
                                 request_id=request_id, app_id=app.app_id)
                 results.append(outcome)
             known = {a.app_id for a in apps}
+            self._finish_unknown_expiries(known, request_id)
             for appr in self.store.all("approvals"):
                 if appr["state"] != "reserved":
                     continue
@@ -111,6 +113,24 @@ class ReconcileMixin:
         return [d for d in self.store.all("deployments")
                 if app_id and d.get("app_id") == app_id and d["deployment_id"] != exclude]
 
+    def _unresolved_for_app(self, app_id: str | None) -> list[dict]:
+        """Every record that leaves the app's outcome unresolved: a failed_uncertain record that
+        names the app, or a still-reserved replacement that targets it (live or superseded
+        records of the same app do not matter: the safeguard is a property of the app)."""
+        if not app_id:
+            return []
+        found = [d for d in self._deps_for(app_id) if d["status"] in ("failed_uncertain", "reserved")]
+        for appr in self.store.all("approvals"):
+            if appr["state"] != "reserved":
+                continue
+            target = (appr["request"].get("replaces") or {}).get("app_id")
+            dep = self.store.get("deployments", appr["deployment_id"])
+            if app_id in (target, appr.get("app_id")) and dep and dep["status"] in (
+                "failed_uncertain", "reserved"
+            ) and dep not in found:
+                found.append(dep)
+        return found
+
     def _find_dep(self, app_id: str) -> dict | None:
         """The authoritative record for an app: the one record that is not history."""
         return next((d for d in self._deps_for(app_id) if d["status"] in LIVE), None)
@@ -125,6 +145,10 @@ class ReconcileMixin:
         return changed
 
     def _sweep_destroy(self, app: ProviderApp, request_id: str) -> str:
+        if self._unresolved_for_app(app.app_id):  # a person resolves it first, even past expiry
+            self._alert("expired_destroy_skipped:unresolved_outcome", request_id=request_id,
+                        app_id=app.app_id)
+            return "alert"
         try:  # the listing may be stale: revalidate ownership and expiry right before deleting
             current = self.provider.get_app(app.app_id)
             if current is None or classify(
@@ -133,24 +157,70 @@ class ReconcileMixin:
                 self._alert("expired_destroy_skipped:changed", request_id=request_id,
                             app_id=app.app_id)
                 return "alert"
-            self.provider.destroy_app(app.app_id)
         except ProviderError:
             self._alert("expired_destroy_failed", request_id=request_id, app_id=app.app_id)
             return "alert"
+        try:
+            self.provider.destroy_app(app.app_id)
+        except ProviderError:
+            return self._destroy_outcome_unknown(app, request_id)
+        self._finalize_expired(app.app_id, request_id)
+        return "destroyed"
+
+    def _destroy_outcome_unknown(self, app: ProviderApp, request_id: str) -> str:
+        """A destroy that raised may still have landed: read the app again, never guess."""
+        try:
+            gone = self.provider.get_app(app.app_id) is None
+        except ProviderError:
+            gone = None
+        if gone:  # the response was lost but the app is gone
+            self._finalize_expired(app.app_id, request_id)
+            return "destroyed"
+        if gone is None:  # cannot tell: durable uncertain note, finalized only on later evidence
+            changed = {}
+            for dep in self._deps_for(app.app_id):
+                if dep["status"] in LIVE:
+                    dep["reason"] = EXPIRY_UNKNOWN
+                    changed[dep["deployment_id"]] = dep
+            if changed:
+                self._save(deployments=changed)
+            self._alert("expired_destroy_outcome_unknown", request_id=request_id,
+                        app_id=app.app_id)
+            return "uncertain"
+        self._alert("expired_destroy_failed", request_id=request_id, app_id=app.app_id)
+        return "alert"  # still exists: records untouched, retried on the next pass
+
+    def _finalize_expired(self, app_id: str, request_id: str) -> None:
+        """The app is confirmed gone: finish every record of it as expired, once, audited."""
         changed = {}
-        for dep in self._deps_for(app.app_id):  # every record whose app just disappeared
+        for dep in self._deps_for(app_id):  # every record whose app just disappeared
             if dep["status"] in LIVE or dep["status"] == "stopped":
-                dep["status"] = "expired"
+                dep.update(status="expired", reason=None)
                 changed[dep["deployment_id"]] = dep
         if changed:
             self._save(deployments=changed)
-        self.audit.emit("expire_destroy", "allow", request_id=request_id, app_id=app.app_id,
+        self.audit.emit("expire_destroy", "allow", request_id=request_id, app_id=app_id,
                         provider_status="destroyed")
-        return "destroyed"
+
+    def _finish_unknown_expiries(self, listed: set[str], request_id: str) -> None:
+        """A destroy whose outcome was unknown and whose app has left the listing: confirm the
+        absence with a direct read before finalizing; any doubt leaves the record alerting."""
+        pending = {d["app_id"] for d in self.store.all("deployments")
+                   if d["status"] in LIVE and d.get("reason") == EXPIRY_UNKNOWN and d.get("app_id")}
+        for app_id in pending - listed:
+            try:
+                gone = self.provider.get_app(app_id) is None
+            except ProviderError:
+                gone = False
+            if gone:
+                self._finalize_expired(app_id, request_id)
+            else:
+                self._alert("expired_destroy_outcome_unknown", request_id=request_id,
+                            app_id=app_id)
 
     def _adopt(self, app: ProviderApp, request_id: str) -> str:
         claim = parse_claim(self._key, app.env)
-        approvals, deployments, handled = {}, {}, False
+        approvals, deployments, handled, rejected = {}, {}, False, False
         for appr in self.store.all("approvals"):  # crash after bind, before `executed` was saved
             if appr["state"] != "reserved" or appr["claim_id"] != claim.claim_id:
                 continue
@@ -163,6 +233,7 @@ class ReconcileMixin:
                 self._alert("replace_failed_uncertain:unexpected_writer",
                             request_id=request_id, dep=owner)
                 deployments[owner["deployment_id"]] = owner
+                rejected = True
                 continue
             appr.update(state="executed", app_id=app.app_id)
             approvals[appr["approval_id"]] = appr
@@ -187,8 +258,14 @@ class ReconcileMixin:
             }
         if approvals or deployments:
             self._save(approvals=approvals, deployments=deployments)  # one atomic commit
-        self.audit.emit("adopt", "allow", request_id=request_id, app_id=app.app_id)
-        return "adopted"
+        # The outcome is what really happened: never "adopted" over a record left uncertain.
+        uncertain = any(d["status"] == "failed_uncertain" for d in self._deps_for(app.app_id))
+        outcome = "recovery_rejected" if rejected else "left_uncertain" if uncertain else "adopted"
+        if outcome == "left_uncertain":
+            self._alert("adopt_left_uncertain", request_id=request_id, app_id=app.app_id)
+        self.audit.emit("adopt", "allow" if outcome == "adopted" else "deny", reason=outcome,
+                        request_id=request_id, app_id=app.app_id)
+        return outcome
 
     def _replacement_ok(self, appr: dict, app: ProviderApp, claim: Claim) -> bool:
         """A replacement landed exactly as approved: version + 1 and exactly the written spec."""

@@ -88,9 +88,12 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
     def _finish(
         self, appr: dict, dep: dict, status: str, *, approval_state: str | None = None,
         reason: str | None = None, request_id: str, caller: str | None, started: float,
-        decision: str = "allow", provider_status: str | None = None,
+        decision: str | None = None, provider_status: str | None = None,
         extra_deployments: dict | None = None,
     ) -> dict:
+        if decision is None:  # the audit decision reports the real outcome, never a hopeful one
+            decision = {"running": "allow", "failed_uncertain": "alert",
+                        "created_unbound": "pending"}.get(status, "deny")
         dep.update(status=status, reason=reason)
         if approval_state:
             appr["state"] = approval_state
@@ -376,15 +379,25 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
             raw = text.encode("utf-8")[-self.policy.max_log_bytes:]
             return raw.decode("utf-8", errors="ignore")  # a split character is dropped
 
+    def _refuse_if_unresolved(self, dep: dict, action: str, caller: str, request_id: str) -> None:
+        """The uncertain-outcome safeguard belongs to the APP: any unresolved record of the app
+        (whichever generation the request came through) refuses every destructive action."""
+        if self._unresolved_for_app(dep.get("app_id")):
+            self._alert("destroy_refused:unresolved_outcome", request_id=request_id, dep=dep)
+            raise self._refuse(action, "app_has_unresolved_outcome", 409,
+                               request_id=request_id, caller=caller, dep=dep)
+
     def destroy(self, deployment_id: str, *, caller: str, request_id: str, keep_record: bool) -> dict:
         """Stop (keep the record) or delete, only for an app with verified ownership."""
         action = "stop" if keep_record else "delete"
         with self.store.locked():
             dep = self.get(deployment_id)
-            if dep["status"] == "failed_uncertain":
-                # An unresolved conflict is not overwritten by a stop: a person resolves it.
+            if dep["status"] in ("failed_uncertain", "failed", "expired"):
+                # Not the record that stands for the app (an unresolved conflict is resolved by a
+                # person, a failed or expired one never owned it): no destructive action through it.
                 raise self._refuse(action, "record_not_authoritative", 409,
                                    request_id=request_id, caller=caller, dep=dep)
+            self._refuse_if_unresolved(dep, action, caller, request_id)
             app = self._owned_app(dep, action, caller, request_id)
             try:
                 if app is not None:
@@ -401,5 +414,6 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
             self._save(deployments=changed,
                        remove_deployments=() if keep_record else (deployment_id,))
             self.audit.emit(action, "allow", request_id=request_id, caller=caller,
-                            provider_status="destroyed", **self._fields(dep))
+                            provider_status="destroyed" if app is not None else "already_gone",
+                            **self._fields(dep))
             return dep

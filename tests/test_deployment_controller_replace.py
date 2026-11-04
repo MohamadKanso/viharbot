@@ -172,7 +172,7 @@ def test_reconcile_after_the_writer_race_keeps_failed_uncertain_and_the_alert(tm
     world, running, dep, done = race_world(tmp_path)
     for ctrl in (world.ctrl, controller(world)):  # the same controller, then a restart
         results = ctrl.reconcile()
-        assert [r["action"] for r in results] == ["adopted"]
+        assert [r["action"] for r in results] == ["left_uncertain"]  # never "adopted" over it
         record = ctrl.get(done["deployment_id"])
         assert record["status"] == "failed_uncertain" and record["reason"] == "unexpected_writer"
         assert ctrl.get_approval(dep["approval_id"])["state"] == "reserved"
@@ -220,7 +220,7 @@ def test_crash_after_a_replacement_with_a_foreign_version_is_not_adopted_as_succ
         execute(world, dep)
     world.provider.bump_version(running["app_id"])
     restarted = controller(world)
-    restarted.reconcile()
+    assert [r["action"] for r in restarted.reconcile()] == ["recovery_rejected"]
     assert restarted.get(dep["deployment_id"])["reason"] == "unexpected_writer"
     assert restarted.get_approval(dep["approval_id"])["state"] == "reserved"
     assert "replace_failed_uncertain:unexpected_writer" in alert_reasons(restarted)
@@ -238,7 +238,7 @@ def test_crash_after_a_replacement_with_an_unexplained_spec_is_not_adopted_as_su
         execute(world, dep)
     world.provider.apps[running["app_id"]].spec["size"] = "something-else"  # same version
     restarted = controller(world)
-    restarted.reconcile()
+    assert [r["action"] for r in restarted.reconcile()] == ["recovery_rejected"]
     assert restarted.get(dep["deployment_id"])["reason"] == "unexpected_writer"
     assert restarted.get_approval(dep["approval_id"])["state"] == "reserved"
     assert "replace_failed_uncertain:unexpected_writer" in alert_reasons(restarted)
@@ -281,12 +281,14 @@ def test_stop_marks_the_authoritative_record_and_leaves_history(world):
     assert world.ctrl.get(running["deployment_id"])["status"] == "superseded"
 
 
-def test_expiry_updates_every_live_record_of_the_app_but_keeps_a_conflict_record(tmp_path):
+def test_expiry_leaves_an_app_with_an_unresolved_record_for_a_person(tmp_path):
     world, running, _, done = race_world(tmp_path)
     world.clock.now += 3 * 3600
-    world.ctrl.reconcile()
-    assert world.ctrl.get(running["deployment_id"])["status"] == "expired"
+    assert [r["action"] for r in world.ctrl.reconcile()] == ["alert"]
+    assert world.provider.apps  # not destroyed while any record of the app is unresolved
+    assert world.ctrl.get(running["deployment_id"])["status"] == "running"
     assert world.ctrl.get(done["deployment_id"])["status"] == "failed_uncertain"
+    assert "expired_destroy_skipped:unresolved_outcome" in alert_reasons(world.ctrl)
 
 
 def test_stopping_by_an_earlier_generation_stops_the_authoritative_record_too(world):
