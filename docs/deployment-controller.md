@@ -42,7 +42,7 @@ does and does not do.
   `bind_refused:claim_expired` and is `failed_uncertain`. The guarantee is dispatch-before-expiry,
   not landing-before-expiry: a write already in flight may complete after expiry (the controller
   cannot stop it without a provider-enforced deadline), and such an app is then bound and expired,
-  which the TTL sweep (part 2) destroys. The log limit counts UTF-8 bytes and never splits a
+  which the TTL sweep destroys. The log limit counts UTF-8 bytes and never splits a
   character.
 - `markers.py`: the two-phase HMAC ownership marker (claim, then bound to the app id and team).
   Only a verified bound marker authorizes anything; a copied marker, a claim-only app, a foreign
