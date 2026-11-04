@@ -648,3 +648,39 @@ def test_default_transport_gives_up_with_a_safe_code_after_repeated_failures(mon
     finally:
         server.shutdown()
     assert caught.value.code == "network"
+
+
+def test_a_truncated_http_error_body_is_retried_and_then_mapped_to_network(monkeypatch):
+    from http.server import BaseHTTPRequestHandler
+
+    monkeypatch.setattr(dev_wiki.time, "sleep", lambda s: None)
+    hits = []
+
+    class ErrorBody(BaseHTTPRequestHandler):
+        mode = "recover"
+
+        def do_GET(self):
+            hits.append(1)
+            body = b'{"message": "Not Found"}'
+            cut = self.mode == "always" or len(hits) == 1
+            self.send_response(404)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body[:4] if cut else body)
+            self.wfile.flush()
+
+        def log_message(self, *a):
+            pass
+
+    server = _serve(ErrorBody)
+    url = f"http://127.0.0.1:{server.server_port}/x"
+    try:
+        status, _, body = dev_wiki._default_transport(url, {})
+        assert status == 404 and b"Not Found" in body and len(hits) == 2  # recovered on retry
+        hits.clear()
+        ErrorBody.mode = "always"
+        with pytest.raises(WikiError) as caught:
+            dev_wiki._default_transport(url, {})
+        assert caught.value.code == "network" and len(hits) == dev_wiki.TRANSPORT_ATTEMPTS
+    finally:
+        server.shutdown()

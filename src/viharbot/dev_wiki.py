@@ -129,16 +129,25 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 _OPENER = urllib.request.build_opener(_NoRedirect)
 
 
+def _attempt(request: urllib.request.Request) -> tuple[int, dict[str, str], bytes]:
+    """One GET. Reads the body of an HTTP error response too, inside the caller's retry boundary."""
+    try:
+        with _OPENER.open(request, timeout=REQUEST_TIMEOUT) as response:  # noqa: S310
+            return response.status, *_read(response)
+    except urllib.error.HTTPError as exc:  # includes unfollowed 3xx; a cut-off body raises out
+        try:
+            return exc.code, *_read(exc)
+        finally:
+            exc.close()
+
+
 def _default_transport(url: str, headers: dict[str, str]) -> tuple[int, dict[str, str], bytes]:
     headers = {**headers, "Accept-Encoding": "gzip"}  # smaller bodies are less likely to be cut
     last: Exception | None = None
     for attempt in range(TRANSPORT_ATTEMPTS):
         request = urllib.request.Request(url, headers=headers, method="GET")
         try:
-            with _OPENER.open(request, timeout=REQUEST_TIMEOUT) as response:  # noqa: S310
-                return response.status, *_read(response)
-        except urllib.error.HTTPError as exc:  # includes unfollowed 3xx
-            return exc.code, *_read(exc)
+            return _attempt(request)
         except (urllib.error.URLError, http.client.HTTPException, TimeoutError, OSError, EOFError,
                 ValueError) as exc:
             last = exc
