@@ -4,6 +4,9 @@
 
 # Who is a trusted contributor, and the workflows and scripts that judge registry changes.
 /CONTRIBUTORS.md @vchokshi
+/CLA-ACCEPTANCES.md @vchokshi
+/CLA-EXCEPTIONS.md @vchokshi
+/tests/test_cla_gate.py @vchokshi
 /.github/ @vchokshi
 
 # The governance that registry changes rely on.
