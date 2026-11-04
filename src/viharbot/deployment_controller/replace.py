@@ -70,8 +70,8 @@ class ReplaceMixin:
             reason = "unexpected_writer" if landed else "update_outcome_unknown"
             self._alert("replace_failed_uncertain:" + reason, request_id=request_id, dep=dep)
             return self._finish(appr, dep, "failed_uncertain", reason=reason, **ctx)
-        self._supersede(dep)
-        return self._finish(appr, dep, "running", approval_state="executed", **ctx)
+        return self._finish(appr, dep, "running", approval_state="executed",
+                            extra_deployments=self._superseded(dep), **ctx)
 
     def _read(self, app_id: str):
         """The app as it is now, or None if it cannot be read (an unverifiable outcome)."""

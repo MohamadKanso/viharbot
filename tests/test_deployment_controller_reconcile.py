@@ -184,3 +184,26 @@ def test_an_expired_claim_only_app_is_never_bound_adopted_or_deleted(world):
     assert "destroy" not in world.provider.calls and "update" in world.provider.calls
     assert restarted.get(done["deployment_id"])["status"] == "created_unbound"
 
+
+
+def test_sweep_revalidates_the_app_right_before_destroying_it(world):
+    dep = run_all(world.ctrl, payload(1, ttl_minutes=1))
+    world.clock.now += 120
+    real_get = world.provider.get_app
+
+    def renewed_then_read(app_id):  # a writer changes the app after the listing
+        foreign_marker(world, world.provider.apps[app_id], expires=T0 + 99999)
+        return real_get(app_id)
+
+    world.provider.get_app = renewed_then_read
+    assert world.ctrl.reconcile()[0]["action"] == "alert"
+    assert dep["app_id"] in world.provider.apps
+    assert "expired_destroy_skipped:changed" in alert_reasons(world.ctrl)
+
+
+def test_sweep_does_not_destroy_an_app_that_vanished_after_the_listing(world):
+    dep = run_all(world.ctrl, payload(1, ttl_minutes=1))
+    world.clock.now += 120
+    world.provider.get_app = lambda app_id: None
+    assert world.ctrl.reconcile()[0]["action"] == "alert"
+    assert dep["app_id"] in world.provider.apps

@@ -89,12 +89,14 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
         self, appr: dict, dep: dict, status: str, *, approval_state: str | None = None,
         reason: str | None = None, request_id: str, caller: str | None, started: float,
         decision: str = "allow", provider_status: str | None = None,
+        extra_deployments: dict | None = None,
     ) -> dict:
         dep.update(status=status, reason=reason)
         if approval_state:
             appr["state"] = approval_state
         appr["app_id"] = dep.get("app_id")
-        self._save(approvals={appr["approval_id"]: appr}, deployments={dep["deployment_id"]: dep})
+        self._save(approvals={appr["approval_id"]: appr},
+                   deployments={**(extra_deployments or {}), dep["deployment_id"]: dep})
         self.audit.emit(
             "execute", decision, reason=reason or status, request_id=request_id, caller=caller,
             provider_status=provider_status or status, approver=appr.get("approver"),

@@ -224,6 +224,37 @@ def test_crash_after_a_replacement_with_a_foreign_version_is_not_adopted_as_succ
     assert restarted.get(dep["deployment_id"])["reason"] == "unexpected_writer"
     assert restarted.get_approval(dep["approval_id"])["state"] == "reserved"
     assert "replace_failed_uncertain:unexpected_writer" in alert_reasons(restarted)
+    assert not [d for d in restarted.store.all("deployments") if d["kind"] == "adopted"]
+
+
+def test_crash_after_a_replacement_with_an_unexplained_spec_is_not_adopted_as_success(world):
+    running, dep = replacement(world)
+
+    def die(*_args, **_kwargs):
+        raise Crash
+
+    world.ctrl._finish = die
+    with pytest.raises(Crash):
+        execute(world, dep)
+    world.provider.apps[running["app_id"]].spec["size"] = "something-else"  # same version
+    restarted = controller(world)
+    restarted.reconcile()
+    assert restarted.get(dep["deployment_id"])["reason"] == "unexpected_writer"
+    assert restarted.get_approval(dep["approval_id"])["state"] == "reserved"
+    assert "replace_failed_uncertain:unexpected_writer" in alert_reasons(restarted)
+    assert not [d for d in restarted.store.all("deployments") if d["kind"] == "adopted"]
+
+
+def test_a_replacement_supersedes_the_old_record_in_the_same_commit_as_its_own_success(world):
+    running, dep = replacement(world)
+    commits = []
+    real = world.ctrl.store.commit
+    world.ctrl.store.commit = lambda **ch: (commits.append(ch), real(**ch))[1]
+    execute(world, dep)
+    final = commits[-1]["deployments"]
+    assert final[running["deployment_id"]]["status"] == "superseded"
+    assert final[dep["deployment_id"]]["status"] == "running"
+
 
 def replaced_and_running(world):
     running, dep = replacement(world)

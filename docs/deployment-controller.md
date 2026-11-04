@@ -53,7 +53,16 @@ does and does not do.
   controllers sharing the file consume an approval at most once. Not for multiple hosts or network
   filesystems.
 - A `failed_uncertain` record is never promoted, overwritten by stop or adopted by reconciliation;
-  it is alerted on every pass until a person resolves it.
+  it is alerted on every pass until a person resolves it. The one exception is a create whose
+  outcome was unknown for a recoverable reason (`bind_pending`, `reconcile_unavailable`,
+  `no_candidate`, `no_operation_evidence`): a later pass may resolve it, but only with
+  provider-backed `find_operation` evidence of the exact app id. Duplicate claims, replacement
+  conflicts, foreign teams and unexplained specs are human-only.
+- Expiry destruction re-reads the app and revalidates ownership and expiry immediately before
+  `destroy_app`. The provider has no conditional delete, so a writer renewing the app between that
+  read and the delete is a residual race (detection and alerting, not prevention; ADR-007).
+  Replacement recovery in `reconcile` accepts a reserved replacement only if the app has exactly
+  the approved version + 1 and exactly the rebuilt approved spec, like the original execution.
 - `audit.py`: structured events with the ADR-007 fields only; tokens, environment values and bodies
   are never accepted as fields.
 - `api.py`: the ADR endpoints, authenticated with the existing `service_auth` dependency. Deployment

@@ -11,8 +11,11 @@ import secrets
 import time
 from collections import Counter
 
-from .markers import BOUND_EXPIRED, BOUND_LIVE, CLAIM_ONLY, Claim, classify, parse_claim
-from .policy import DeploymentRequest
+from .markers import (
+    BOUND_EXPIRED, BOUND_KEY, BOUND_LIVE, CLAIM_KEY, CLAIM_ONLY, Claim, bound_entry, claim_entry,
+    classify, parse_claim,
+)
+from .policy import DeploymentRequest, build_spec
 from .provider import ProviderApp, ProviderError
 
 LIVE = ("running", "created_unbound", "reserved")  # a record that stands for its app right now
@@ -112,18 +115,24 @@ class ReconcileMixin:
         """The authoritative record for an app: the one record that is not history."""
         return next((d for d in self._deps_for(app_id) if d["status"] in LIVE), None)
 
-    def _supersede(self, current: dict) -> None:
-        """One app id has one authoritative record. Earlier generations become history."""
+    def _superseded(self, current: dict) -> dict:
+        """One app id has one authoritative record: the earlier generations, as history."""
         changed = {}
         for old in self._deps_for(current.get("app_id"), current["deployment_id"]):
             if old["status"] in LIVE:
                 old.update(status="superseded", reason="superseded_by:" + current["deployment_id"])
                 changed[old["deployment_id"]] = old
-        if changed:
-            self._save(deployments=changed)
+        return changed
 
     def _sweep_destroy(self, app: ProviderApp, request_id: str) -> str:
-        try:
+        try:  # the listing may be stale: revalidate ownership and expiry right before deleting
+            current = self.provider.get_app(app.app_id)
+            if current is None or classify(
+                self._key, current, self.team_id, self._clock()
+            ) != BOUND_EXPIRED:
+                self._alert("expired_destroy_skipped:changed", request_id=request_id,
+                            app_id=app.app_id)
+                return "alert"
             self.provider.destroy_app(app.app_id)
         except ProviderError:
             self._alert("expired_destroy_failed", request_id=request_id, app_id=app.app_id)
@@ -141,28 +150,15 @@ class ReconcileMixin:
 
     def _adopt(self, app: ProviderApp, request_id: str) -> str:
         claim = parse_claim(self._key, app.env)
-        dep = self._find_dep(app.app_id)
-        if dep is None and not any(d["status"] == "failed_uncertain"
-                                   for d in self._deps_for(app.app_id)):
-            dep_id = "dep_" + secrets.token_hex(8)
-            dep = {
-                "deployment_id": dep_id, "request_id": "adopted-" + app.app_id,
-                "approval_id": None, "status": "running", "requester": None, "name": app.name,
-                "image_digest": (app.spec.get("image") or {}).get("digest", ""),
-                "size": app.spec.get("size", ""), "region": app.spec.get("region", ""),
-                "ttl_minutes": max(0, (claim.expires_at - claim.created_at) // 60),
-                "request_hash": claim.request_hash, "app_id": app.app_id,
-                "expires_at": claim.expires_at, "reason": None, "kind": "adopted",
-            }
-            self._save(deployments={dep_id: dep})
-        approvals, deployments = {}, {}
+        approvals, deployments, handled = {}, {}, False
         for appr in self.store.all("approvals"):  # crash after bind, before `executed` was saved
             if appr["state"] != "reserved" or appr["claim_id"] != claim.claim_id:
                 continue
             owner = self.store.get("deployments", appr["deployment_id"])
             if owner and owner["status"] == "failed_uncertain":
                 continue  # a detected conflict or unknown outcome is never promoted to executed
-            if owner and owner["kind"] == "replace" and not self._lineage_ok(appr, app):
+            handled = True
+            if owner and owner["kind"] == "replace" and not self._replacement_ok(appr, app, claim):
                 owner.update(status="failed_uncertain", reason="unexpected_writer")
                 self._alert("replace_failed_uncertain:unexpected_writer",
                             request_id=request_id, dep=owner)
@@ -174,19 +170,36 @@ class ReconcileMixin:
                 owner.update(status="running", reason=None, app_id=app.app_id,
                              expires_at=claim.expires_at)
                 deployments[owner["deployment_id"]] = owner
+                deployments.update(self._superseded(owner))
+        dep = self._find_dep(app.app_id)
+        if dep is None and not handled and not any(
+            d["status"] == "failed_uncertain" for d in self._deps_for(app.app_id)
+        ):
+            dep_id = "dep_" + secrets.token_hex(8)
+            deployments[dep_id] = {
+                "deployment_id": dep_id, "request_id": "adopted-" + app.app_id,
+                "approval_id": None, "status": "running", "requester": None, "name": app.name,
+                "image_digest": (app.spec.get("image") or {}).get("digest", ""),
+                "size": app.spec.get("size", ""), "region": app.spec.get("region", ""),
+                "ttl_minutes": max(0, (claim.expires_at - claim.created_at) // 60),
+                "request_hash": claim.request_hash, "app_id": app.app_id,
+                "expires_at": claim.expires_at, "reason": None, "kind": "adopted",
+            }
         if approvals or deployments:
-            self._save(approvals=approvals, deployments=deployments)
-            for owner in deployments.values():
-                if owner["status"] == "running":
-                    self._supersede(owner)
+            self._save(approvals=approvals, deployments=deployments)  # one atomic commit
         self.audit.emit("adopt", "allow", request_id=request_id, app_id=app.app_id)
         return "adopted"
 
-    @staticmethod
-    def _lineage_ok(appr: dict, app: ProviderApp) -> bool:
-        """A replacement landed exactly approved version + 1 (no foreign writer in between)."""
-        target = DeploymentRequest.model_validate(appr["request"]).replaces
-        return target is not None and app.version == target.expected_version + 1
+    def _replacement_ok(self, appr: dict, app: ProviderApp, claim: Claim) -> bool:
+        """A replacement landed exactly as approved: version + 1 and exactly the written spec."""
+        req = DeploymentRequest.model_validate(appr["request"])
+        if req.replaces is None or app.version != req.replaces.expected_version + 1:
+            return False
+        markers = {
+            CLAIM_KEY: claim_entry(self._key, claim),
+            BOUND_KEY: bound_entry(self._key, claim, app.app_id),
+        }
+        return app.spec == build_spec(req, markers)
 
     def _complete_bind(self, app: ProviderApp, seen: Counter, now: float, request_id: str) -> bool:
         """Bind a claim-only app of an intact reservation, only with independent app-id evidence.
