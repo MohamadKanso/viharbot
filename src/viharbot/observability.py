@@ -42,6 +42,18 @@ class JsonFormatter(logging.Formatter):
             ),
         }
         for key in (
+            "logical_agent",
+            "runtime_instance",
+            "runtime_kind",
+            "attempt",
+            "contract_version",
+            "operation_class",
+            "idempotency_key",
+            "deadline_ms",
+            "attempt_max_output_tokens",
+            "attempt_max_cost_usd",
+            "total_max_output_tokens",
+            "total_max_cost_usd",
             "identity_id",
             "caller",
             "decision",
