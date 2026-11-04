@@ -8,6 +8,7 @@ injects a `Transport`. It is not wired into any runtime path. See docs/nova-rout
 from __future__ import annotations
 
 import json
+import math
 import re
 import time
 from dataclasses import dataclass, field
@@ -290,6 +291,23 @@ def _valid(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
+def _valid_spend(value: Any) -> bool:
+    """Recorded spend: a non-negative integer. bool, float (incl. NaN, inf), str, None are not."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _remaining_s(deadline: RequestDeadline) -> float:
+    """Seconds left, or 0.0 when the deadline reports anything but a finite real number."""
+    value = deadline.remaining()
+    ok = isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    return float(value) if ok else 0.0
+
+
+def has_idempotency_key(key: Any) -> bool:
+    """A key is established only if it is a string with a non-whitespace character."""
+    return isinstance(key, str) and key.strip() != ""
+
+
 def _unit(
     budget: Mapping[str, Any], attempt_key: str, total_key: str, default: int | None
 ) -> tuple[int, int] | None:
@@ -307,19 +325,22 @@ def _unit(
     return attempt, total
 
 
-def retry_budget_admitted(
+def retry_budget_refusal(
     budget: Mapping[str, Any] | None,
     defaults: AttemptDefaults = AttemptDefaults(),
     spent_tokens: int = 0,
     spent_cost_micro_usd: int = 0,
-) -> bool:
-    """May a retry follow an unknown outcome? Tokens and cost are checked separately.
+) -> str | None:
+    """None if a retry may follow an unknown outcome, else the decision-record reason.
 
-    remaining = total - spent_by_resolved_attempts - full attempt allowance reserved for the
-    unresolved primary; admitted only if remaining >= attempt. Absent or invalid values refuse.
+    Tokens and cost are checked separately. remaining = total - spent_by_resolved_attempts -
+    full attempt allowance reserved for the unresolved primary; admitted only if remaining >=
+    attempt. Absent or invalid budget values, and invalid spend, refuse. Never raises.
     """
+    if not _valid_spend(spent_tokens) or not _valid_spend(spent_cost_micro_usd):
+        return "retry_budget_invalid_spend"
     if not isinstance(budget, Mapping):
-        return False
+        return "retry_budget_not_admitted"
     units = (
         ("attempt_max_output_tokens", "total_max_output_tokens", defaults.output_tokens,
          spent_tokens),
@@ -328,12 +349,22 @@ def retry_budget_admitted(
     )
     for attempt_key, total_key, default, spent in units:
         pair = _unit(budget, attempt_key, total_key, default)
-        if pair is None or spent < 0:
-            return False
+        if pair is None:
+            return "retry_budget_not_admitted"
         attempt, total = pair
         if total - spent - attempt < attempt:
-            return False
-    return True
+            return "retry_budget_not_admitted"
+    return None
+
+
+def retry_budget_admitted(
+    budget: Mapping[str, Any] | None,
+    defaults: AttemptDefaults = AttemptDefaults(),
+    spent_tokens: int = 0,
+    spent_cost_micro_usd: int = 0,
+) -> bool:
+    """May a retry follow an unknown outcome? See `retry_budget_refusal` for the rule."""
+    return retry_budget_refusal(budget, defaults, spent_tokens, spent_cost_micro_usd) is None
 
 
 # ---------------------------------------------------------------- decision table
@@ -381,6 +412,11 @@ class RoutingRequest:
     logical_agent: str = "nova"
     idempotency_key: str | None = None
     budget: Mapping[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        # None means "no key". Anything else must be a usable key, or the request is malformed.
+        if self.idempotency_key is not None and not has_idempotency_key(self.idempotency_key):
+            raise ValueError("idempotency_key must be None or a non-empty, non-blank string")
 
 
 class Transport(Protocol):
@@ -443,7 +479,7 @@ class NovaRouter:
         log: list[RoutingDecision] = []
 
         def record(attempt, inst, from_id, reason, decision, breaker, dup) -> None:
-            remaining = max(0, int(request.deadline.remaining() * 1000))
+            remaining = max(0, int(_remaining_s(request.deadline) * 1000))
             log.append(RoutingDecision(
                 request.logical_agent, request.request_id, attempt,
                 inst.instance_id if inst else None, inst.runtime_kind if inst else None,
@@ -480,7 +516,7 @@ class NovaRouter:
         ]
         if not candidates:
             return stop("no_eligible_instance", 0, False)
-        if request.deadline.expired():
+        if _remaining_s(request.deadline) <= 0:
             return stop("deadline_exhausted", 0, False)
 
         # The breaker is read once, here: it picks the initial target and nothing else.
@@ -497,7 +533,7 @@ class NovaRouter:
 
         for attempt in range(1, MAX_ATTEMPTS + 1):
             # Re-checked immediately before every send: the transport never sees a timeout <= 0.
-            remaining = request.deadline.remaining()
+            remaining = _remaining_s(request.deadline)
             if remaining <= 0:
                 return stop("deadline_exhausted", attempt - 1,
                             "unknown" if possible_dup else False)
@@ -523,18 +559,21 @@ class NovaRouter:
             secondary = others[0]
             action = next_action(
                 outcome, request.operation_class, secondary,
-                request.idempotency_key is not None, state_compatible(target, secondary),
+                has_idempotency_key(request.idempotency_key), state_compatible(target, secondary),
             )
             if action is Action.FAIL:
                 return stop("failover_not_allowed", attempt, dup, result)
-            if request.deadline.expired():
+            if _remaining_s(request.deadline) <= 0:
                 return stop("deadline_exhausted", attempt, dup, result)
-            if unknown and not (
-                target.budget_enforcement == "metered"
-                and secondary.budget_enforcement == "metered"
-                and retry_budget_admitted(request.budget, self._defaults)
-            ):
-                return stop("retry_budget_not_admitted", attempt, dup, result)
+            if unknown:
+                refusal = (
+                    retry_budget_refusal(request.budget, self._defaults)
+                    if target.budget_enforcement == "metered"
+                    and secondary.budget_enforcement == "metered"
+                    else "retry_budget_not_admitted"
+                )
+                if refusal is not None:
+                    return stop(refusal, attempt, dup, result)
             failover_from, target = target.instance_id, secondary
             reason = "unknown_outcome" if unknown else "not_accepted"
             decision = "retry_after_unknown" if unknown else "failover_not_accepted"

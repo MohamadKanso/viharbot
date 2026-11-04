@@ -22,7 +22,9 @@ from viharbot.nova_routing import (
     load_manifest,
     next_action,
     parse_manifest,
+    has_idempotency_key,
     retry_budget_admitted,
+    retry_budget_refusal,
 )
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "deploy" / "nova" / "instances.example.json"
@@ -714,3 +716,82 @@ def test_stateful_unknown_outcome_never_fails_over_either_direction(start_on_sec
     r = router(t, m, breakers=breakers, shares_state=lambda i: True).route(
         request(op="stateful"))
     assert r.error == "failover_not_allowed" and [c[0] for c in t.calls] == [start]
+
+
+# ---------------------------------------------------------------- input strictness
+
+
+@pytest.mark.parametrize("key", ["", "   ", "\t\n", 0, 1, b"k", ["k"], False])
+def test_invalid_idempotency_key_rejected_at_construction(key):
+    with pytest.raises(ValueError):
+        request(op="idempotent", key=key)
+
+
+def test_key_predicate():
+    assert [has_idempotency_key(k) for k in (None, "", " ", 1, "k", " k ")] == [
+        False, False, False, False, True, True]
+
+
+@pytest.mark.parametrize("key", ["", "   ", 7, "k"])
+def test_router_ignores_unvalidated_key_bypassing_construction(key):
+    """A request built without __post_init__ must still not establish a key."""
+    m = manifest(classes=OPERATION_CLASSES_ALL, honors=True)
+    req = request(op="idempotent", key=None)
+    object.__setattr__(req, "idempotency_key", key)
+    t = Scripted(**{PRIMARY: [TIMEOUT], SECONDARY: [ok(SECONDARY)]})
+    expected = "completed" if key == "k" else "failed"
+    assert router(t, m).route(req).status == expected
+    side = request(op="side-effecting", key=None)
+    object.__setattr__(side, "idempotency_key", key)
+    t = Scripted(**{PRIMARY: [PRE_SEND], SECONDARY: [ok(SECONDARY)]})
+    assert router(t, m).route(side).status == expected
+
+
+@pytest.mark.parametrize("op, first", [("idempotent", TIMEOUT), ("side-effecting", PRE_SEND)])
+def test_key_dependent_failover_needs_a_valid_key(op, first):
+    m = manifest(classes=OPERATION_CLASSES_ALL, honors=True)
+    t = Scripted(**{PRIMARY: [first]})
+    assert router(t, m).route(request(op=op, key=None)).error == "failover_not_allowed"
+    t = Scripted(**{PRIMARY: [first], SECONDARY: [ok(SECONDARY)]})
+    assert router(t, m).route(request(op=op, key="k")).status == "completed"
+
+
+@pytest.mark.parametrize(
+    "bad", [float("nan"), float("inf"), float("-inf"), -1, 1.0, 0.5, True, False, "0", "1", None]
+)
+@pytest.mark.parametrize("which", ["spent_tokens", "spent_cost_micro_usd"])
+def test_invalid_spend_fails_closed_without_raising(bad, which):
+    assert retry_budget_admitted(GOOD_BUDGET, DEFAULTS, **{which: bad}) is False
+    assert retry_budget_refusal(GOOD_BUDGET, DEFAULTS, **{which: bad}) == "retry_budget_invalid_spend"
+
+
+def test_valid_spend_boundary():
+    big = {**GOOD_BUDGET, "total_max_output_tokens": 3000, "total_max_cost_usd": 300_000}
+    assert retry_budget_refusal(big, DEFAULTS, 1000, 100_000) is None
+    assert retry_budget_refusal(big, DEFAULTS, 1001, 0) == "retry_budget_not_admitted"
+    assert retry_budget_refusal(big, DEFAULTS, 0, 100_001) == "retry_budget_not_admitted"
+
+
+def test_non_mapping_budget_refuses_with_reason():
+    assert retry_budget_refusal(None, DEFAULTS) == "retry_budget_not_admitted"
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf"), "9", None, True])
+def test_non_finite_or_non_numeric_deadline_is_exhausted(bad):
+    class BadDeadline:
+        def remaining(self):
+            return bad
+
+    req = request()
+    object.__setattr__(req, "deadline", BadDeadline())
+    t = Scripted()
+    r = router(t).route(req)
+    assert (r.error, t.calls) == ("deadline_exhausted", [])
+    assert r.decisions[-1].deadline_remaining_ms == 0
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -1, 1.5, True, "5", None])
+def test_invalid_budget_fields_refuse_retry(bad):
+    for name in ("attempt_max_output_tokens", "total_max_output_tokens"):
+        budget = {**GOOD_BUDGET, name: bad}
+        assert retry_budget_admitted(budget, DEFAULTS) is False
