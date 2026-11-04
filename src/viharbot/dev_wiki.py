@@ -29,6 +29,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+import gzip
+import http.client
 import ipaddress
 import json
 import logging
@@ -51,7 +53,8 @@ DEFAULT_API = "https://api.github.com"
 PAGE_SIZE = 100
 MAX_PAGES = 20  # per list; a list that needs more is reported as truncated, not silently cut
 MAX_DOC_BYTES = 400_000
-REQUEST_TIMEOUT = 10
+REQUEST_TIMEOUT = 20
+TRANSPORT_ATTEMPTS = 3  # GETs are idempotent; a dropped or truncated read is retried
 FAILURE_RETRY_SECONDS = 30
 AGENT_NAMES = ("Charlie", "Nova", "Atlas", "Pixel", "Sage", "Cipher", "Scout", "Orbit",
                "Kepler", "Archie", "Ada")
@@ -127,15 +130,31 @@ _OPENER = urllib.request.build_opener(_NoRedirect)
 
 
 def _default_transport(url: str, headers: dict[str, str]) -> tuple[int, dict[str, str], bytes]:
-    request = urllib.request.Request(url, headers=headers, method="GET")
-    try:
-        with _OPENER.open(request, timeout=REQUEST_TIMEOUT) as response:  # noqa: S310
-            return (response.status, {k.lower(): v for k, v in response.headers.items()},
-                    response.read())
-    except urllib.error.HTTPError as exc:  # includes unfollowed 3xx
-        return exc.code, {k.lower(): v for k, v in exc.headers.items()}, exc.read()
-    except (urllib.error.URLError, TimeoutError, OSError):
-        raise WikiError("network") from None
+    headers = {**headers, "Accept-Encoding": "gzip"}  # smaller bodies are less likely to be cut
+    last: Exception | None = None
+    for attempt in range(TRANSPORT_ATTEMPTS):
+        request = urllib.request.Request(url, headers=headers, method="GET")
+        try:
+            with _OPENER.open(request, timeout=REQUEST_TIMEOUT) as response:  # noqa: S310
+                return response.status, *_read(response)
+        except urllib.error.HTTPError as exc:  # includes unfollowed 3xx
+            return exc.code, *_read(exc)
+        except (urllib.error.URLError, http.client.HTTPException, TimeoutError, OSError, EOFError,
+                ValueError) as exc:
+            last = exc
+            if attempt + 1 < TRANSPORT_ATTEMPTS:
+                time.sleep(0.5 * (attempt + 1))
+    logger.warning("development wiki transport failed", extra={
+        "agent": "web", "error": type(last).__name__})
+    raise WikiError("network")
+
+
+def _read(response) -> tuple[dict[str, str], bytes]:
+    headers = {k.lower(): v for k, v in response.headers.items()}
+    body = response.read()
+    if headers.get("content-encoding", "").lower() == "gzip":
+        body = gzip.decompress(body)
+    return headers, body
 
 
 class GitHubReader:
