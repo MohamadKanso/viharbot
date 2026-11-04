@@ -267,8 +267,10 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
 
         A conditional provider gets the just-read version as the condition, so a writer that slipped
         in is refused (never retried). Otherwise the write is verified by read-back and a foreign
-        version is failed_uncertain (detection only). Expiry is checked AFTER the read and right
-        before the write, so a slow read cannot carry a bind past expiry.
+        version is failed_uncertain (detection only). The current spec must equal the approved
+        template (no normalization is defined). Expiry is checked AFTER the read and right before
+        the write, so a slow read cannot carry a bind past expiry; a write already dispatched is
+        not undone (dispatch-before-expiry, see the docs).
         """
         try:
             current = self.provider.get_app(app.app_id)
@@ -279,6 +281,12 @@ class DeploymentController(ReplaceMixin, ReconcileMixin):
             and c.claim_id == claim.claim_id
         if not mine:
             return self._uncertain(appr, dep, "unexpected_writer", "bind_failed_uncertain", **ctx)
+        approved = build_spec(
+            DeploymentRequest.model_validate(appr["request"]),
+            {CLAIM_KEY: claim_entry(self._key, claim)})
+        if current.spec != approved:  # the claim proves the request, not that the spec is intact
+            return self._uncertain(appr, dep, "unexpected_writer",
+                                   "bind_failed_uncertain:spec_changed", **ctx)
         spec = copy.deepcopy(current.spec)
         spec["env"][BOUND_KEY] = bound_entry(self._key, claim, app.app_id)
         if self._clock() >= claim.expires_at:  # the last thing before the write: no read follows
