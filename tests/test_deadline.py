@@ -176,7 +176,7 @@ def test_agentcore_timeouts_are_bounded_by_remaining_time(monkeypatch, remaining
         assert config.connect_timeout == pytest.approx(agentcore)
         assert config.read_timeout == pytest.approx(agentcore)
         assert config.retries == {"total_max_attempts": 1}  # the SDK does not retry
-        assert fake.invocations[0]["runtimeSessionId"] == RID
+        assert fake.invocations[0]["runtimeSessionId"] != RID  # derived; see test_nova_contract
 
 
 def test_agentcore_without_a_deadline_uses_the_shared_default_client(monkeypatch):

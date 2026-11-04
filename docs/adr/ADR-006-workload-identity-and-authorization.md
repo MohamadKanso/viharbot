@@ -115,16 +115,22 @@ Negative tests. **A2 (authentication, each testable without a grant):** a servic
 - **ECS/Fargate:** an Application Load Balancer cannot verify SigV4, so the in-app token check is mandatory there.
 - **LiteLLM:** unchanged. Each model-using service keeps its own key and alias, and per-agent keys depend on how the external gateway is configured, which ViharBot does not manage.
 
-### Where the issuer's key lives (founder decision)
+### Where the issuer's key lives (founder decision, 2026-11-03: option A accepted)
 
 | Option | Effect |
 |---|---|
-| A. The web process signs | Simplest. A compromise of the public-facing tier can mint tokens for every agent. |
-| B. A separate internal signer service ("Charlie service") | Smaller blast radius. One more service and one more trust point. |
+| A. The web process signs (**accepted**) | Simplest. A compromise of the public-facing tier can mint tokens for every agent. |
+| B. A separate internal signer service ("Charlie service"), the future alternative | Smaller blast radius. One more service and one more trust point. |
 
-Recommendation: implement A first behind an interface, and move to B before any agent is reachable from outside the private network or deployed to AWS.
+**Decision (founder, 2026-11-03): option A is accepted**, because this is a lab. The web process holds the signing key and mints assertions. The same holds if the web service runs in AWS, where the key is stored in AWS Secrets Manager and injected into the web service (not verified or provisioned here). Keys are separate per environment: a Stage key must never be accepted in production. The `AssertionIssuer` interface is kept so option B can replace the in-process issuer later.
 
-**First-hop grant contract for the separate signer (option B).** A separate signer reduces the blast radius only if it does not simply believe the web process. The signer therefore decides first-hop grants from **its own policy**, not from claims the web process makes:
+This **relaxes the earlier recommendation of this ADR** ("implement A first behind an interface, and move to B before any agent is reachable from outside the private network or deployed to AWS") by founder decision. Option B is no longer required before AWS or external reachability. It remains the future alternative that the interface permits.
+
+**Residual risk under option A, in every environment, stated plainly:** a secret store protects storage and rotation, but the web process still reads the key at runtime. Compromise of the web process therefore lets an attacker mint assertions for every agent and, once A3 exists, first-hop grants for any live session, bounded only by rate limits, audit and short lifetimes. Per-user identity and a signer-controlled login remain the way to shrink this.
+
+**Still open before outbound auth is enabled in Stage:** where the DigitalOcean web component's key is stored, who rotates it, and how callees receive the public-key registry.
+
+**First-hop grant contract for the separate signer (option B). Conditional: this is the design to use if the founder later adopts option B; it is not in force under the accepted option A.** A separate signer reduces the blast radius only if it does not simply believe the web process. The signer therefore decides first-hop grants from **its own policy**, not from claims the web process makes:
 
 - The web process may present only: an identifier for the authenticated user session, the engagement the user selected, and the capabilities the request needs. It never states what the user is allowed to do.
 - The signer holds a repository-configured **policy** mapping (user or session class, engagement) to the capabilities, resource scopes and classification ceiling that may ever be granted. It issues a first-hop grant for the **intersection** of the request and that policy, never more.
@@ -164,7 +170,7 @@ Recommendation: implement A first behind an interface, and move to B before any 
 
 1. Does AgentCore's JWT authorizer accept a non-Cognito issuer? (Verify before relying on it.)
 2. Does DigitalOcean offer workload identity or internal encryption? (None found.)
-3. Where does the issuer key live, and who rotates it? (Option A or B above.) For option B, how does login become signer-controlled so the web process never holds a reusable session credential?
+3. Issuer-key location is decided (option A, founder, 2026-11-03). Still open for enabling outbound auth in Stage: where the DigitalOcean web component's key is stored, who rotates it, and how callees receive the public-key registry. If option B is later adopted, how does login become signer-controlled so the web process never holds a reusable session credential?
 4. How are engagement and classification established when the web tier has one shared user?
 5. How many replicas does each agent run, given the in-memory replay cache?
 6. Which signing library is acceptable as a dependency?

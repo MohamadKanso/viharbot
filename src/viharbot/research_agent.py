@@ -15,6 +15,7 @@ from .inference_config import effective_inference, legacy_inference
 from .memory import remember
 from .agentcore_runtime import add_agentcore_routes
 from .model_agent import build_agent
+from .nova_contract import nova_log_fields
 from .observability import configure_logging, get_request_id
 from .schemas import ResearchFindings, SecurityAssessment
 from .security_client import SecurityClientError, send_findings_to_security
@@ -82,6 +83,7 @@ def research(
                 "agent": "research",
                 "request_id": request_id,
                 **inference.log_extra(),
+                **nova_log_fields(),
                 "duration_ms": inference_latency_ms,
             },
         )
@@ -97,6 +99,7 @@ def research(
                 "agent": "research",
                 "request_id": request_id,
                 **inference.log_extra(),
+                **nova_log_fields(),
                 "duration_ms": round((time.perf_counter() - started) * 1000, 2),
                 "error": type(exc).__name__,
             },
@@ -146,4 +149,4 @@ def research_and_assess(
     )
 
 
-add_agentcore_routes(app, ResearchRequest, research)
+add_agentcore_routes(app, ResearchRequest, research, logical_agent="nova")

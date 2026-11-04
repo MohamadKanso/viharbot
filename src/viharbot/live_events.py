@@ -4,6 +4,9 @@ Fourteen typed events share one envelope and form a strict discriminated union o
 Every event is built from real orchestration facts, validated here, and only then serialized.
 Nothing in this module invents activity: it only describes what the application did.
 
+Eleven further education events (`EDUCATION_EVENT_TYPES`) are declared for later phases but never
+emitted yet; they are not terminal and carry only opaque ids, counts and states.
+
 Ordering is by `sequence`, never by timestamp. Unknown fields are rejected everywhere.
 """
 
@@ -264,6 +267,83 @@ class OrchestrationFailedData(Strict):
     elapsed_ms: float = Field(ge=0)
 
 
+# ---- education event data (declared only; nothing emits these yet) ----------------------------
+# Only opaque ids, counts and states. Never prompts, PR text, learner names or secrets.
+OpaqueId = Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$")]
+Repository = Annotated[str, Field(pattern=r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")]
+
+
+class PullRequestDiscoveredData(Strict):
+    status: Literal["discovered"]
+    repository: Repository
+    pr_number: int = Field(ge=1)
+
+
+class ExtractionStartedData(Strict):
+    status: Literal["running"]
+    extraction_id: OpaqueId
+    pr_number: int = Field(ge=1)
+
+
+class ExtractionCompletedData(Strict):
+    status: Literal["completed"]
+    extraction_id: OpaqueId
+    artifact_count: int = Field(ge=0)
+    duration_ms: float = Field(ge=0)
+
+
+class InstructorUpdateProposedData(Strict):
+    status: Literal["proposed"]
+    proposal_id: OpaqueId
+    artifact_count: int = Field(ge=0)
+
+
+class InstructorUpdateApprovedData(Strict):
+    status: Literal["approved"]
+    proposal_id: OpaqueId
+
+
+class RevisionStartedData(Strict):
+    status: Literal["running"]
+    revision_id: OpaqueId
+    track_id: OpaqueId
+
+
+class RevisionProposedData(Strict):
+    status: Literal["proposed"]
+    revision_id: OpaqueId
+    track_id: OpaqueId
+    change_count: int = Field(ge=0)
+
+
+class RevisionApprovedData(Strict):
+    status: Literal["approved"]
+    revision_id: OpaqueId
+    track_id: OpaqueId
+
+
+class LessonStartedData(Strict):
+    status: Literal["running"]
+    lesson_id: OpaqueId
+    learner_ref: OpaqueId  # opaque; never a name, email or account
+
+
+class LessonCompletedData(Strict):
+    status: Literal["completed"]
+    lesson_id: OpaqueId
+    learner_ref: OpaqueId
+    duration_ms: float = Field(ge=0)
+
+
+class AssessmentCompletedData(Strict):
+    status: Literal["completed"]
+    assessment_id: OpaqueId
+    lesson_id: OpaqueId
+    learner_ref: OpaqueId
+    question_count: int = Field(ge=1)
+    outcome: Literal["passed", "needs_review"]
+
+
 # ---- the fourteen events ----------------------------------------------------------------------
 class PlannerStarted(_Envelope):
     event_type: Literal["planner_started"]
@@ -335,11 +415,71 @@ class OrchestrationFailed(_Envelope):
     data: OrchestrationFailedData
 
 
+# ---- the eleven education events: declared, not emitted, never terminal ----------------------
+class LearningPrDiscovered(_Envelope):
+    event_type: Literal["learning.pr_discovered"]
+    data: PullRequestDiscoveredData
+
+
+class LearningExtractionStarted(_Envelope):
+    event_type: Literal["learning.extraction_started"]
+    data: ExtractionStartedData
+
+
+class LearningExtractionCompleted(_Envelope):
+    event_type: Literal["learning.extraction_completed"]
+    data: ExtractionCompletedData
+
+
+class LearningInstructorUpdateProposed(_Envelope):
+    event_type: Literal["learning.instructor_update_proposed"]
+    data: InstructorUpdateProposedData
+
+
+class LearningInstructorUpdateApproved(_Envelope):
+    event_type: Literal["learning.instructor_update_approved"]
+    data: InstructorUpdateApprovedData
+
+
+class CurriculumRevisionStarted(_Envelope):
+    event_type: Literal["curriculum.revision_started"]
+    data: RevisionStartedData
+
+
+class CurriculumRevisionProposed(_Envelope):
+    event_type: Literal["curriculum.revision_proposed"]
+    data: RevisionProposedData
+
+
+class CurriculumRevisionApproved(_Envelope):
+    event_type: Literal["curriculum.revision_approved"]
+    data: RevisionApprovedData
+
+
+class LessonStarted(_Envelope):
+    event_type: Literal["lesson.started"]
+    data: LessonStartedData
+
+
+class LessonCompleted(_Envelope):
+    event_type: Literal["lesson.completed"]
+    data: LessonCompletedData
+
+
+class AssessmentCompleted(_Envelope):
+    event_type: Literal["assessment.completed"]
+    data: AssessmentCompletedData
+
+
 LiveEvent = Annotated[
     Union[
         PlannerStarted, PlannerCompleted, PlannerFailed, DelegationRequested, DelegationAuthorized,
         DelegationRejected, AgentStarted, AgentCompleted, AgentFailed, DependencyRecorded,
         EvidenceSuperseded, FinalResponse, OrchestrationCompleted, OrchestrationFailed,
+        LearningPrDiscovered, LearningExtractionStarted, LearningExtractionCompleted,
+        LearningInstructorUpdateProposed, LearningInstructorUpdateApproved,
+        CurriculumRevisionStarted, CurriculumRevisionProposed, CurriculumRevisionApproved,
+        LessonStarted, LessonCompleted, AssessmentCompleted,
     ],
     Field(discriminator="event_type"),
 ]
@@ -349,6 +489,13 @@ EVENT_TYPES: tuple[str, ...] = (
     "delegation_authorized", "delegation_rejected", "agent_started", "agent_completed",
     "agent_failed", "dependency_recorded", "evidence_superseded", "final_response",
     "orchestration_completed", "orchestration_failed")
+# Education events are a separate registry: EVENT_TYPES stays the chat-stream contract. They are
+# declared and parseable but nothing emits them, and none is terminal.
+EDUCATION_EVENT_TYPES: tuple[str, ...] = (
+    "learning.pr_discovered", "learning.extraction_started", "learning.extraction_completed",
+    "learning.instructor_update_proposed", "learning.instructor_update_approved",
+    "curriculum.revision_started", "curriculum.revision_proposed", "curriculum.revision_approved",
+    "lesson.started", "lesson.completed", "assessment.completed")
 TERMINAL_EVENT_TYPES = frozenset({"orchestration_completed", "orchestration_failed"})
 
 _adapter = TypeAdapter(LiveEvent)

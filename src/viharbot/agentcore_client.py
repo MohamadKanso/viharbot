@@ -6,6 +6,7 @@ import json
 import os
 import threading
 from typing import Any
+from uuid import uuid4
 
 from .deadline import DeadlineExceeded, RequestDeadline, is_timeout_error
 
@@ -72,9 +73,12 @@ def invoke_agentcore(
     else:
         client = _deadline_client(deadline.require_remaining())
 
+    # AgentCore requires runtimeSessionId of at least 33 characters, but a request id may be
+    # 1 to 128. The session id is derived (36 + 5 characters); the request id stays in the payload.
+    session_id = f"nova-{uuid4()}"
     arguments = dict(
         agentRuntimeArn=runtime_arn,
-        runtimeSessionId=request_id,
+        runtimeSessionId=session_id,
         qualifier="DEFAULT",
         contentType="application/json",
         accept="application/json",
