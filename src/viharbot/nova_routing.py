@@ -454,6 +454,21 @@ class NovaRouter:
             record(attempt, None, None, None, error, None, dup)
             return RoutingResult("failed", error, final, tuple(log))
 
+        def state_compatible(holder: Instance, other: Instance) -> bool:
+            """May state held on `holder` be used on `other`? Symmetric over the pair.
+
+            `shares_state(i)` says instance i shares the primary's state, so the pair is
+            compatible when the non-primary side shares it, whichever side is the holder.
+            """
+            primary = self._manifest.primary
+            if holder is other:
+                return True
+            if holder is primary:
+                return self._shares_state(other)
+            if other is primary:
+                return self._shares_state(holder)
+            return self._shares_state(holder) and self._shares_state(other)
+
         # Eligibility is evaluated per request and instance, so failover never widens it.
         # Stateful work may start on a non-primary only if it shares the primary's state.
         candidates = [
@@ -462,8 +477,7 @@ class NovaRouter:
             and self._eligible(i, request)
             and (
                 request.operation_class != "stateful"
-                or i is self._manifest.primary
-                or self._shares_state(i)
+                or state_compatible(self._manifest.primary, i)
             )
         ]
         if not candidates:
@@ -484,11 +498,14 @@ class NovaRouter:
         possible_dup: bool | str = False
 
         for attempt in range(1, MAX_ATTEMPTS + 1):
+            # Re-checked immediately before every send: the transport never sees a timeout <= 0.
+            remaining = request.deadline.remaining()
+            if remaining <= 0:
+                return stop("deadline_exhausted", attempt - 1,
+                            "unknown" if possible_dup else False)
             record(attempt, target, failover_from, reason, decision,
                    snapshot[target.instance_id], possible_dup)
-            result = self._transport.send(
-                target, request, attempt, max(0.0, request.deadline.remaining())
-            )
+            result = self._transport.send(target, request, attempt, remaining)
             outcome = classify(result, target)
             self._breakers[target.instance_id].record_attempt(
                 outcome in (Outcome.COMPLETED, Outcome.FAILED_AFTER_RUNNING)
@@ -508,7 +525,7 @@ class NovaRouter:
             secondary = others[0]
             action = next_action(
                 outcome, request.operation_class, secondary,
-                request.idempotency_key is not None, self._shares_state(secondary),
+                request.idempotency_key is not None, state_compatible(target, secondary),
             )
             if action is Action.FAIL:
                 return stop("failover_not_allowed", attempt, dup, result)

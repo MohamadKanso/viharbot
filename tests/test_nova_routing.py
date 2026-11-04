@@ -504,6 +504,60 @@ def test_deadline_exhausted_blocks_retry_and_failover():
         assert r.error == op_error and len(t.calls) == 1
 
 
+class TickingBreaker(CircuitBreaker):
+    """Consumes time when its state is read, as a slow breaker inspection would."""
+
+    def __init__(self, clock, step):
+        super().__init__(clock=clock)
+        self.ticker, self.step = clock, step
+
+    @property
+    def state(self):
+        self.ticker.now += self.step
+        return super().state
+
+
+class TickingBudget(dict):
+    """A budget whose inspection consumes time, as a slow retry preparation would."""
+
+    def __init__(self, clock, step, *a):
+        super().__init__(*a)
+        self.clock, self.step = clock, step
+
+    def __contains__(self, key):
+        self.clock.now += self.step
+        return super().__contains__(key)
+
+
+def test_deadline_expiring_between_selection_and_send_never_reaches_transport():
+    clock = Clock()
+    breakers = {PRIMARY: TickingBreaker(clock, 60), SECONDARY: TickingBreaker(clock, 0)}
+    t = Scripted()
+    r = router(t, breakers=breakers).route(request(seconds=30, clock=clock))
+    assert (r.status, r.error, t.calls) == ("failed", "deadline_exhausted", [])
+    last = r.decisions[-1]
+    assert (last.routing_decision, last.deadline_remaining_ms, last.possible_duplicate) == (
+        "deadline_exhausted", 0, False)
+
+
+def test_deadline_exactly_zero_never_reaches_transport():
+    clock = Clock()
+    t = Scripted()
+    r = router(t).route(request(seconds=0, clock=clock))
+    assert (r.error, t.calls) == ("deadline_exhausted", [])
+
+
+def test_deadline_expiring_before_retry_send_sends_nothing_more():
+    clock = Clock()
+    budget = TickingBudget(clock, 100, GOOD_BUDGET)
+    t = Scripted(**{PRIMARY: [TIMEOUT]})
+    r = router(t).route(request(seconds=30, clock=clock, budget=budget))
+    assert r.error == "deadline_exhausted" and len(t.calls) == 1
+    assert all(c[3] > 0 for c in t.calls)
+    assert r.decisions[-1].possible_duplicate == "unknown"
+    assert r.decisions[-1].attempt == 1
+
+
 def test_idempotent_unknown_outcome_never_retried_today():
     m = manifest(classes=("read_only", "idempotent"))
     t = Scripted(**{PRIMARY: [TIMEOUT]})
@@ -623,3 +677,40 @@ def test_manifest_copy_is_unmodified_by_helpers():
     snapshot = copy.deepcopy(raw)
     parse_manifest(raw)
     assert raw == snapshot
+
+
+@pytest.mark.parametrize("start_on_secondary", [False, True])
+@pytest.mark.parametrize("shared", [False, True])
+def test_stateful_not_accepted_moves_only_between_state_sharing_instances(
+        start_on_secondary, shared):
+    m = manifest(classes=OPERATION_CLASSES_ALL)
+    start, other = (SECONDARY, PRIMARY) if start_on_secondary else (PRIMARY, SECONDARY)
+    breakers = {}
+    if start_on_secondary:
+        breakers[PRIMARY] = CircuitBreaker(failure_threshold=1, clock=Clock())
+        breakers[PRIMARY].record_attempt(False)  # initial selection lands on the secondary
+    t = Scripted(**{start: [PRE_SEND], other: [ok(other)]})
+    r = router(t, m, breakers=breakers,
+               shares_state=lambda i: shared and i.instance_id == SECONDARY).route(
+        request(op="stateful"))
+    if start_on_secondary and not shared:
+        # the secondary may not even receive stateful work without shared state
+        assert [c[0] for c in t.calls] == [PRIMARY]
+    elif shared:
+        assert r.status == "completed" and [c[0] for c in t.calls] == [start, other]
+    else:
+        assert r.error == "no_failover_target" and [c[0] for c in t.calls] == [start]
+
+
+@pytest.mark.parametrize("start_on_secondary", [False, True])
+def test_stateful_unknown_outcome_never_fails_over_either_direction(start_on_secondary):
+    m = manifest(classes=OPERATION_CLASSES_ALL)
+    breakers = {}
+    if start_on_secondary:
+        breakers[PRIMARY] = CircuitBreaker(failure_threshold=1, clock=Clock())
+        breakers[PRIMARY].record_attempt(False)
+    start = SECONDARY if start_on_secondary else PRIMARY
+    t = Scripted(**{start: [TIMEOUT]})
+    r = router(t, m, breakers=breakers, shares_state=lambda i: True).route(
+        request(op="stateful"))
+    assert r.error == "failover_not_allowed" and [c[0] for c in t.calls] == [start]
