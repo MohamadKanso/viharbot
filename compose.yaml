@@ -11,6 +11,9 @@ services:
       WEB_AUTH_ENABLED: ${WEB_AUTH_ENABLED:-0}
       WEB_USERNAME: ${WEB_USERNAME:-}
       WEB_PASSWORD: ${WEB_PASSWORD:-}
+      # Development Wiki (read-only). Empty means the wiki reports itself unavailable. Use a
+      # fine-grained read-only token for this one repository; it never reaches the browser.
+      DEV_WIKI_GITHUB_TOKEN: ${DEV_WIKI_GITHUB_TOKEN:-}
       RESEARCH_URL: http://research:8000/research
       SECURITY_URL: http://security:8000/assess
       FACT_CHECK_URL: http://fact-check:8000/process
