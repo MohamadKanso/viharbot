@@ -26,7 +26,14 @@ does not do.
   independent app-id evidence: the app id recorded from the create response, or a provider-backed
   operation lookup. Nothing is deleted on a name prefix.
 - `store.py`: one JSON file, atomic and fsynced writes, no database. A missing or corrupt file is
-  treated as lost state.
+  treated as lost state. `RecordStore.locked()` takes an exclusive advisory file lock (POSIX
+  `flock`) and re-reads the file, so controllers in one or several processes on the same file
+  consume an approval at most once. It does not work across hosts or network filesystems.
+- Deployment records: one app id has one authoritative record. A successful replacement marks the
+  earlier record `superseded` (history); expiry and stop update every live record of the app. A
+  `failed_uncertain` record is never promoted, overwritten by stop or adopted by reconciliation;
+  it is alerted on every pass until a person resolves it. A claim-only app is never bound once its
+  claim has expired, and is alerted instead.
 - `audit.py`: structured events with the ADR-007 fields only; the token, environment values and
   bodies are never accepted as fields.
 - `api.py`: the ADR endpoints, authenticated with the existing `service_auth` dependency. Deployment

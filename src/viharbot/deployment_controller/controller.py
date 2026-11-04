@@ -3,7 +3,9 @@
 Approval states are ``pending -> reserved(claim_id) -> executed | expired``. A reservation is
 durably recorded before any provider call and is never returned to ``pending``. A provider timeout
 is an unknown outcome and never produces a second create. Everything here runs under one lock, so
-the controller's own replacements are serialized.
+replacements are serialized, including across controller instances and processes that share the
+store file: ``RecordStore.locked()`` takes a file lock and reloads before every read-modify-write,
+so only one instance can reserve (consume) a given approval.
 """
 
 from __future__ import annotations
@@ -11,7 +13,6 @@ from __future__ import annotations
 import copy
 import hmac
 import secrets
-import threading
 import time
 from collections import Counter
 from typing import Callable
@@ -32,6 +33,12 @@ from .provider import (
 from .store import RecordStore, StoreError
 
 HOUR, DAY = 3600, 86400
+LIVE = ("running", "created_unbound", "reserved")  # a record that stands for its app right now
+# A create whose outcome was unknown for one of these reasons can still be resolved later with
+# provider-backed evidence. Replacement conflicts and duplicate claims never can.
+RECOVERABLE = (
+    None, "bind_pending", "reconcile_unavailable", "no_candidate", "no_operation_evidence",
+)
 
 
 class DeploymentController:
@@ -46,7 +53,6 @@ class DeploymentController:
         self.audit = audit or AuditLog()
         self.alerts: list[dict] = []
         self._key, self._clock, self._instance = marker_key, clock, instance_id
-        self._lock = threading.RLock()
 
     # --- helpers --------------------------------------------------------------------------------
 
@@ -120,7 +126,7 @@ class DeploymentController:
             raise self._refuse("submit", denied.reason, denied.status,
                                request_id=request_id, caller=caller) from None
         digest = request_hash(req, self.team_id)
-        with self._lock:
+        with self.store.locked():
             for existing in self.store.all("deployments"):
                 if existing["request_id"] == req.request_id:
                     if existing["request_hash"] != digest:
@@ -164,7 +170,7 @@ class DeploymentController:
             "approve", reason, status, request_id=request_id, caller=approver, dep=dep)
         if approver not in self.policy.approvers:
             raise refuse("approver_not_authorized", 403)
-        with self._lock:
+        with self.store.locked():
             appr = self.store.get("approvals", approval_id)
             if appr is None:
                 raise refuse("unknown_approval", 404)
@@ -195,7 +201,7 @@ class DeploymentController:
     def execute(self, approval_id: str, *, caller: str, request_id: str) -> dict:
         """Reserve durably, then call the provider. Returns the deployment record."""
         started = time.perf_counter()
-        with self._lock:
+        with self.store.locked():
             appr = self.store.get("approvals", approval_id)
             if appr is None:  # also what a wiped store looks like: never read as pending
                 raise self._refuse("execute", "unknown_approval", 404,
@@ -278,6 +284,13 @@ class DeploymentController:
         self._save(approvals={appr["approval_id"]: appr}, deployments={dep["deployment_id"]: dep})
         return self._bind(appr, dep, app, claim, **ctx)
 
+    def _record_evidence_and_bind(self, appr, dep, app: ProviderApp, claim: Claim, **ctx) -> dict:
+        """Durably record the independent app-id evidence, and only then bind (ADR-007)."""
+        dep.update(app_id=app.app_id, status="created_unbound", reason=None)
+        appr["app_id"] = app.app_id
+        self._save(approvals={appr["approval_id"]: appr}, deployments={dep["deployment_id"]: dep})
+        return self._bind(appr, dep, app, claim, **ctx)
+
     def _bind(self, appr, dep, app: ProviderApp, claim: Claim, **ctx) -> dict:
         spec = copy.deepcopy(app.spec)
         spec["env"][BOUND_KEY] = bound_entry(self._key, claim, app.app_id)
@@ -299,8 +312,7 @@ class DeploymentController:
             if (c := parse_claim(self._key, a.env)) and c.claim_id == claim.claim_id
         ]
         if len(found) == 1 and self.provider.find_operation(claim.claim_id) == found[0].app_id:
-            dep["app_id"] = appr["app_id"] = found[0].app_id
-            return self._bind(appr, dep, found[0], claim, **ctx)
+            return self._record_evidence_and_bind(appr, dep, found[0], claim, **ctx)
         reason = (
             "reconcile_unavailable" if apps is None else "duplicate_claims" if len(found) > 1
             else "no_candidate" if not found else "no_operation_evidence"
@@ -333,6 +345,7 @@ class DeploymentController:
             reason = "unexpected_writer" if landed else "update_outcome_unknown"
             self._alert("replace_failed_uncertain:" + reason, request_id=request_id, dep=dep)
             return self._finish(appr, dep, "failed_uncertain", reason=reason, **ctx)
+        self._supersede(dep)
         return self._finish(appr, dep, "running", approval_state="executed", **ctx)
 
     # --- read, stop, delete ---------------------------------------------------------------------
@@ -365,7 +378,7 @@ class DeploymentController:
         return app
 
     def logs(self, deployment_id: str, lines: int, *, caller: str, request_id: str) -> str:
-        with self._lock:
+        with self.store.locked():
             dep = self.get(deployment_id)
             app = self._owned_app(dep, "logs", caller, request_id)
             if app is None:
@@ -384,8 +397,12 @@ class DeploymentController:
     def destroy(self, deployment_id: str, *, caller: str, request_id: str, keep_record: bool) -> dict:
         """Stop (keep the record) or delete. Only an app with verified ownership is destroyed."""
         action = "stop" if keep_record else "delete"
-        with self._lock:
+        with self.store.locked():
             dep = self.get(deployment_id)
+            if dep["status"] == "failed_uncertain":
+                # An unresolved conflict must not be overwritten by a stop: a person resolves it.
+                raise self._refuse(action, "record_not_authoritative", 409,
+                                   request_id=request_id, caller=caller, dep=dep)
             app = self._owned_app(dep, action, caller, request_id)
             try:
                 if app is not None:
@@ -394,7 +411,12 @@ class DeploymentController:
                 raise self._refuse(action, "provider_unavailable", 502, request_id=request_id,
                                    caller=caller, dep=dep) from None
             dep["status"] = "stopped"
-            self._save(deployments={deployment_id: dep},
+            changed = {deployment_id: dep}
+            for other in self._deps_for(dep["app_id"], deployment_id):  # same app, same fate
+                if other["status"] in LIVE:
+                    other["status"] = "stopped"
+                    changed[other["deployment_id"]] = other
+            self._save(deployments=changed,
                        remove_deployments=() if keep_record else (deployment_id,))
             self.audit.emit(action, "allow", request_id=request_id, caller=caller,
                             provider_status="destroyed", **self._fields(dep))
@@ -410,7 +432,7 @@ class DeploymentController:
         not duplicated). Everything else, and anything with no verified marker, is left alone and
         alerted. Nothing is deleted on a name prefix alone.
         """
-        with self._lock:
+        with self.store.locked():
             now = self._clock()
             apps = [a for a in self.provider.list_apps()
                     if a.name.startswith(self.policy.name_prefix)]
@@ -425,20 +447,44 @@ class DeploymentController:
                     outcome["action"] = self._sweep_destroy(app, request_id)
                 elif kind == BOUND_LIVE:
                     outcome["action"] = self._adopt(app, request_id)
-                elif kind == CLAIM_ONLY and self._complete_bind(app, seen, request_id):
+                elif kind == CLAIM_ONLY and self._complete_bind(app, seen, now, request_id):
                     outcome["action"] = "bound"
                 else:
-                    self._alert(f"left_alone:{kind}", request_id=request_id, app_id=app.app_id)
+                    # A claim-only app is never adopted or deleted, expired or not: alert a person.
+                    expired = kind == CLAIM_ONLY and now >= parse_claim(self._key, app.env).expires_at
+                    self._alert(f"left_alone:{kind}{':expired' if expired else ''}",
+                                request_id=request_id, app_id=app.app_id)
                 results.append(outcome)
             known = {a.app_id for a in apps}
             for appr in self.store.all("approvals"):
-                if appr["state"] == "reserved" and appr.get("app_id") not in known:
-                    dep = self.store.get("deployments", appr["deployment_id"])
+                if appr["state"] != "reserved":
+                    continue
+                dep = self.store.get("deployments", appr["deployment_id"])
+                if dep and dep["status"] == "failed_uncertain":
+                    # Never resolved by the controller: it keeps alerting until a person acts.
+                    self._alert("failed_uncertain_unresolved:" + str(dep.get("reason")),
+                                request_id=request_id, dep=dep)
+                elif appr.get("app_id") not in known:
                     self._alert("reservation_unresolved", request_id=request_id, dep=dep)
             return results
 
+    def _deps_for(self, app_id: str | None, exclude: str | None = None) -> list[dict]:
+        return [d for d in self.store.all("deployments")
+                if app_id and d.get("app_id") == app_id and d["deployment_id"] != exclude]
+
     def _find_dep(self, app_id: str) -> dict | None:
-        return next((d for d in self.store.all("deployments") if d.get("app_id") == app_id), None)
+        """The authoritative record for an app: the one record that is not history."""
+        return next((d for d in self._deps_for(app_id) if d["status"] in LIVE), None)
+
+    def _supersede(self, current: dict) -> None:
+        """One app id has one authoritative record. Earlier generations become history."""
+        changed = {}
+        for old in self._deps_for(current.get("app_id"), current["deployment_id"]):
+            if old["status"] in LIVE:
+                old.update(status="superseded", reason="superseded_by:" + current["deployment_id"])
+                changed[old["deployment_id"]] = old
+        if changed:
+            self._save(deployments=changed)
 
     def _sweep_destroy(self, app: ProviderApp, request_id: str) -> str:
         try:
@@ -446,10 +492,13 @@ class DeploymentController:
         except ProviderError:
             self._alert("expired_destroy_failed", request_id=request_id, app_id=app.app_id)
             return "alert"
-        dep = self._find_dep(app.app_id)
-        if dep:
-            dep["status"] = "expired"
-            self._save(deployments={dep["deployment_id"]: dep})
+        changed = {}
+        for dep in self._deps_for(app.app_id):  # every record whose app just disappeared
+            if dep["status"] in LIVE or dep["status"] == "stopped":
+                dep["status"] = "expired"
+                changed[dep["deployment_id"]] = dep
+        if changed:
+            self._save(deployments=changed)
         self.audit.emit("expire_destroy", "allow", request_id=request_id, app_id=app.app_id,
                         provider_status="destroyed")
         return "destroyed"
@@ -457,7 +506,8 @@ class DeploymentController:
     def _adopt(self, app: ProviderApp, request_id: str) -> str:
         claim = parse_claim(self._key, app.env)
         dep = self._find_dep(app.app_id)
-        if dep is None:
+        if dep is None and not any(d["status"] == "failed_uncertain"
+                                   for d in self._deps_for(app.app_id)):
             dep_id = "dep_" + secrets.token_hex(8)
             dep = {
                 "deployment_id": dep_id, "request_id": "adopted-" + app.app_id,
@@ -471,31 +521,67 @@ class DeploymentController:
             self._save(deployments={dep_id: dep})
         approvals, deployments = {}, {}
         for appr in self.store.all("approvals"):  # crash after bind, before `executed` was saved
-            if appr["state"] == "reserved" and appr["claim_id"] == claim.claim_id:
-                appr.update(state="executed", app_id=app.app_id)
-                approvals[appr["approval_id"]] = appr
-                owner = self.store.get("deployments", appr["deployment_id"])
-                if owner:
-                    owner.update(status="running", reason=None, app_id=app.app_id,
-                                 expires_at=claim.expires_at)
-                    deployments[owner["deployment_id"]] = owner
-        if approvals:
+            if appr["state"] != "reserved" or appr["claim_id"] != claim.claim_id:
+                continue
+            owner = self.store.get("deployments", appr["deployment_id"])
+            if owner and owner["status"] == "failed_uncertain":
+                continue  # a detected conflict or unknown outcome is never promoted to executed
+            if owner and owner["kind"] == "replace" and not self._lineage_ok(appr, app):
+                owner.update(status="failed_uncertain", reason="unexpected_writer")
+                self._alert("replace_failed_uncertain:unexpected_writer",
+                            request_id=request_id, dep=owner)
+                deployments[owner["deployment_id"]] = owner
+                continue
+            appr.update(state="executed", app_id=app.app_id)
+            approvals[appr["approval_id"]] = appr
+            if owner:
+                owner.update(status="running", reason=None, app_id=app.app_id,
+                             expires_at=claim.expires_at)
+                deployments[owner["deployment_id"]] = owner
+        if approvals or deployments:
             self._save(approvals=approvals, deployments=deployments)
+            for owner in deployments.values():
+                if owner["status"] == "running":
+                    self._supersede(owner)
         self.audit.emit("adopt", "allow", request_id=request_id, app_id=app.app_id)
         return "adopted"
 
-    def _complete_bind(self, app: ProviderApp, seen: Counter, request_id: str) -> bool:
+    @staticmethod
+    def _lineage_ok(appr: dict, app: ProviderApp) -> bool:
+        """A replacement landed exactly approved version + 1 (no foreign writer in between)."""
+        target = DeploymentRequest.model_validate(appr["request"]).replaces
+        return target is not None and app.version == target.expected_version + 1
+
+    def _complete_bind(self, app: ProviderApp, seen: Counter, now: float, request_id: str) -> bool:
+        """Bind a claim-only app of an intact reservation, only with independent app-id evidence.
+
+        Evidence is the app id recorded from the create response, or else provider-backed operation
+        evidence, which is recorded durably before the bind. An expired claim is never bound.
+        """
         claim = parse_claim(self._key, app.env)
-        if seen[claim.claim_id] != 1:
-            return False  # duplicate claim matches: leave every one untouched
+        if seen[claim.claim_id] != 1 or now >= claim.expires_at:
+            return False  # duplicate claim matches or an expired claim: leave untouched, alert
         for appr in self.store.all("approvals"):
-            if (
+            if not (
                 appr["state"] == "reserved" and appr["claim_id"] == claim.claim_id
-                and appr.get("app_id") == app.app_id  # recorded from the create response
                 and appr["request_hash"] == claim.request_hash
             ):
-                dep = self.store.get("deployments", appr["deployment_id"])
-                self._bind(appr, dep, app, claim, request_id=request_id, caller=None,
-                           started=time.perf_counter())
-                return dep["status"] == "running"
+                continue
+            dep = self.store.get("deployments", appr["deployment_id"])
+            if dep is None or dep["kind"] != "create" or dep.get("reason") not in RECOVERABLE:
+                return False
+            ctx = dict(request_id=request_id, caller=None, started=time.perf_counter())
+            if appr.get("app_id") == app.app_id:
+                evidence = True  # recorded from the create response
+            elif appr.get("app_id"):
+                return False  # the reservation names another app: this is a copy
+            else:
+                try:
+                    evidence = self.provider.find_operation(claim.claim_id) == app.app_id
+                except ProviderError:
+                    evidence = False  # lookup unavailable: unresolved, try again next pass
+            if not evidence:
+                return False
+            self._record_evidence_and_bind(appr, dep, app, claim, **ctx)
+            return self.store.get("deployments", dep["deployment_id"])["status"] == "running"
         return False

@@ -124,7 +124,9 @@ def test_request_hash_binds_every_field_template_version_and_team(monkeypatch):
 
 def test_changing_an_environment_value_after_approval_invalidates_it(world):
     dep = submit_approved(world.ctrl, payload())
-    world.ctrl.store.data["approvals"][dep["approval_id"]]["request"]["env"]["LOG_LEVEL"] = "debug"
+    tampered = world.ctrl.store.get("approvals", dep["approval_id"])
+    tampered["request"]["env"]["LOG_LEVEL"] = "debug"
+    world.ctrl.store.commit(approvals={dep["approval_id"]: tampered})
     assert reason_of(execute, world, dep) == "request_changed_after_approval"
     assert not world.provider.apps
     assert reason_of(execute, world, dep) == "approval_not_pending"
@@ -180,7 +182,9 @@ def test_approving_again_is_a_safe_retry_only_for_the_same_approver_and_hash(wor
     approve(world.ctrl, dep)  # same approver, same hash, still pending
     assert reason_of(world.ctrl.approve, dep["approval_id"], approver="approver",
                      reviewed_hash="wrong", request_id="r") == "request_hash_mismatch"
-    world.ctrl.store.data["approvals"][dep["approval_id"]]["approver"] = "someone-else"
+    other = world.ctrl.store.get("approvals", dep["approval_id"])
+    other["approver"] = "someone-else"
+    world.ctrl.store.commit(approvals={dep["approval_id"]: other})
     assert reason_of(approve, world.ctrl, dep) == "approval_not_pending"
 
 
@@ -747,3 +751,237 @@ def test_controller_requires_a_marker_key(tmp_path):
         from viharbot.deployment_controller.policy import Policy
         DeploymentController(provider=FakeProvider(), store=RecordStore(tmp_path / "s.json"),
                              policy=Policy(), marker_key=b"")
+
+
+# --- review round: conflicts survive reconcile, evidence before bind, generations, locking -------
+
+
+def race_world(tmp_path):
+    world = make_world(tmp_path, conditional_update=False)
+    running, dep = replacement(world)
+    world.provider.before_update = lambda p, app_id: p.bump_version(app_id)
+    done = execute(world, dep)
+    assert done["reason"] == "unexpected_writer"
+    world.provider.before_update = None
+    return world, running, dep, done
+
+
+def test_reconcile_after_the_writer_race_keeps_failed_uncertain_and_the_alert(tmp_path):
+    world, running, dep, done = race_world(tmp_path)
+    for ctrl in (world.ctrl, controller(world)):  # the same controller, then a restart
+        results = ctrl.reconcile()
+        assert [r["action"] for r in results] == ["adopted"]
+        record = ctrl.get(done["deployment_id"])
+        assert record["status"] == "failed_uncertain" and record["reason"] == "unexpected_writer"
+        assert ctrl.get_approval(dep["approval_id"])["state"] == "reserved"
+        assert "failed_uncertain_unresolved:unexpected_writer" in alert_reasons(ctrl)
+    assert controller(world).get(running["deployment_id"])["status"] == "running"
+    assert len(world.ctrl.store.all("deployments")) == 2  # nothing "adopted" on top of the conflict
+
+
+def test_reconcile_after_an_unknown_replacement_outcome_stays_failed_uncertain(world):
+    running, dep = replacement(world)
+    world.provider.fail_next("update", "before")
+    done = execute(world, dep)
+    assert done["reason"] == "update_outcome_unknown"
+    restarted = controller(world)
+    restarted.reconcile()
+    assert restarted.get(done["deployment_id"])["status"] == "failed_uncertain"
+    assert "failed_uncertain_unresolved:update_outcome_unknown" in alert_reasons(restarted)
+
+
+def test_crash_after_a_clean_replacement_is_adopted_and_supersedes_the_old_record(world):
+    running, dep = replacement(world)
+
+    def die(*_args, **_kwargs):
+        raise Crash
+
+    world.ctrl._finish = die
+    with pytest.raises(Crash):
+        execute(world, dep)
+    restarted = controller(world)
+    assert [r["action"] for r in restarted.reconcile()] == ["adopted"]
+    assert restarted.get_approval(dep["approval_id"])["state"] == "executed"
+    assert restarted.get(dep["deployment_id"])["status"] == "running"
+    assert restarted.get(running["deployment_id"])["status"] == "superseded"
+
+
+def test_crash_after_a_replacement_with_a_foreign_version_is_not_adopted_as_success(tmp_path):
+    world = make_world(tmp_path, conditional_update=False)
+    running, dep = replacement(world)
+
+    def die(*_args, **_kwargs):
+        raise Crash
+
+    world.ctrl._finish = die
+    with pytest.raises(Crash):
+        execute(world, dep)
+    world.provider.bump_version(running["app_id"])
+    restarted = controller(world)
+    restarted.reconcile()
+    assert restarted.get(dep["deployment_id"])["reason"] == "unexpected_writer"
+    assert restarted.get_approval(dep["approval_id"])["state"] == "reserved"
+    assert "replace_failed_uncertain:unexpected_writer" in alert_reasons(restarted)
+
+
+def test_evidence_is_recorded_durably_before_a_recovery_bind(world):
+    dep = submit_approved(world.ctrl, payload())
+    world.provider.fail_next("create", "after")
+
+    def die(*_args, **_kwargs):
+        raise Crash
+
+    world.provider.update_app = die  # the process dies at the bind that follows the recovery
+    with pytest.raises(Crash):
+        execute(world, dep)
+    saved = RecordStore(world.path)  # what a restart sees
+    appr = saved.get("approvals", dep["approval_id"])
+    assert appr["state"] == "reserved" and appr["app_id"] == "app-0001"
+    assert saved.get("deployments", dep["deployment_id"])["status"] == "created_unbound"
+    assert markers.BOUND_KEY not in world.provider.apps["app-0001"].env
+    del world.provider.update_app
+    restarted = controller(world)
+    assert [r["action"] for r in restarted.reconcile()] == ["bound"]
+    assert restarted.get_approval(dep["approval_id"])["state"] == "executed"
+
+
+def test_a_copied_claim_never_rebinds_once_evidence_names_another_app(world):
+    dep = submit_approved(world.ctrl, payload())
+    world.provider.fail_next("create", "after")
+    original = world.provider.update_app
+    calls = []
+
+    def lose_bind(*args):
+        calls.append(1)
+        raise ProviderTimeout("update")
+
+    world.provider.update_app = lose_bind
+    done = execute(world, dep)
+    world.provider.update_app = original
+    assert done["status"] == "created_unbound" and calls
+    twin = world.provider.add_foreign("orbit-twin")
+    world.provider.copy_markers(done["app_id"], twin.app_id, (markers.CLAIM_KEY,))
+    world.provider.destroy_app(done["app_id"])  # only the copy remains
+    restarted = controller(world)
+    assert [r["action"] for r in restarted.reconcile()] == ["alert"]
+    assert markers.BOUND_KEY not in twin.env
+
+
+def unavailable_listing(world):
+    dep = submit_approved(world.ctrl, payload())
+    world.provider.fail_next("create", "after")
+    original, calls = world.provider.list_apps, []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) > 1:
+            raise ProviderTimeout("list")
+        return original()
+
+    world.provider.list_apps = flaky
+    done = execute(world, dep)
+    world.provider.list_apps = original
+    assert done["reason"] == "reconcile_unavailable" and done["app_id"] is None
+    return dep, done
+
+
+def test_a_later_pass_recovers_an_unknown_create_from_operation_evidence(world):
+    dep, done = unavailable_listing(world)
+    lookup = world.provider.find_operation
+
+    def broken(_claim_id):
+        raise ProviderTimeout("lookup")
+
+    world.provider.find_operation = broken  # a lookup failure is unresolved, not a bind
+    first = controller(world)
+    assert [r["action"] for r in first.reconcile()] == ["alert"]
+    assert markers.BOUND_KEY not in world.provider.apps["app-0001"].env
+    world.provider.find_operation = lookup
+    second = controller(world)
+    assert [r["action"] for r in second.reconcile()] == ["bound"]
+    record = second.get(done["deployment_id"])
+    assert record["status"] == "running" and record["app_id"] == "app-0001"
+    assert second.get_approval(dep["approval_id"])["state"] == "executed"
+    assert world.provider.calls.count("create") == 1
+
+
+def test_a_later_pass_without_operation_evidence_stays_unbound(tmp_path):
+    world = make_world(tmp_path, operation_lookup=False)
+    dep, _ = unavailable_listing(world)
+    assert [r["action"] for r in controller(world).reconcile()] == ["alert"]
+    assert world.ctrl.get_approval(dep["approval_id"])["state"] == "reserved"
+
+
+def test_an_expired_claim_only_app_is_never_bound_adopted_or_deleted(world):
+    dep, done = bind_fails(world)
+    world.clock.now += 2 * 3600
+    restarted = controller(world)
+    assert [r["action"] for r in restarted.reconcile()] == ["alert"]
+    assert "left_alone:claim_only:expired" in alert_reasons(restarted)
+    assert markers.BOUND_KEY not in app_of(world, done).env
+    assert "destroy" not in world.provider.calls and "update" in world.provider.calls
+    assert restarted.get(done["deployment_id"])["status"] == "created_unbound"
+
+
+def replaced_and_running(world):
+    running, dep = replacement(world)
+    done = execute(world, dep)
+    assert done["status"] == "running"
+    return running, done
+
+
+def test_one_app_id_has_one_authoritative_record_and_expiry_covers_it(world):
+    running, done = replaced_and_running(world)
+    assert world.ctrl.get(running["deployment_id"])["status"] == "superseded"
+    world.clock.now += 3 * 3600
+    assert [r["action"] for r in world.ctrl.reconcile()] == ["destroyed"]
+    assert world.ctrl.get(done["deployment_id"])["status"] == "expired"
+    assert world.ctrl.get(running["deployment_id"])["status"] == "superseded"  # history stays
+    assert not world.provider.apps
+
+
+def test_stop_marks_the_authoritative_record_and_leaves_history(world):
+    running, done = replaced_and_running(world)
+    stopped = world.ctrl.destroy(done["deployment_id"], caller="orbit", request_id="r",
+                                 keep_record=True)
+    assert stopped["status"] == "stopped"
+    assert world.ctrl.get(running["deployment_id"])["status"] == "superseded"
+
+
+def test_expiry_updates_every_live_record_of_the_app_but_keeps_a_conflict_record(tmp_path):
+    world, running, _, done = race_world(tmp_path)
+    world.clock.now += 3 * 3600
+    world.ctrl.reconcile()
+    assert world.ctrl.get(running["deployment_id"])["status"] == "expired"
+    assert world.ctrl.get(done["deployment_id"])["status"] == "failed_uncertain"
+
+
+def test_two_controllers_on_one_store_consume_an_approval_only_once(world):
+    other = controller(world)  # loaded before the approval exists: its cache is stale
+    dep = submit_approved(world.ctrl, payload())
+    first = execute(world, dep, ctrl=other)
+    assert first["status"] == "running"
+    assert reason_of(execute, world, dep) == "approval_not_pending"
+    assert world.provider.calls.count("create") == 1
+
+
+def test_store_lock_failure_is_a_store_error(world, monkeypatch):
+    monkeypatch.setattr("fcntl.flock", lambda *a: (_ for _ in ()).throw(OSError("no lock")))
+    with pytest.raises(StoreError):
+        world.ctrl.store.all("approvals")
+    monkeypatch.undo()
+    assert world.ctrl.store.all("approvals") == []
+
+
+def test_stop_cannot_overwrite_a_conflict_record(tmp_path):
+    world, running, _, done = race_world(tmp_path)
+    assert reason_of(world.ctrl.destroy, done["deployment_id"], caller="orbit", request_id="r",
+                     keep_record=True) == "record_not_authoritative"
+    assert world.ctrl.get(done["deployment_id"])["status"] == "failed_uncertain"
+
+
+def test_stopping_by_an_earlier_generation_stops_the_authoritative_record_too(world):
+    old, new = replaced_and_running(world)
+    world.ctrl.destroy(old["deployment_id"], caller="orbit", request_id="r", keep_record=True)
+    assert world.ctrl.get(new["deployment_id"])["status"] == "stopped"
+    assert not world.provider.apps
