@@ -26,10 +26,15 @@ does and does not do.
   a conditional provider the just-read version is the condition (a conflict is `failed_uncertain`
   plus an alert, never retried); without one (`Provider.conditional_update` false) it verifies by
   read-back, and a foreign version is `failed_uncertain` plus an alert (detection, not prevention,
-  per ADR-007). The claim expiry is checked with the injected clock after that read and immediately
-  before the write, so a slow read cannot carry a bind past expiry; an expired claim is never
-  bound, is alerted as `bind_refused:claim_expired` and is `failed_uncertain`. The log limit counts
-  UTF-8 bytes and never splits a character.
+  per ADR-007). The just-read spec must equal the approved template exactly (no provider
+  normalization is defined); anything else is `failed_uncertain` plus an alert. The claim expiry
+  is checked with the injected clock after that read and immediately before the write, so a slow
+  read cannot carry a bind past expiry; an expired claim is never bound, is alerted as
+  `bind_refused:claim_expired` and is `failed_uncertain`. The guarantee is dispatch-before-expiry,
+  not landing-before-expiry: a write already in flight may complete after expiry (the controller
+  cannot stop it without a provider-enforced deadline), and such an app is then bound and expired,
+  which the TTL sweep (part 2) destroys. The log limit counts UTF-8 bytes and never splits a
+  character.
 - `markers.py`: the two-phase HMAC ownership marker (claim, then bound to the app id and team).
   Only a verified bound marker authorizes anything; a copied marker, a claim-only app, a foreign
   team or a tampered marker is never ownership proof. Nothing is destroyed on a name prefix.

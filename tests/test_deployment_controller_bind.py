@@ -169,6 +169,40 @@ def test_the_expiry_boundary_during_a_slow_bind_read_is_exclusive(tmp_path):
                 assert_expired_not_bound(world, done["deployment_id"], dep["approval_id"])
 
 
+@pytest.mark.parametrize("conditional", [True, False])
+@pytest.mark.parametrize("edit", [
+    lambda spec: spec["image"].update(digest="sha256:" + "b" * 64),
+    lambda spec: spec["env"].update(LOG_LEVEL="debug"),
+    lambda spec: spec.update(port=9999),
+])
+def test_a_spec_changed_before_the_bind_read_is_never_bound(tmp_path, conditional, edit):
+    world = make_world(tmp_path, conditional_update=conditional)
+    dep = submit_approved(world.ctrl, payload())
+    after_call(world.provider, "create_app", lambda: edit(world.provider.apps["app-0001"].spec))
+    done = go(world, dep)  # the claim is intact, but the spec is no longer the approved one
+    assert done["status"] == "failed_uncertain" and done["reason"] == "unexpected_writer"
+    assert "bind_failed_uncertain:spec_changed" in alerts(world.ctrl)
+    assert markers.BOUND_KEY not in world.provider.apps["app-0001"].env
+    assert "update" not in world.provider.calls
+    assert world.ctrl.get_approval(dep["approval_id"])["state"] == "reserved"
+
+
+def test_expiry_crossed_while_the_update_is_in_flight_is_not_undone(world):
+    """The guarantee is dispatch-before-expiry: nothing here can stop a write already sent."""
+    dep = submit_approved(world.ctrl, payload())
+    original = world.provider.update_app
+
+    def slow_update(*args, **kwargs):
+        result = original(*args, **kwargs)
+        world.clock.now += TWO_HOURS  # the write completes after the claim expired
+        return result
+    world.provider.update_app = slow_update
+    done = go(world, dep)
+    assert done["status"] == "running" and markers.BOUND_KEY in world.provider.apps[
+        done["app_id"]].env
+    assert world.clock.now >= done["expires_at"]  # bound and expired: left to the TTL sweep
+
+
 # --- log cap is bytes ---
 def test_log_cap_is_utf8_bytes_and_never_splits_a_character(tmp_path):
     world = make_world(tmp_path)
