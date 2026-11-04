@@ -55,7 +55,7 @@ Code: `src/viharbot/personas/` (`models.py`, `registry.py`, `definitions/<id>.to
 | Block | Fields | Purpose |
 |---|---|---|
 | `agent_id` | must equal the file name and an existing identity | Stable identity link. Name, title and role are **not** duplicated; they stay in the identity file. |
-| `provenance` | `persona_version` (semver), `schema_version`, `status` (`draft` / `review` / `approved`), `sources`, `approval_ref` | Versioning and configuration provenance. `approval_ref` is allowed only when `approved`. |
+| `provenance` | `persona_version` (semver), `schema_version`, `status` (`draft` / `review` / `approved`), `sources`, `approval_ref` | Versioning and configuration provenance. `approval_ref` is allowed only when `approved`; it is metadata and does not itself verify founder approval (review of the pull request does). |
 | `biography`, `values`, `principles` | text and lists | Professional biography, core values, guiding principles. |
 | `traits` | `identity_traits`, `design_direction_traits`, `behavioral_tendencies` | Identity traits must appear in the approved identity's `personality` (checked at load). Design direction from the brief is additive and never replaces them. |
 | `communication` | `tone`, `sentence_style`, `preferred_vocabulary`, `avoid`, `illustrative_examples` | Voice. Examples illustrate; they are not templates and never apply to structured output. |
@@ -65,7 +65,7 @@ Code: `src/viharbot/personas/` (`models.py`, `registry.py`, `definitions/<id>.to
 | `disagreement` | `requires_evidence` (must be `true`), `style`, `resolution_preference`, `escalation` | Constitution section 5.5. The schema cannot express disagreement without evidence. |
 | `self_assessment` | `uncertainty_reporting`, `confidence_vocabulary` | Uncertainty reporting. |
 | `model_preference` | `family`, `rationale` | Must equal the identity's `preferred_model_family`. **No alias field exists**, so model governance stays in central LiteLLM routing. |
-| `visual_identity` | `avatar_file`, `alt_text` | A bare image file name (no path or URL), checked against `images/` and the web allowlist. |
+| `visual_identity` | `avatar_file`, `alt_text` | A bare image file name (no path or URL). The loader checks syntax only; a CI test checks that bundled avatars exist in `images/` and in the web allowlist. |
 
 **What the schema forbids by construction.** Every model is strict and frozen, and unknown fields are rejected. A persona cannot carry tools, permissions, scopes, capabilities, endpoints, runtime placement, bindings, model aliases, credentials, trust scores or seniority. It cannot have status `implemented` or `activated`. Tests assert each of these, and that no runtime module imports `viharbot.personas`.
 
@@ -123,8 +123,8 @@ Every item below is either enforced in Phase A or must be enforced by the named 
 | LiteLLM only; no new billable calls in unit tests | No inference added. Persona carries no alias. Tests are offline |
 | Shared memory respects engagement and data boundaries | Phase D, after ADR-009 is accepted; Phase A adds no memory |
 | Runtime placement independent of identity | Personas have no runtime fields |
-| Disagreement cannot fabricate | `requires_evidence` is schema-fixed to true; Phase C validates that a challenge cites a supplied artifact |
-| Avatar references are safe | Bare file names only, checked against the existing allowlist |
+| Disagreement is evidence-required | `requires_evidence` is a schema-fixed configuration invariant only; it does not prove evidence exists or is true. Phase C adds validation that a challenge cites a supplied artifact, and even a citation does not prove a claim, so behavioral evaluation remains a separate control |
+| Avatar references are safe | The loader accepts only bare image file names (syntax). Existence in `images/` and membership in the web allowlist are checked by a CI test on the bundled definitions, not by the loader. Loader-level enforcement needs a shared allowlist module and is deferred to Phase E |
 | Logs avoid prompts and private memory | No logging added; Phase B logs persona id and version only |
 
 Threats to address in Phase C testing (see [threat model](threat-model-agent-communication.md)): prompt injection through another agent's output (treat as untrusted data), sycophantic agreement between agents, runaway review loops (budgets), review shopping, and a persona edited through a data path.
@@ -166,6 +166,7 @@ Not created. Titles are proposals for the founder to file under #157. #161 (pers
 | D1 | Collaboration history and outcome metrics | C2, ADR-009 | Records carry provenance, scope and retention; metrics defined before use |
 | D2 | Governed update procedure for persona, skills and practices | A2 | Changes only via reviewed PR; agent writes to these files are impossible by construction |
 | E1 | Collaboration SSE events (schema minor version) | C2 | Emitted from real execution only; old clients parse unchanged; docs and fixtures updated |
+| E3 | Loader-level avatar validation via a shared allowlist | E1 | Allowlist moved from `web_app.py` to a side-effect-free shared module; loader rejects unknown or non-allowlisted avatars; negative tests for a missing file and an existing but unallowlisted image |
 | E2 | Agent profile and community UI requirements, then build | E1, A2 | Requirements doc approved before build; accessibility checks; existing page works unchanged |
 
 ## 9. Files expected to change

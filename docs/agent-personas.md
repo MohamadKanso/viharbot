@@ -38,8 +38,9 @@ Rules enforced at load time:
 * `traits.identity_traits` must appear in the identity's approved `personality` text.
 * `model_preference.family` must equal the identity's `preferred_model_family`. There is no alias field.
 * `collaboration` must name existing, different agents. A pattern describes a working preference, not trust or access.
-* `disagreement.requires_evidence` can only be `true`.
-* `visual_identity.avatar_file` is a bare image file name, not a path or URL.
+* `disagreement.requires_evidence` can only be `true`. This is a configuration invariant, not proof that evidence is present or true; evidence validation is a Phase C control.
+* `visual_identity.avatar_file` is a bare image file name, not a path or URL. The loader checks syntax only. A CI test checks that the bundled avatars exist in `images/` and in the web allowlist; loader-level checks are deferred to Phase E.
+* `approval_ref` is metadata. It does not verify founder approval; pull request review does.
 * All eight established agents must have a persona.
 * Errors name the file and field and never echo rejected values.
 

@@ -119,8 +119,9 @@ class PeerPattern(_Strict):
 
 
 class Disagreement(_Strict):
-    # Constitution section 5.5: disagreement must rest on evidence. The schema accepts only true,
-    # so a persona cannot be configured to argue without evidence or fabricate it.
+    # Constitution section 5.5: disagreement must rest on evidence. The schema accepts only true.
+    # This is a configuration invariant only: it does not check that evidence is present,
+    # relevant or true. That validation, and any behavioral evaluation, are future controls.
     requires_evidence: Literal[True]
     style: Text
     resolution_preference: Text
