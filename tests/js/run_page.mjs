@@ -29,6 +29,7 @@ const context = vm.createContext({
   // The page asks once, at load, which model each agent uses. That GET is not a chat request, so
   // it is answered "not available" and kept out of the recorded calls.
   fetch: (url, options) => {
+    if (String(url).startsWith("/api/development/availability")) return Promise.resolve({ ok: false, json: async () => null });
     if (String(url).startsWith("/api/team-models")) return Promise.resolve({ ok: false, json: async () => null });
     fetchCalls.push({ url, options });
     return fetchPromise;
