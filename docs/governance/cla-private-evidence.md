@@ -28,7 +28,18 @@ The public SHA-256 fingerprints the private evidence record without revealing it
 
 ## Storage mechanism
 
-A **separate private GitHub repository**, `vchokshi/viharbot-cla-evidence`, used only for this. Its local working copy is `~/viharbot-cla-evidence`, outside the project checkout. `verify-comment` refuses to write evidence inside any git checkout, so point `--evidence-out` at `~/viharbot-cla-evidence/evidence`, then commit and push it yourself.
+A **separate private GitHub repository**, `vchokshi/viharbot-cla-evidence`, used only for this. Its local working copy is `~/viharbot-cla-evidence`, outside the project checkout.
+
+**Recording procedure.** `verify-comment` refuses to write inside **any** git checkout, including this one, so that evidence can never land in a public repository by accident. It therefore writes to a **staging directory outside every checkout**, and you copy the verified file into the private repository yourself:
+
+```bash
+mkdir -p ~/.viharbot/cla-staging
+python3 .github/scripts/cla_gate.py verify-comment ... --evidence-out ~/.viharbot/cla-staging
+cp ~/.viharbot/cla-staging/EV-<account>-<comment>.json ~/viharbot-cla-evidence/evidence/
+# then add, commit and push in ~/viharbot-cla-evidence, and delete the staged copy
+```
+
+Run `audit --evidence-dir ~/viharbot-cla-evidence/evidence` after the copy; it fails if the file does not match the public row.
 
 * Collaborators: the founder only. No teams, no deploy keys, no GitHub Actions, no secrets, no forks, no outside collaborators, no apps. Two-factor or passkey on the founder's account.
 * Branch protection on `main`: no force-push, no deletion, signed commits if the founder uses signing.

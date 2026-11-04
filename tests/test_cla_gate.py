@@ -95,9 +95,19 @@ def user(account, kind="User"):
     return {"id": account[0], "login": account[1], "type": kind}
 
 
-def commit(author=ALICE, message="Change", committer=None, sha="a1b2c3d4e5f6", email=None):
+SAME = object()
+LOGINS = {"alice": 2002, "bob": 3003, "founder": 1, "carol": 4004}
+
+
+def resolver(login):
+    """What GitHub would answer for a login lookup."""
+    return LOGINS.get(login)
+
+
+def commit(author=ALICE, message="Change", committer=SAME, sha="a1b2c3d4e5f6", email=None):
+    who = author if committer is SAME else committer
     return {"sha": sha, "message": message, "author_email": email,
-            "author": user(author) if author else None, "committer": user(committer) if committer else None}
+            "author": user(author) if author else None, "committer": user(who) if who else None}
 
 
 def make_pr(author=ALICE, commits=None, files=(), number=7, unsupported=()):
@@ -242,12 +252,21 @@ def test_committers_are_checked_and_the_web_committer_is_exempt_by_exception():
     assert not judge(commits=[commit(ALICE, committer=WEB_FLOW)], exc=no_exceptions).ok
 
 
+def test_an_unlinked_committer_fails_even_when_the_author_is_accepted():
+    # Sage finding: a null committer used to be skipped, so this passed.
+    result = judge(commits=[commit(ALICE, committer=None)])
+    assert not result.ok and "unlinked committer" in errors_text(result)
+    assert judge(commits=[commit(ALICE, committer=ALICE)]).ok
+    founder_pr = judge(author=FOUNDER, commits=[commit(FOUNDER, committer=None)])
+    assert not founder_pr.ok and "unlinked committer" in errors_text(founder_pr)
+
+
 def test_co_authored_by_trailers_are_checked():
     trailer = "Fix\n\nCo-authored-by: Bob <3003+bob@users.noreply.github.com>"
-    result = judge(commits=[commit(ALICE, message=trailer)])
+    result = judge(commits=[commit(ALICE, message=trailer)], resolve=resolver)
     assert not result.ok and "`bob`" in errors_text(result) and "co-author" in errors_text(result)
     accepted = in_force(row(), row(BOB, ev_id="EV-3003-98"))
-    assert judge(rec=accepted, commits=[commit(ALICE, message=trailer)]).ok
+    assert judge(rec=accepted, commits=[commit(ALICE, message=trailer)], resolve=resolver).ok
 
 
 def test_legacy_noreply_trailers_are_resolved_by_login_and_unresolvable_ones_fail():
@@ -259,16 +278,33 @@ def test_legacy_noreply_trailers_are_resolved_by_login_and_unresolvable_ones_fai
     other = "Fix\n\nCo-authored-by: X <x@example.com>"
     assert not judge(commits=[commit(ALICE, message=other)]).ok
     founder_trailer = "Fix\n\nCo-authored-by: F <1+founder@users.noreply.github.com>"
-    assert judge(commits=[commit(ALICE, message=founder_trailer)]).ok
+    assert judge(commits=[commit(ALICE, message=founder_trailer)], resolve=resolver).ok
+
+
+def test_a_forged_noreply_trailer_is_not_believed():
+    # An ID written into a trailer is a claim. GitHub must confirm the login owns that ID.
+    wrong_id = "Fix\n\nCo-authored-by: X <1+bob@users.noreply.github.com>"  # bob is 3003, not 1
+    result = judge(commits=[commit(ALICE, message=wrong_id)], resolve=resolver)
+    assert not result.ok and "cannot be matched" in errors_text(result)
+    ghost = "Fix\n\nCo-authored-by: X <77+ghost@users.noreply.github.com>"
+    assert not judge(commits=[commit(ALICE, message=ghost)], resolve=resolver).ok
+    assert not judge(commits=[commit(ALICE, message=wrong_id)], resolve=lambda login: None).ok
+
+
+def test_a_bot_trailer_is_confirmed_by_lookup_and_needs_an_exception():
+    trailer = "Fix\n\nCo-authored-by: d <49699333+dependabot[bot]@users.noreply.github.com>"
+    lookup = {"dependabot[bot]": 49699333}.get
+    assert judge(commits=[commit(ALICE, message=trailer)], resolve=lookup).ok  # EX-001 covers it
+    assert not judge(commits=[commit(ALICE, message=trailer)], resolve=lookup, exc=exceptions()).ok
 
 
 def test_unresolvable_identities_fail_closed():
     unlinked = commit(None, sha="abc1234def00")
     result = judge(commits=[commit(ALICE), unlinked])
     assert not result.ok and "cannot be matched" in errors_text(result)
-    noreply = commit(None, email="3003+bob@users.noreply.github.com")  # author unlinked but ID is in the email
+    noreply = commit(None, email="3003+bob@users.noreply.github.com")  # an email is a claim, not a link
     result = judge(commits=[noreply])
-    assert "`bob`" in errors_text(result) and "cannot be matched" not in errors_text(result)
+    assert not result.ok and "cannot be matched" in errors_text(result) and "`bob`" not in errors_text(result)
 
 
 def test_founder_pull_request_does_not_excuse_third_party_commits():
@@ -479,8 +515,19 @@ def test_unlinked_commit_email_fails_even_for_a_founder_authored_pull_request():
     # The machine-default email is not linked to a GitHub account, so authorship cannot be checked.
     result = judge(author=FOUNDER, commits=[commit(None, email="vihar@host.local")])
     assert not result.ok and "unlinked commit author" in errors_text(result)
-    linked = commit(None, email="1+founder@users.noreply.github.com")  # noreply address carries the ID
-    assert judge(author=FOUNDER, commits=[linked]).ok
+    forged = commit(None, email="1+founder@users.noreply.github.com", committer=ALICE)
+    result = judge(author=ALICE, commits=[forged])
+    assert not result.ok and "unlinked commit author" in errors_text(result)  # no founder exemption from an email
+    assert not any("founder-owned" in line for line in result.exemptions)
+
+
+def test_forged_identities_cannot_borrow_the_founder_or_an_accepted_user():
+    # Sage finding: raw noreply addresses were trusted. Cover the founder and an accepted contributor.
+    for who in ("1+founder", "2002+alice", "3003+bob"):
+        forged = commit(None, email=f"{who}@users.noreply.github.com", committer=ALICE)
+        result = judge(author=ALICE, commits=[forged])
+        assert not result.ok, who
+        assert not any("founder-owned" in line for line in result.exemptions), who
 
 
 def test_exemptions_are_logged_with_reason_authorizer_and_scope():
@@ -788,7 +835,7 @@ def test_step_summary_receives_the_report(tmp_path, monkeypatch):
 RULES_PATH = f"/repos/{REPO}/rules/branches/main"
 
 
-def rules(check=True, pinned=True, owners=True, approvals=1, base=True):
+def rules(check=True, pinned=True, owners=True, approvals=1, base=True, strict=True):
     out = [{"type": "pull_request", "parameters": {"required_approving_review_count": approvals,
                                                     "require_code_owner_review": owners}}]
     if base:
@@ -796,7 +843,8 @@ def rules(check=True, pinned=True, owners=True, approvals=1, base=True):
     contexts = [{"context": "CI result", "integration_id": 15368}]
     if check:
         contexts.append({"context": "CLA acceptance", **({"integration_id": 15368} if pinned else {})})
-    out.append({"type": "required_status_checks", "parameters": {"required_status_checks": contexts}})
+    out.append({"type": "required_status_checks",
+                "parameters": {"required_status_checks": contexts, "strict_required_status_checks_policy": strict}})
     return out
 
 
@@ -813,7 +861,7 @@ def test_activation_passes_only_when_the_live_ruleset_and_record_are_ready(tmp_p
 
 @pytest.mark.parametrize("live", [
     [], rules(check=False), rules(pinned=False), rules(owners=False), rules(approvals=0), rules(base=False),
-    cla.NotFound("rules"),
+    rules(strict=False), cla.NotFound("rules"),
 ])
 def test_missing_or_inactive_ruleset_blocks_activation(tmp_path, live):
     lines, ok = activation(tmp_path, live)
@@ -981,7 +1029,9 @@ def test_ruleset_requires_the_check_pinned_to_actions_and_code_owner_review():
     assert data["enforcement"] == "active"
     pull = next(r for r in data["rules"] if r["type"] == "pull_request")["parameters"]
     assert pull["require_code_owner_review"] is True and pull["required_approving_review_count"] >= 1
-    checks = next(r for r in data["rules"] if r["type"] == "required_status_checks")["parameters"]["required_status_checks"]
+    status_rule = next(r for r in data["rules"] if r["type"] == "required_status_checks")["parameters"]
+    assert status_rule["strict_required_status_checks_policy"] is True  # freshness: stale successes cannot merge
+    checks = status_rule["required_status_checks"]
     mine = [c for c in checks if c["context"] == "CLA acceptance"]
     assert mine == [{"context": "CLA acceptance", "integration_id": cla.ACTIONS_APP_ID}]
     assert {"CI result", "Contributor registry", "Dependency review"} <= {c["context"] for c in checks}
@@ -1009,3 +1059,20 @@ def test_untrusted_names_cannot_inject_workflow_commands():
     hostile = (5005, "bad\n::error::pwned`x")
     report = cla.render(judge(author=hostile, commits=[commit(hostile)]))
     assert "\n::error::" not in report and "`x" not in report.replace("`bad", "")
+
+
+def test_documented_evidence_procedure_does_not_write_into_a_checkout():
+    # Sage finding: the docs told the founder to write straight into the private repository's
+    # working tree, which verify-comment correctly refuses. The documented path must be a staging
+    # directory outside every checkout, followed by an explicit copy.
+    for name in ("docs/governance/cla-acceptance.md", "docs/governance/cla-private-evidence.md"):
+        for line in shipped(name).splitlines():
+            if "--evidence-out" in line:
+                target = line.split("--evidence-out")[1].split()[0].strip('"')
+                assert "viharbot-cla-evidence" not in target, (name, line)
+                assert not cla.inside_a_git_checkout(Path(target.replace("~", str(Path.home())))), (name, target)
+
+
+def test_freshness_is_documented_with_its_limits():
+    text = shipped("docs/governance/cla-acceptance.md")
+    assert "Freshness" in text and "up to date" in text and "expiry" in text.lower()

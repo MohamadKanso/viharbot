@@ -465,39 +465,45 @@ class IdentityLookup(Exception):
 Resolver = Callable[[str], "int | None"]
 
 
-def _person(item: dict | None, source: str, sha: str, email: str | None = None) -> Person:
+def _person(item: dict | None, source: str, sha: str) -> Person:
+    """A person GitHub itself linked to a commit. Never inferred from an email address: a raw
+    address is a claim anyone can write, so an unlinked author or committer stays unresolved."""
     if isinstance(item, dict) and isinstance(item.get("id"), int) and isinstance(item.get("login"), str):
         kind = item.get("type") or ("Bot" if item["login"].endswith("[bot]") else "User")
         return Person(item["id"], item["login"], kind, source, sha)
-    match = NOREPLY_ID.match(email or "")
-    if match:
-        login = match.group(2)
-        return Person(int(match.group(1)), login, "Bot" if login.endswith("[bot]") else "User", source, sha)
     return Person(None, None, "User", source, sha)
 
 
 def attributions(pr: dict, resolve: Resolver) -> list[Person]:
-    """Every identifiable contributor: PR author, commit authors, committers, co-author trailers."""
+    """Every identifiable contributor: PR author, commit authors, committers, co-author trailers.
+
+    Authors and committers count only when GitHub linked them to an account. A committer that
+    GitHub could not link is unresolved and fails, exactly like an author. A `Co-authored-by`
+    trailer is an attribution claim, not authenticated consent: a noreply address is accepted only
+    if GitHub confirms that its login belongs to the numeric ID written in it.
+    """
     author = pr["author"]
     people = [Person(author["id"], author["login"], author.get("type", "User"), "pull request author")]
     for commit in pr["commits"]:
         sha = str(commit.get("sha", ""))[:12]
-        people.append(_person(commit.get("author"), "commit author", sha, commit.get("author_email")))
-        if commit.get("committer"):
-            people.append(_person(commit["committer"], "committer", sha))
+        people.append(_person(commit.get("author"), "commit author", sha))
+        people.append(_person(commit.get("committer"), "committer", sha))
         for email in TRAILER.findall(str(commit.get("message", ""))):
             by_id = NOREPLY_ID.match(email)
             by_login = NOREPLY_LOGIN.match(email)
+            kind = "User"
             if by_id:
-                login = by_id.group(2)
-                people.append(Person(int(by_id.group(1)), login, "Bot" if login.endswith("[bot]") else "User",
-                                     "co-author", sha))
+                claimed, login = int(by_id.group(1)), by_id.group(2)
+                kind = "Bot" if login.endswith("[bot]") else "User"
+                confirmed = resolve(login) == claimed
+                people.append(Person(claimed if confirmed else None, login if confirmed else None, kind,
+                                     "co-author", sha, None if confirmed else email.lower()))
             elif by_login:
                 account_id = resolve(by_login.group(1))
-                people.append(Person(account_id, by_login.group(1) if account_id else None, "User",
+                people.append(Person(account_id, by_login.group(1) if account_id else None, kind,
                                      "co-author", sha))
             else:
-                people.append(Person(None, None, "User", "co-author", sha, email.lower()))
+                people.append(Person(None, None, kind, "co-author", sha, email.lower()))
     unique: dict[object, Person] = {}
     for index, person in enumerate(people):
         key = person.account_id if person.account_id is not None else (index, person.sha, person.source)
@@ -1024,6 +1030,11 @@ def activation_report(repo: str, branch: str, record_text: str | None, gh: GitHu
     lines.append(("PASS" if mine else "FAIL", f"`{CHECK_NAME}` is a required status check on `{branch}` (live)"))
     lines.append(("PASS" if any(c.get("integration_id") == ACTIONS_APP_ID for c in mine) else "FAIL",
                   f"`{CHECK_NAME}` is pinned to the GitHub Actions app, so no other app can report it"))
+    holders = [r.get("parameters", {}) for r in rules if r.get("type") == "required_status_checks"
+               and any(c.get("context") == CHECK_NAME for c in r.get("parameters", {}).get("required_status_checks", []))]
+    lines.append(("PASS" if holders and all(h.get("strict_required_status_checks_policy") for h in holders) else "FAIL",
+                  "branches must be up to date before merging, so a change to the record or exceptions on "
+                  "`main` invalidates earlier successful runs (freshness)"))
     pulls = [r.get("parameters", {}) for r in rules if r.get("type") == "pull_request"]
     lines.append(("PASS" if pulls and any(p.get("required_approving_review_count", 0) >= 1 for p in pulls)
                   else "FAIL", "a pull request with at least one approval is required"))

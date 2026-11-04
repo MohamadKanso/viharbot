@@ -16,15 +16,34 @@ What was done to activate the contribution agreement, what was verified and how,
 | Legal review | **Waived** | Founder's decision; not a verification of the text |
 | Founder approval | Done | The founder's instruction on 2026-11-04 |
 | Private evidence store | **Done, with listed gaps** | Private repository `vchokshi/viharbot-cla-evidence`, read through the API: private, one collaborator (the founder), Actions disabled, no webhooks, no deploy keys, no pending invitations, issues and wiki off. An append-only ruleset (id 26567016: no deletion, no force-push) is live on its `main`; **its rejection of a force-push was not tested** (the test was blocked), so it is confirmed by reading the rules only. Forking cannot be switched off for a personal private repository; only people with access can fork it, and only the founder has access. An encrypted archive was created and restored into scratch space, and the restored tree is byte-identical (`diff -r`). **Gaps:** the archive and its key (`~/.viharbot/`) are on one machine, so there is no offsite or offline second copy yet, and a restore test of a store holding real evidence cannot happen until the first acceptance exists |
-| Required ruleset | Done (live) | `protect-main` (ruleset 26490874) was updated through the API to require `CLA acceptance` pinned to the GitHub Actions app, and code-owner review. `cla_gate.py activation-check --repo vchokshi/viharbot` then read the **live** rules and passed every automated line. A second, older ruleset ("Ruleset", id 26066523) already applies and is unchanged |
+| Required ruleset | Done (live) | `protect-main` (ruleset 26490874) was updated through the API to require `CLA acceptance` pinned to the GitHub Actions app, and code-owner review. **Freshness is not yet applied live:** after Sage's review the check also requires "branches must be up to date before merging" (`strict_required_status_checks_policy`), so that a changed record invalidates earlier successful runs, but changing that live setting was not authorized, so `activation-check` reports `FAIL` on it until the founder applies it (command below). `cla_gate.py activation-check --repo vchokshi/viharbot` then read the **live** rules and passed every automated line. A second, older ruleset ("Ruleset", id 26066523) already applies and is unchanged |
 | Negative test on real data | Done (offline) | The gate was run against the real pull request #179 using the live GitHub API and the post-merge files. It failed #179 as intended and resolved the author to account 91088196 |
 | Negative test through GitHub's merge protection | **Not done** | The workflow runs from the base branch and does not exist on `main` until this pull request is merged. A throwaway sandbox repository for a real Actions run was not created (blocked). **The workflow has never run on GitHub Actions.** The first real run is the first pull request after merge |
 
 ## What this means for pull requests right now
 
 * **Every open and new pull request now waits for `CLA acceptance`, including this one.** The check cannot report on a pull request until the workflow is on `main`. Merging this pull request therefore needs the founder's admin bypass ("merge without waiting for requirements", ruleset bypass mode `pull_request`). That is the intended use of the bypass here and should not be used for external code.
-* **Commit identity.** The check resolves every commit author, committer and co-author to a numeric GitHub ID and fails closed on any it cannot. Commits made on this machine carry the machine-default email `vihar.chokshi@vihar.chokshi-L9KP6LY7M7`, which GitHub does not link to an account, so their author is unresolved. This affects #181 and #184 (checked against the real API). Fix it for future work with `git config --global user.email 8943966+vchokshi@users.noreply.github.com`. Existing commits keep the old email unless their authorship is rewritten, which was not done. After the merge, #184 will fail the check until its commits are fixed or the founder merges with the bypass.
+* **Commit identity.** The check resolves every commit author, committer and co-author to a numeric GitHub ID and fails closed on any it cannot. It trusts only the account GitHub links to a commit, never an email address written into one, and it applies the same rule to committers as to authors. Commits made on this machine carry the machine-default email `vihar.chokshi@vihar.chokshi-L9KP6LY7M7`, which GitHub does not link to an account, so their author is unresolved. This affects #181 and #184 (checked against the real API). Fix it for future work with `git config --global user.email 8943966+vchokshi@users.noreply.github.com`. Existing commits keep the old email unless their authorship is rewritten, which was not done. After the merge, #184 will fail the check until its commits are fixed or the founder merges with the bypass.
 * **AI attribution.** `Co-Authored-By: ... <noreply@anthropic.com>` trailers are excused by logged exception EX-003, which matches that exact address in co-author trailers only.
+
+## Apply freshness (founder, one command)
+
+```bash
+gh api repos/vchokshi/viharbot/rulesets/26490874 > /tmp/live.json
+python3 - <<'PY'
+import json
+d = json.load(open("/tmp/live.json"))
+p = {k: d[k] for k in ("name", "target", "enforcement", "conditions", "bypass_actors", "rules")}
+for r in p["rules"]:
+    if r["type"] == "required_status_checks":
+        r["parameters"]["strict_required_status_checks_policy"] = True
+json.dump(p, open("/tmp/strict.json", "w"))
+PY
+gh api -X PUT repos/vchokshi/viharbot/rulesets/26490874 --input /tmp/strict.json
+python3 .github/scripts/cla_gate.py activation-check --repo vchokshi/viharbot   # all PASS
+```
+
+The older "Ruleset" (id 26066523) already requires up-to-date branches for its own checks, so this adds no new friction. Until it is applied, a pull request that went green before a change to the record can still merge on its old result.
 
 ## Readiness commands
 

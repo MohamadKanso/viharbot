@@ -11,7 +11,7 @@ This is the **public record the `CLA acceptance` check reads**: the agreement's 
 * Legal review: waived: founder decision 2026-11-04; no counsel review; risk accepted by the founder
 * Founder approval: approved: vchokshi 2026-11-04
 * Private evidence storage: verified: private repo, founder-only, Actions off, restore test 2026-11-04; offsite copy pending
-* Required ruleset: verified: protect-main live 2026-11-04 (activation-check)
+* Required ruleset: verified: protect-main live 2026-11-04 (activation-check); up-to-date freshness policy pending founder
 
 **The agreement has not been reviewed by a lawyer.** The founder approved it alone and waived legal review; the check prints that on every run. `in-force` is accepted only when the text is frozen (the hash above must match the agreement file exactly) and every prerequisite line is recorded as complete, waived, approved or verified; otherwise the file is invalid and the check fails closed.
 

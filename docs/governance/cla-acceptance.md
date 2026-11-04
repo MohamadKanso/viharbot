@@ -31,12 +31,12 @@ The check reads all of these only from the protected `main` branch, never from a
 
 ## How the founder records an acceptance
 
-1. Run the verifier. It reads the comment from GitHub and writes the evidence to the **private store** (it refuses to write inside a git checkout):
+1. Run the verifier. It reads the comment from GitHub and writes the evidence to a **staging directory outside every git checkout** (it refuses to write inside any checkout), from which you copy it into the private store as described in [private evidence architecture](cla-private-evidence.md):
 
    ```bash
    GITHUB_TOKEN=... python3 .github/scripts/cla_gate.py verify-comment \
      --repo vchokshi/viharbot --comment-url "https://github.com/vchokshi/viharbot/pull/N#issuecomment-ID" \
-     --eligibility adult-individual --verified-by vchokshi --evidence-out /path/to/private/store/evidence
+     --eligibility adult-individual --verified-by vchokshi --evidence-out ~/.viharbot/cla-staging
    ```
 
    It refuses unless: an agreement is `in-force`; the author is an ordinary user account; the text is exactly the statement for the current version; the comment is **unedited since it was posted**; its own URL and repository match.
@@ -75,13 +75,23 @@ Everything else fails, including: no acceptance, an older version after a materi
 
 Identity is by numeric ID. A renamed account keeps its acceptance, and the report notes the change.
 
-**Commit identity.** Commit with an email linked to your GitHub account; GitHub's noreply address (`<id>+<login>@users.noreply.github.com`) works. A commit whose author GitHub cannot link to an account is unresolved and fails the check, for everyone including the founder. The one narrow exception is a logged `attribution` row in `CLA-EXCEPTIONS.md` for an exact `Co-authored-by` trailer address that is a tool's attribution rather than a person (currently `noreply@anthropic.com`); it never excuses a commit author or committer.
+**Commit identity.** Commit with an email linked to your GitHub account; GitHub's noreply address (`<id>+<login>@users.noreply.github.com`) works. Identity is taken **only from the account GitHub links to the commit**, never from the text of an email: anyone can write a founder's or an accepted contributor's noreply address into a commit, so an author or committer that GitHub did not link is unresolved and fails the check, for everyone including the founder. This applies to the **committer** as well as the author: an accepted author with an unlinked committer fails.
+
+**Co-author trailers are attribution claims, not consent.** A `Co-authored-by` trailer is text anyone can write. The check treats its person as a contributor who must be covered, and accepts a noreply trailer only if GitHub confirms that the login in it owns the numeric ID in it; a mismatch or an unknown login is unresolved and fails. A trailer never authenticates the person or shows they agreed to anything. The one narrow exception is a logged `attribution` row in `CLA-EXCEPTIONS.md` for an exact `Co-authored-by` trailer address that is a tool's attribution rather than a person (currently `noreply@anthropic.com`); it never excuses a commit author or committer.
 
 **Waived legal review.** The record may say `Legal review: waived: <reason>` only as an explicit founder decision. Every check report then states that the agreement has not been reviewed by counsel.
 
 ## API handling
 
 The check reads the pull request's commits and files with the read-only token. It paginates, retries transient errors (5xx, network) with backoff, waits at most 60 seconds for a rate limit and otherwise fails with "re-run", and **fails closed on any GitHub error**. It also fails a pull request it cannot read in full: over 250 commits or 3000 files (GitHub's listing limits), or a list shorter than the count GitHub reports. Re-running fixes transient failures; splitting fixes large pull requests.
+
+## Freshness: a successful run can go stale
+
+The check reads the record and exceptions from the base branch **when it runs**. If the record then changes (a withdrawal, an eligibility hold, a new legal-terms version, a removed or expiring exception), an earlier success on an open pull request would otherwise stay green.
+
+* **What prevents it:** the ruleset must require branches to be **up to date before merging** (`strict_required_status_checks_policy`), and `activation-check` verifies it live. **It is set in `protect-main.json` but not yet applied to the live ruleset, so `activation-check` currently fails on it** ([how to apply](cla-activation.md)). Once applied, every change to the record or exceptions reaches `main` through a merge, which makes open pull requests out of date; they must be updated, which creates a new commit and a new run of the check against the new base. A previously green pull request therefore cannot merge on its old result after such a change.
+* **What does not:** an exception **expiring by date** while `main` has not moved. The check judges expiry on the day it runs, and nothing re-runs it as the date passes. Mitigation is procedural: approved-case exceptions are per pull request with a short expiry, the founder is the one who merges, and **a pull request that relies on an exception should be re-run on the day it merges** (push or re-run the check).
+* **Not demonstrated live.** This was reasoned and checked against the live ruleset settings. It has not been shown experimentally that a green pull request is blocked after a withdrawal, because the workflow has not run on GitHub yet. Do that test after the merge (see the [activation record](cla-activation.md)).
 
 ## Versions: material and editorial
 
