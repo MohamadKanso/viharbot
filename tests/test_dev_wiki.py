@@ -583,3 +583,104 @@ def test_ui_shows_the_link_only_when_the_server_says_configured(answer, hidden):
     if answer is not None:
         api["/api/development/availability"] = answer  # None: the request fails, link stays hidden
     assert run_ui(["#home"], api)["linkHiddenAtLoad"] is hidden
+
+
+# ---- transport resilience: gzip bodies and truncated reads ----
+
+def _serve(handler_cls):
+    import threading
+    from http.server import HTTPServer
+    server = HTTPServer(("127.0.0.1", 0), handler_cls)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def test_default_transport_decodes_gzip_and_retries_a_truncated_read(monkeypatch):
+    import gzip
+    from http.server import BaseHTTPRequestHandler
+
+    monkeypatch.setattr(dev_wiki.time, "sleep", lambda s: None)
+    hits = []
+    payload = gzip.compress(b'[{"number": 1}]')
+
+    class Flaky(BaseHTTPRequestHandler):
+        def do_GET(self):
+            hits.append(self.headers.get("Accept-Encoding"))
+            self.send_response(200)
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload[:5] if len(hits) == 1 else payload)  # first read is cut short
+            self.wfile.flush()
+
+        def log_message(self, *a):
+            pass
+
+    server = _serve(Flaky)
+    try:
+        status, _, body = dev_wiki._default_transport(
+            f"http://127.0.0.1:{server.server_port}/x", {"Authorization": "Bearer t"})
+    finally:
+        server.shutdown()
+    assert status == 200 and json.loads(body) == [{"number": 1}]
+    assert len(hits) == 2 and hits[0] == "gzip"
+
+
+def test_default_transport_gives_up_with_a_safe_code_after_repeated_failures(monkeypatch):
+    from http.server import BaseHTTPRequestHandler
+
+    monkeypatch.setattr(dev_wiki.time, "sleep", lambda s: None)
+
+    class Broken(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Length", "100")
+            self.end_headers()
+            self.wfile.write(b"short")
+
+        def log_message(self, *a):
+            pass
+
+    server = _serve(Broken)
+    try:
+        with pytest.raises(WikiError) as caught:
+            dev_wiki._default_transport(f"http://127.0.0.1:{server.server_port}/x", {})
+    finally:
+        server.shutdown()
+    assert caught.value.code == "network"
+
+
+def test_a_truncated_http_error_body_is_retried_and_then_mapped_to_network(monkeypatch):
+    from http.server import BaseHTTPRequestHandler
+
+    monkeypatch.setattr(dev_wiki.time, "sleep", lambda s: None)
+    hits = []
+
+    class ErrorBody(BaseHTTPRequestHandler):
+        mode = "recover"
+
+        def do_GET(self):
+            hits.append(1)
+            body = b'{"message": "Not Found"}'
+            cut = self.mode == "always" or len(hits) == 1
+            self.send_response(404)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body[:4] if cut else body)
+            self.wfile.flush()
+
+        def log_message(self, *a):
+            pass
+
+    server = _serve(ErrorBody)
+    url = f"http://127.0.0.1:{server.server_port}/x"
+    try:
+        status, _, body = dev_wiki._default_transport(url, {})
+        assert status == 404 and b"Not Found" in body and len(hits) == 2  # recovered on retry
+        hits.clear()
+        ErrorBody.mode = "always"
+        with pytest.raises(WikiError) as caught:
+            dev_wiki._default_transport(url, {})
+        assert caught.value.code == "network" and len(hits) == dev_wiki.TRANSPORT_ATTEMPTS
+    finally:
+        server.shutdown()

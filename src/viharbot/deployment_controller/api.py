@@ -6,12 +6,14 @@ the route's capability, and the caller's registry subject must also be named in 
 authentication off; ``create_app`` requires an authenticator. This module is not wired into
 compose, Dockerfiles or deploy files, and there is no module-level app.
 
-Limitations: no startup reconciliation or sweeper yet (part 2), and no approval UI; the approve
-route is the minimal interface ADR-007 leaves open.
+Known limitations: no background sweeper is scheduled (call ``reconcile`` at startup, which the
+lifespan does, and periodically), and approvals have no UI; the approve route is the minimal
+interface ADR-007 leaves open.
 """
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import Any
 from uuid import uuid4
 
@@ -21,6 +23,7 @@ from ..observability import get_request_id
 from ..service_auth import Caller, ServiceAuthenticator, require_assertion
 from .controller import DeploymentController
 from .policy import PolicyDenied
+from .provider import ProviderError
 
 REQUEST_CAPABILITY = "deployment.request"
 APPROVE_CAPABILITY = "deployment.approve"
@@ -28,7 +31,15 @@ AUDIENCE = "deployment-controller"
 
 
 def create_app(controller: DeploymentController, authenticator: ServiceAuthenticator) -> FastAPI:
-    app = FastAPI(title="ViharBot Deployment Controller", version="0.1")
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        try:
+            controller.reconcile(request_id="startup")
+        except ProviderError:
+            controller._alert("startup_reconcile_failed", request_id="startup")
+        yield
+
+    app = FastAPI(title="ViharBot Deployment Controller", version="0.1", lifespan=lifespan)
     app.state.controller = controller
 
     def ask(caller: Caller = Depends(require_assertion(authenticator, REQUEST_CAPABILITY))) -> str:
