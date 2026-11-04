@@ -1,0 +1,264 @@
+{
+ "scenario": "education_events",
+ "description": "Declared, not emitted: one valid example of each education event type. Not a chat stream.",
+ "events": [
+  {
+   "schema_version": "1.0",
+   "event_id": "evt-000001",
+   "request_id": "req-edu-1",
+   "sequence": 1,
+   "timestamp": "2026-11-03T12:00:00.000Z",
+   "source": {
+    "identity_id": "archie",
+    "display_name": "Professor Archibald",
+    "role": "specialist"
+   },
+   "correlation": {
+    "decision_number": null,
+    "execution_id": null,
+    "parent_event_id": null
+   },
+   "event_type": "learning.pr_discovered",
+   "data": {
+    "status": "discovered",
+    "repository": "vchokshi/viharbot",
+    "pr_number": 104
+   }
+  },
+  {
+   "schema_version": "1.0",
+   "event_id": "evt-000002",
+   "request_id": "req-edu-1",
+   "sequence": 2,
+   "timestamp": "2026-11-03T12:00:00.000Z",
+   "source": {
+    "identity_id": "archie",
+    "display_name": "Professor Archibald",
+    "role": "specialist"
+   },
+   "correlation": {
+    "decision_number": null,
+    "execution_id": null,
+    "parent_event_id": null
+   },
+   "event_type": "learning.extraction_started",
+   "data": {
+    "status": "running",
+    "extraction_id": "ext-001",
+    "pr_number": 104
+   }
+  },
+  {
+   "schema_version": "1.0",
+   "event_id": "evt-000003",
+   "request_id": "req-edu-1",
+   "sequence": 3,
+   "timestamp": "2026-11-03T12:00:00.000Z",
+   "source": {
+    "identity_id": "archie",
+    "display_name": "Professor Archibald",
+    "role": "specialist"
+   },
+   "correlation": {
+    "decision_number": null,
+    "execution_id": null,
+    "parent_event_id": null
+   },
+   "event_type": "learning.extraction_completed",
+   "data": {
+    "status": "completed",
+    "extraction_id": "ext-001",
+    "artifact_count": 3,
+    "duration_ms": 1250.5
+   }
+  },
+  {
+   "schema_version": "1.0",
+   "event_id": "evt-000004",
+   "request_id": "req-edu-1",
+   "sequence": 4,
+   "timestamp": "2026-11-03T12:00:00.000Z",
+   "source": {
+    "identity_id": "archie",
+    "display_name": "Professor Archibald",
+    "role": "specialist"
+   },
+   "correlation": {
+    "decision_number": null,
+    "execution_id": null,
+    "parent_event_id": null
+   },
+   "event_type": "learning.instructor_update_proposed",
+   "data": {
+    "status": "proposed",
+    "proposal_id": "prop-001",
+    "artifact_count": 3
+   }
+  },
+  {
+   "schema_version": "1.0",
+   "event_id": "evt-000005",
+   "request_id": "req-edu-1",
+   "sequence": 5,
+   "timestamp": "2026-11-03T12:00:00.000Z",
+   "source": {
+    "identity_id": "archie",
+    "display_name": "Professor Archibald",
+    "role": "specialist"
+   },
+   "correlation": {
+    "decision_number": null,
+    "execution_id": null,
+    "parent_event_id": null
+   },
+   "event_type": "learning.instructor_update_approved",
+   "data": {
+    "status": "approved",
+    "proposal_id": "prop-001"
+   }
+  },
+  {
+   "schema_version": "1.0",
+   "event_id": "evt-000006",
+   "request_id": "req-edu-1",
+   "sequence": 6,
+   "timestamp": "2026-11-03T12:00:00.000Z",
+   "source": {
+    "identity_id": "ada",
+    "display_name": "Ada",
+    "role": "specialist"
+   },
+   "correlation": {
+    "decision_number": null,
+    "execution_id": null,
+    "parent_event_id": null
+   },
+   "event_type": "curriculum.revision_started",
+   "data": {
+    "status": "running",
+    "revision_id": "rev-001",
+    "track_id": "git-fundamentals"
+   }
+  },
+  {
+   "schema_version": "1.0",
+   "event_id": "evt-000007",
+   "request_id": "req-edu-1",
+   "sequence": 7,
+   "timestamp": "2026-11-03T12:00:00.000Z",
+   "source": {
+    "identity_id": "ada",
+    "display_name": "Ada",
+    "role": "specialist"
+   },
+   "correlation": {
+    "decision_number": null,
+    "execution_id": null,
+    "parent_event_id": null
+   },
+   "event_type": "curriculum.revision_proposed",
+   "data": {
+    "status": "proposed",
+    "revision_id": "rev-001",
+    "track_id": "git-fundamentals",
+    "change_count": 2
+   }
+  },
+  {
+   "schema_version": "1.0",
+   "event_id": "evt-000008",
+   "request_id": "req-edu-1",
+   "sequence": 8,
+   "timestamp": "2026-11-03T12:00:00.000Z",
+   "source": {
+    "identity_id": "ada",
+    "display_name": "Ada",
+    "role": "specialist"
+   },
+   "correlation": {
+    "decision_number": null,
+    "execution_id": null,
+    "parent_event_id": null
+   },
+   "event_type": "curriculum.revision_approved",
+   "data": {
+    "status": "approved",
+    "revision_id": "rev-001",
+    "track_id": "git-fundamentals"
+   }
+  },
+  {
+   "schema_version": "1.0",
+   "event_id": "evt-000009",
+   "request_id": "req-edu-1",
+   "sequence": 9,
+   "timestamp": "2026-11-03T12:00:00.000Z",
+   "source": {
+    "identity_id": "ada",
+    "display_name": "Ada",
+    "role": "specialist"
+   },
+   "correlation": {
+    "decision_number": null,
+    "execution_id": null,
+    "parent_event_id": null
+   },
+   "event_type": "lesson.started",
+   "data": {
+    "status": "running",
+    "lesson_id": "lesson-001",
+    "learner_ref": "learner-7f3a"
+   }
+  },
+  {
+   "schema_version": "1.0",
+   "event_id": "evt-000010",
+   "request_id": "req-edu-1",
+   "sequence": 10,
+   "timestamp": "2026-11-03T12:00:00.000Z",
+   "source": {
+    "identity_id": "ada",
+    "display_name": "Ada",
+    "role": "specialist"
+   },
+   "correlation": {
+    "decision_number": null,
+    "execution_id": null,
+    "parent_event_id": null
+   },
+   "event_type": "lesson.completed",
+   "data": {
+    "status": "completed",
+    "lesson_id": "lesson-001",
+    "learner_ref": "learner-7f3a",
+    "duration_ms": 600000
+   }
+  },
+  {
+   "schema_version": "1.0",
+   "event_id": "evt-000011",
+   "request_id": "req-edu-1",
+   "sequence": 11,
+   "timestamp": "2026-11-03T12:00:00.000Z",
+   "source": {
+    "identity_id": "ada",
+    "display_name": "Ada",
+    "role": "specialist"
+   },
+   "correlation": {
+    "decision_number": null,
+    "execution_id": null,
+    "parent_event_id": null
+   },
+   "event_type": "assessment.completed",
+   "data": {
+    "status": "completed",
+    "assessment_id": "assess-001",
+    "lesson_id": "lesson-001",
+    "learner_ref": "learner-7f3a",
+    "question_count": 5,
+    "outcome": "passed"
+   }
+  }
+ ]
+}
