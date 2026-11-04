@@ -1,11 +1,38 @@
-FROM python:3.12-slim
+# syntax=docker/dockerfile:1
+# Test image only: never deployed, never used to build a service. Production images are the other
+# Dockerfile.* files and contain neither pytest nor Node.
+
+# Source of the Node 24 binary. Only the `node` executable is copied out of this stage (the page
+# has no npm dependencies), so the image gets no npm, no apt Node repository and no extra tooling.
+# Bookworm matches the Python base below, so the binary's glibc requirement is met.
+FROM node:24-bookworm-slim AS node
+
+FROM python:3.12-slim-bookworm
+
+# git: the suite checks `git check-ignore .env` and builds throwaway repositories under tmp_path.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
 
 WORKDIR /app
+
+# Dependencies first, from metadata plus the package, so editing a test does not reinstall them.
 COPY pyproject.toml README.md ./
 COPY src ./src
-COPY tests ./tests
-COPY scripts ./scripts
 RUN pip install --no-cache-dir '.[test]'
 
-ENV PYTHONUNBUFFERED=1
-CMD ["python", "-m", "pytest", "-q"]
+# What the offline suite reads. The context is an allowlist (Dockerfile.tests.dockerignore), so
+# this single COPY cannot bring in .env, credentials, .git or local data.
+COPY . .
+
+# A fresh, empty repository (no history, no remote, nothing from the host) so the tests that ask
+# git which files are tracked or ignored run for real instead of skipping. --intent-to-add records
+# the copied paths in the index without writing objects, and .gitignore still keeps .env out.
+RUN git init --quiet && git add --intent-to-add .
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+CMD ["python", "-m", "pytest", "-ra", "-q", "-p", "no:cacheprovider"]
