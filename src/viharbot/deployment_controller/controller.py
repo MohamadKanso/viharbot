@@ -1,12 +1,12 @@
-"""The controller core: approval state machine, reserve-then-execute, create and bind (ADR-007).
+"""The controller core: approval state machine, reserve-then-execute, create, bind (ADR-007).
 
 Approval states are ``pending -> reserved(claim_id) -> executed | expired``. A reservation is
 durably recorded before any provider call and is never returned to ``pending``. A provider timeout
 is an unknown outcome and never produces a second create. Everything runs under
 ``RecordStore.locked()`` (a file lock plus reload), so only one instance can consume an approval.
 
-Reconciliation, timeout recovery and replacement updates are part 2, not here: a create timeout is
-recorded as ``failed_uncertain`` with an alert and is never retried.
+Reconciliation and timeout recovery live in ``reconcile.py`` and replacement updates in
+``replace.py``, as mixins of the controller below.
 """
 
 from __future__ import annotations
@@ -15,10 +15,12 @@ import copy
 import hmac
 import secrets
 import time
+from collections import deque
 from typing import Callable
 
 from pydantic import ValidationError
 
+from .app_safety import LIVE, UNRESOLVED, AppSafetyMixin
 from .audit import AuditLog
 from .markers import (
     BOUND_KEY, CLAIM_KEY, Claim, bound_entry, claim_entry, parse_claim, verified_bound,
@@ -27,12 +29,14 @@ from .policy import (
     DeploymentRequest, Policy, PolicyDenied, build_spec, request_hash,
 )
 from .provider import Provider, ProviderApp, ProviderError, ProviderTimeout, VersionConflict
+from .reconcile import ReconcileMixin
+from .replace import ReplaceMixin
 from .store import RecordStore, StoreError
 
 HOUR, DAY = 3600, 86400
 
 
-class DeploymentController:
+class DeploymentController(AppSafetyMixin, ReplaceMixin, ReconcileMixin):
     def __init__(
         self, *, provider: Provider, store: RecordStore, policy: Policy, marker_key: bytes,
         audit: AuditLog | None = None, clock: Callable[[], float] = time.time,
@@ -43,6 +47,7 @@ class DeploymentController:
         self.provider, self.store, self.policy = provider, store, policy
         self.audit = audit or AuditLog()
         self.alerts: list[dict] = []
+        self.guard_log: deque = deque(maxlen=256)  # recent guard decisions
         self._key, self._clock, self._instance = marker_key, clock, instance_id
 
     # --- helpers ---
@@ -86,13 +91,18 @@ class DeploymentController:
     def _finish(
         self, appr: dict, dep: dict, status: str, *, approval_state: str | None = None,
         reason: str | None = None, request_id: str, caller: str | None, started: float,
-        decision: str = "allow", provider_status: str | None = None,
+        decision: str | None = None, provider_status: str | None = None,
+        extra_deployments: dict | None = None,
     ) -> dict:
+        if decision is None:  # the audit decision reports the real outcome, never a hopeful one
+            decision = {"running": "allow", "failed_uncertain": "alert",
+                        "created_unbound": "pending"}.get(status, "deny")
         dep.update(status=status, reason=reason)
         if approval_state:
             appr["state"] = approval_state
         appr["app_id"] = dep.get("app_id")
-        self._save(approvals={appr["approval_id"]: appr}, deployments={dep["deployment_id"]: dep})
+        self._save(approvals={appr["approval_id"]: appr},
+                   deployments={**(extra_deployments or {}), dep["deployment_id"]: dep})
         self.audit.emit(
             "execute", decision, reason=reason or status, request_id=request_id, caller=caller,
             provider_status=provider_status or status, approver=appr.get("approver"),
@@ -130,7 +140,7 @@ class DeploymentController:
                 "image_digest": req.image.digest, "size": req.size, "region": req.region,
                 "ttl_minutes": req.ttl_minutes, "request_hash": digest, "app_id": None,
                 "expires_at": None, "reason": None,
-                "kind": "create",
+                "kind": "replace" if req.replaces else "create",
             }
             appr = {
                 "approval_id": appr_id, "deployment_id": dep_id, "request": req.model_dump(),
@@ -211,6 +221,8 @@ class DeploymentController:
                 raise refuse("request_changed_after_approval", 409)
             try:
                 self.policy.check(req)
+                if req.replaces:
+                    self._preflight(appr, req)
                 self._check_quota(req, now)
             except PolicyDenied as denied:
                 raise refuse(denied.reason, denied.status) from None
@@ -228,6 +240,8 @@ class DeploymentController:
             )
             appr.update(state="reserved", claim_id=claim.claim_id)
             dep.update(status="reserved", expires_at=claim.expires_at)
+            if req.replaces:  # the target is durable before any provider call
+                dep["app_id"] = req.replaces.app_id
             action = {"ts": now, "kind": dep["kind"]}
             self._save(approvals={approval_id: appr}, deployments={dep["deployment_id"]: dep},
                        actions=[action])  # durable before any provider call
@@ -235,11 +249,14 @@ class DeploymentController:
                 return self._finish(  # the reservation stays consumed (terminal), never retryable
                     appr, dep, "expired", approval_state="expired", reason="approval_expired",
                     request_id=request_id, caller=caller, started=started, decision="deny")
-            return self._create(appr, dep, req, claim, request_id, caller, started)
+            args = (appr, dep, req, claim, request_id, caller, started)
+            return self._replace(*args) if req.replaces else self._create(*args)
 
     def _check_quota(self, req: DeploymentRequest, now: float) -> None:
         if self._recent(now, DAY) >= self.policy.max_actions_per_day:
             raise PolicyDenied("daily_quota_exhausted", 429)
+        if req.replaces:
+            return
         if self._recent(now, HOUR, "create") >= self.policy.max_creates_per_hour:
             raise PolicyDenied("hourly_quota_exhausted", 429)
         live = [a for a in self.provider.list_apps() if a.name.startswith(self.policy.name_prefix)]
@@ -251,10 +268,8 @@ class DeploymentController:
         ctx = dict(request_id=request_id, caller=caller, started=started)
         try:
             app = self.provider.create_app(req.name, spec)
-        except ProviderTimeout:  # unknown outcome: never a second create
-            self._alert("create_outcome_unknown", request_id=request_id, dep=dep)
-            return self._finish(
-                appr, dep, "failed_uncertain", reason="create_outcome_unknown", **ctx)
+        except ProviderTimeout:
+            return self._resolve_unknown_create(appr, dep, claim, **ctx)
         except ProviderError:
             return self._finish(appr, dep, "failed", reason="provider_error_on_create", **ctx)
         dep.update(app_id=app.app_id, status="created_unbound")
@@ -282,6 +297,10 @@ class DeploymentController:
         except ProviderError:
             self._alert("bind_pending", request_id=ctx["request_id"], dep=dep)
             return self._finish(appr, dep, "created_unbound", reason="bind_pending", **ctx)
+        decision = self._guard("bind", app.app_id, dep)
+        if not decision.allowed:
+            return self._uncertain(appr, dep, decision.reason, "bind_refused:" + decision.reason,
+                                   **ctx)
         mine = current is not None and (c := parse_claim(self._key, current.env)) is not None \
             and c.claim_id == claim.claim_id
         if not mine:
@@ -374,9 +393,12 @@ class DeploymentController:
         action = "stop" if keep_record else "delete"
         with self.store.locked():
             dep = self.get(deployment_id)
-            if dep["status"] == "failed_uncertain":
-                # An unresolved conflict is not overwritten by a stop: a person resolves it.
-                raise self._refuse(action, "record_not_authoritative", 409,
+            decision = self._guard(action, dep.get("app_id"), dep)
+            if not decision.allowed:
+                if decision.reason == UNRESOLVED:
+                    self._alert("destroy_refused:unresolved_outcome", request_id=request_id,
+                                dep=dep)
+                raise self._refuse(action, decision.reason, 409,
                                    request_id=request_id, caller=caller, dep=dep)
             app = self._owned_app(dep, action, caller, request_id)
             try:
@@ -387,8 +409,13 @@ class DeploymentController:
                                    caller=caller, dep=dep) from None
             dep["status"] = "stopped"
             changed = {deployment_id: dep}
+            for other in self._deps_for(dep["app_id"], deployment_id):  # same app, same fate
+                if other["status"] in LIVE:
+                    other["status"] = "stopped"
+                    changed[other["deployment_id"]] = other
             self._save(deployments=changed,
                        remove_deployments=() if keep_record else (deployment_id,))
             self.audit.emit(action, "allow", request_id=request_id, caller=caller,
-                            provider_status="destroyed", **self._fields(dep))
+                            provider_status="destroyed" if app is not None else "already_gone",
+                            **self._fields(dep))
             return dep

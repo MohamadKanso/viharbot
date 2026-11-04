@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 from deployment_controller_helpers import (
-    POLICY, alert_reasons, app_of, execute, make_world, payload, reason_of, submit_approved,
+    POLICY, alert_reasons, app_of, execute, make_world, payload, reason_of, replacement,
+    submit_approved,
 )
 
 from viharbot.deployment_controller.provider import FakeProvider, ProviderTimeout
@@ -126,3 +127,42 @@ def test_after_fault_raises_for_every_operation(op):
         assert provider.apps[app.app_id].spec["env"] == {"A": "1"}
     if op not in ("destroy", "create"):
         calls[op]()  # the fault was one-shot
+
+
+# --- part 2 paths: replacement and timeout recovery share the same clock and team logic ---
+
+def test_replacement_approval_expiring_during_a_slow_preflight_applies_nothing(world):
+    running, dep = replacement(world)
+    world.provider.on_call = lambda op: setattr(world.clock, "now", world.clock.now + TTL) \
+        if op == "get" else None  # the preflight read is the slow one
+    assert reason_of(execute, world, dep) == "approval_expired"
+    assert world.provider.calls.count("update") == 1  # only the original bind
+    assert world.ctrl.get_approval(dep["approval_id"])["state"] == "expired"
+
+
+@pytest.mark.parametrize("conditional", [True, False])
+def test_replacement_refuses_a_result_for_another_team(tmp_path, conditional):
+    world = make_world(tmp_path, conditional_update=conditional)
+    running, dep = replacement(world)
+    original_update = world.provider.update_app
+
+    def update(*args, **kwargs):
+        result = original_update(*args, **kwargs)
+        result.team_id = "team-2"
+        world.provider.apps[result.app_id].team_id = "team-2"  # the read-back agrees
+        return result
+
+    world.provider.update_app = update
+    done = execute(world, dep)
+    assert done["status"] == "failed_uncertain" and done["reason"] == "foreign_team"
+    assert "replace_failed_uncertain:foreign_team" in alert_reasons(world.ctrl)
+
+
+def test_timeout_recovery_bind_refuses_a_foreign_team(world):
+    dep = submit_approved(world.ctrl, payload())
+    world.provider.fail_next("create", "after")
+    foreign_team_on_get(world, "team-2")
+    done = execute(world, dep)
+    assert done["status"] == "failed_uncertain" and done["reason"] == "foreign_team"
+    assert world.provider.calls.count("update") == 0
+    assert world.ctrl.get_approval(dep["approval_id"])["state"] == "reserved"
