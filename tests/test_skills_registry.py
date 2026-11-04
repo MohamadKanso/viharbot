@@ -24,9 +24,9 @@ from viharbot.skills import (
 
 AGENTS = load_registry()
 ORIGINAL_IDS = {"charlie", "nova", "atlas", "pixel", "sage", "cipher", "scout", "orbit"}
-EXPECTED_IDS = ORIGINAL_IDS | {"archie", "ada"}
+EXPECTED_IDS = ORIGINAL_IDS | {"archie", "ada", "kepler"}
 EXPECTED_COUNTS = {"charlie": 8, "nova": 8, "scout": 8, "cipher": 12, "atlas": 10, "pixel": 8,
-                   "sage": 10, "orbit": 14, "archie": 10, "ada": 10}
+                   "sage": 10, "orbit": 14, "archie": 10, "ada": 10, "kepler": 0}
 SRC = Path(__file__).resolve().parent.parent / "src" / "viharbot"
 REGISTRY_DOC = (
     Path(__file__).resolve().parent.parent / "docs" / "governance" / "agent-skills-registry-v1.md"
@@ -57,7 +57,7 @@ def load(tmp_path: Path, *skills: dict, agent: str = "charlie"):
 
 # 1. the eight established identities remain registered, alongside Archie and Ada
 def test_the_eight_established_identities_remain_registered_with_the_two_education_agents():
-    assert {a.id for a in AGENTS.list()} == EXPECTED_IDS and len(AGENTS) == 10
+    assert {a.id for a in AGENTS.list()} == EXPECTED_IDS and len(AGENTS) == 11
 
 
 # 2. all skill definitions load successfully, and all 98 are represented
@@ -284,7 +284,7 @@ def test_existing_bindings_and_capability_status_are_unchanged():
         "research", "fact_check", "source_quality", "security_assessment", "privacy_review",
         "synthesis", "slide_generation", "philosophical_analysis", "code_review",
     }
-    assert len(Capability) == 15
+    assert len(Capability) == 16
 
 
 # 12. existing workflows remain functional: the runtime does not depend on skills
