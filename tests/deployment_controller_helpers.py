@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from viharbot.deployment_controller.audit import AuditLog
 from viharbot.deployment_controller.controller import DeploymentController
-from viharbot.deployment_controller.policy import Policy
+from viharbot.deployment_controller.policy import Policy, PolicyDenied
 from viharbot.deployment_controller.provider import FakeProvider
 from viharbot.deployment_controller.store import RecordStore
 
@@ -73,12 +75,24 @@ def submit_approved(ctrl, body) -> dict:
     return dep
 
 
-def replacement(world, n: int = 1, **overrides) -> tuple[dict, dict]:
-    """A running app plus an approved replacement request for it (not yet executed)."""
-    running = run_all(world.ctrl, payload(n))
-    app = world.provider.apps[running["app_id"]]
-    body = payload(
-        n, request_id=f"rep-{n}", env={"LOG_LEVEL": "debug"},
-        replaces={"app_id": app.app_id, "expected_version": app.version}, **overrides,
-    )
-    return running, submit_approved(world.ctrl, body)
+
+def reason_of(call, *args, **kwargs):
+    with pytest.raises(PolicyDenied) as info:
+        call(*args, **kwargs)
+    return info.value.reason
+
+
+def submit(world, body, caller="orbit"):
+    return world.ctrl.submit(body, caller=caller, request_id="r")
+
+
+def execute(world, dep, ctrl=None):
+    return (ctrl or world.ctrl).execute(dep["approval_id"], caller="approver", request_id="r")
+
+
+def app_of(world, dep):
+    return world.provider.apps[dep["app_id"]]
+
+
+def alert_reasons(ctrl):
+    return [a["reason"] for a in ctrl.alerts]

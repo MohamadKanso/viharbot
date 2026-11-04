@@ -18,11 +18,6 @@ from .provider import ProviderApp
 CLAIM_KEY = "ORBIT_CLAIM"
 BOUND_KEY = "ORBIT_BOUND"
 
-BOUND_EXPIRED = "bound_expired"
-BOUND_LIVE = "bound_live"
-CLAIM_ONLY = "claim_only"
-UNOWNED = "unowned"  # missing, invalid, foreign team or tampered
-
 
 @dataclass(frozen=True)
 class Claim:
@@ -72,12 +67,3 @@ def verified_bound(key: bytes, app: ProviderApp, team_id: str) -> Claim | None:
         return None
     return claim
 
-
-def classify(key: bytes, app: ProviderApp, team_id: str, now: float) -> str:
-    claim = verified_bound(key, app, team_id)
-    if claim is not None:
-        return BOUND_EXPIRED if now >= claim.expires_at else BOUND_LIVE
-    claim = parse_claim(key, app.env)
-    if claim is not None and claim.team_id == team_id and app.team_id == team_id:
-        return CLAIM_ONLY  # includes a bound marker copied from another app
-    return UNOWNED

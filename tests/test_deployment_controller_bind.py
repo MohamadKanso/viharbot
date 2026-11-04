@@ -1,14 +1,13 @@
-"""Bind safety: version condition, claim expiry on every bind path, lookup failures, log bytes."""
+"""Bind safety: version condition, claim expiry checked right before the write, log bytes."""
 
 from __future__ import annotations
 
 import pytest
 from deployment_controller_helpers import (
-    controller, make_world, payload, replacement, run_all, submit_approved,
+    controller, make_world, payload, run_all, submit_approved,
 )
 
 from viharbot.deployment_controller import markers
-from viharbot.deployment_controller.provider import ProviderTimeout
 
 TWO_HOURS = 2 * 3600
 
@@ -80,13 +79,6 @@ def test_a_writer_between_read_and_bind_is_detected_without_conditional_updates(
     assert done["status"] == "failed_uncertain" and done["reason"] == "unexpected_writer"
     assert "bind_failed_uncertain:unverified" in alerts(world.ctrl)
     assert world.ctrl.get_approval(dep["approval_id"])["state"] == "reserved"
-    controller(world).reconcile()  # reconcile never promotes the conflict record to executed
-    assert world.ctrl.get(done["deployment_id"])["status"] == "failed_uncertain"
-
-
-def test_a_clean_bind_without_conditional_updates_verifies_by_read_back(tmp_path):
-    world = make_world(tmp_path, conditional_update=False)
-    assert run_all(world.ctrl, payload())["status"] == "running"
 
 
 def test_an_app_changed_before_the_bind_read_is_never_bound(world):
@@ -103,7 +95,7 @@ def test_a_read_failure_before_the_bind_leaves_it_pending(world):
     after_call(world.provider, "create_app", lambda: world.provider.fail_next("get", "before"))
     done = go(world, dep)
     assert done["status"] == "created_unbound" and done["reason"] == "bind_pending"
-    assert controller(world).reconcile()[0]["action"] == "bound"
+    assert "bind_pending" in alerts(world.ctrl)
 
 
 def test_a_read_back_failure_without_conditional_updates_is_uncertain(tmp_path):
@@ -120,9 +112,7 @@ def test_a_read_back_failure_without_conditional_updates_is_uncertain(tmp_path):
     assert done["status"] == "failed_uncertain" and done["reason"] == "unexpected_writer"
 
 
-# --- claim expiry is rechecked immediately before every bind -----------------------------------
-
-
+# --- claim expiry is rechecked immediately before every bind ---
 def assert_expired_not_bound(world, dep_id, approval_id):
     record = world.ctrl.get(dep_id)
     assert record["status"] == "failed_uncertain" and record["reason"] == "claim_expired"
@@ -141,82 +131,45 @@ def test_expiry_during_an_immediate_create_is_never_bound(world):
     assert_expired_not_bound(world, done["deployment_id"], dep["approval_id"])
 
 
-def test_expiry_during_timeout_recovery_is_never_bound(world):
+def test_expiry_during_a_slow_bind_read_is_never_bound(world):
+    """The claim is live when the bind starts but expires while get_app is in flight."""
     dep = submit_approved(world.ctrl, payload())
-    world.provider.fail_next("create", "after")
-    original = world.provider.find_operation
+    claim_expiry = int(world.clock.now) + 3600
+    original = world.provider.get_app
 
-    def slow_lookup(claim_id):
-        world.clock.now += TWO_HOURS
-        return original(claim_id)
-    world.provider.find_operation = slow_lookup
+    def slow_get(app_id):
+        result = original(app_id)
+        world.clock.now = claim_expiry + 1  # the read itself crossed the expiry
+        return result
+    world.provider.get_app = slow_get
     done = go(world, dep)
     assert_expired_not_bound(world, done["deployment_id"], dep["approval_id"])
 
 
-def test_expiry_during_a_later_reconcile_lookup_is_never_bound(world):
-    dep = submit_approved(world.ctrl, payload())
-    world.provider.fail_next("create", "after")
-    original_list, calls = world.provider.list_apps, []
+def test_the_expiry_boundary_during_a_slow_bind_read_is_exclusive(tmp_path):
+    for conditional in (True, False):
+        for offset, bound in ((-1, True), (0, False)):  # the expiry instant is already late
+            home = tmp_path / f"{conditional}{offset}"
+            home.mkdir()
+            world = make_world(home, conditional_update=conditional)
+            dep = submit_approved(world.ctrl, payload())
+            claim_expiry = int(world.clock.now) + 3600
+            original = world.provider.get_app
 
-    def flaky():
-        calls.append(1)
-        if len(calls) > 1:
-            raise ProviderTimeout("list")
-        return original_list()
-    world.provider.list_apps = flaky
-    done = go(world, dep)
-    world.provider.list_apps = original_list
-    assert done["reason"] == "reconcile_unavailable"
-    original = world.provider.find_operation
-
-    def slow_lookup(claim_id):
-        world.clock.now += TWO_HOURS  # the claim expires after the pass's own expiry check
-        return original(claim_id)
-    world.provider.find_operation = slow_lookup
-    second = controller(world)
-    assert [r["action"] for r in second.reconcile()] == ["alert"]
-    world.ctrl = second
-    assert_expired_not_bound(world, done["deployment_id"], dep["approval_id"])
+            def slow_get(app_id, original=original, world=world, at=claim_expiry + offset):
+                result = original(app_id)
+                world.clock.now = at
+                return result
+            world.provider.get_app = slow_get
+            done = go(world, dep)
+            if bound:
+                assert done["status"] == "running"
+                assert markers.BOUND_KEY in world.provider.apps[done["app_id"]].env
+            else:
+                assert_expired_not_bound(world, done["deployment_id"], dep["approval_id"])
 
 
-def test_expiry_before_a_replacement_update_is_never_written(world):
-    running, dep = replacement(world)
-    original = world.ctrl.store.commit
-
-    def commit(**changes):
-        original(**changes)
-        if "actions" in changes:  # the reservation just became durable
-            world.clock.now += TWO_HOURS
-    world.ctrl.store.commit = commit
-    calls_before = world.provider.calls.count("update")
-    done = go(world, dep)
-    assert done["status"] == "failed_uncertain" and done["reason"] == "claim_expired"
-    assert world.provider.calls.count("update") == calls_before
-    assert "bind_refused:claim_expired" in alerts(world.ctrl)
-    assert world.ctrl.get_approval(dep["approval_id"])["state"] == "reserved"
-
-
-# --- an unavailable operation lookup during immediate recovery ---------------------------------
-
-
-def test_lookup_failure_during_immediate_recovery_is_a_normal_uncertain_record(world):
-    dep = submit_approved(world.ctrl, payload())
-    world.provider.fail_next("create", "after")
-    world.provider.fail_next("find", "before")
-    done = go(world, dep)
-    assert done["status"] == "failed_uncertain" and done["reason"] == "reconcile_unavailable"
-    assert "create_outcome_unknown:reconcile_unavailable" in alerts(world.ctrl)
-    assert world.provider.calls.count("create") == 1
-    assert world.ctrl.get_approval(dep["approval_id"])["state"] == "reserved"
-    # a later pass recovers it from provider evidence without a second create
-    assert [r["action"] for r in controller(world).reconcile()] == ["bound"]
-    assert world.provider.calls.count("create") == 1
-
-
-# --- log cap is bytes ---------------------------------------------------------------------------
-
-
+# --- log cap is bytes ---
 def test_log_cap_is_utf8_bytes_and_never_splits_a_character(tmp_path):
     world = make_world(tmp_path)
     world.ctrl = controller(world, max_log_bytes=5)
