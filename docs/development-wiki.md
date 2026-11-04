@@ -32,6 +32,8 @@ A read-only view of how development is going, inside the ViharBot web app (**Dev
 | `DEV_WIKI_BRANCH` | default `main` |
 | `DEV_WIKI_CACHE_SECONDS` | default 300 (minimum 30) |
 
+The **Development Wiki link is hidden** in the top bar unless a token is configured: the page asks `GET /api/development/availability` (no GitHub call) and shows the link only on `{"configured": true}`. If that request fails the link stays hidden. Opening `#wiki` directly without a token still shows the "unavailable" state.
+
 Local Compose passes `DEV_WIKI_GITHUB_TOKEN` through (empty by default). `deploy/digitalocean/app.yaml` is unchanged, so a Stage built from it shows the wiki as unavailable until a secret is added by a deliberate, reviewed deployment change.
 
 ## API (all behind the existing web authentication)

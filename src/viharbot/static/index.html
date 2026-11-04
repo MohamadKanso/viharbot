@@ -49,6 +49,7 @@
       .top-right { display: flex; align-items: center; gap: 18px; }
       .privacy-label { color: #8c8c82; font-size: 12px; }
       .team-link { display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; border: 1px solid #e9dfd3; border-radius: 999px; color: #685d51; background: rgba(255,255,255,.78); font-size: 13px; font-weight: 700; text-decoration: none; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
+      .team-link[hidden] { display: none; }
       .team-link:hover { transform: translateY(-1px); border-color: #dec7b4; box-shadow: 0 5px 14px rgba(61,53,40,.08); }
       .team-link span { color: #c4775e; font-size: 16px; }
       .team-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #e4e9dd; border-radius: 999px; color: #5f7561; background: rgba(255,255,255,.7); font-size: 12px; font-weight: 650; }
@@ -350,7 +351,7 @@
         </a>
         <div class="top-right">
           <span class="privacy-label">Thoughtful answers, with room for uncertainty</span>
-          <a class="team-link" id="wiki-link" href="#wiki"><span aria-hidden="true">▤</span> Development Wiki</a>
+          <a class="team-link" id="wiki-link" href="#wiki" hidden><span aria-hidden="true">▤</span> Development Wiki</a>
           <a class="team-link" id="team-link" href="#team"><span aria-hidden="true">✳</span> Meet the team</a>
           <span class="team-status"><i></i>6 live · 10 in the crew</span>
         </div>
@@ -1650,6 +1651,14 @@
       const wikiBody = document.querySelector("#wiki-body");
       const wikiSync = document.querySelector("#wiki-sync");
       let wikiToken = 0;
+      // The link stays hidden unless the server says the wiki is configured (a GitHub token is set).
+      // If this request fails for any reason the link simply stays hidden.
+      if (wikiLink) {
+        fetch("/api/development/availability", { headers: { Accept: "application/json" } })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => { if (d && d.configured === true) wikiLink.hidden = false; })
+          .catch(() => {});
+      }
       const wikiDate = (value) => (value ? String(value).slice(0, 10) : "unknown");
       function wikiAnchor(href, text, external) {
         const a = el("a", "", text);
