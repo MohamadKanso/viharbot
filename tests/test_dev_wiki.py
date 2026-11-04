@@ -551,3 +551,35 @@ def test_default_transport_does_not_follow_redirects_or_forward_the_token():
     finally:
         for server in (target, front):
             server.shutdown()
+
+
+# ---- the nav link only appears when the wiki is configured ----
+
+def test_availability_reports_configuration_without_calling_github(client):
+    fake = FakeGitHub()
+    dev_wiki.set_service(WikiService(WikiConfig({}), fake))
+    assert client.get("/api/development/availability").json() == {"configured": False}
+    dev_wiki.set_service(make_service(fake))
+    assert client.get("/api/development/availability").json() == {"configured": True}
+    assert fake.calls == []  # asking is free: no sync is triggered
+
+
+def test_availability_requires_web_authentication(client, monkeypatch):
+    monkeypatch.setenv("WEB_AUTH_ENABLED", "true")
+    monkeypatch.setenv("WEB_USERNAME", "u")
+    monkeypatch.setenv("WEB_PASSWORD", "p")
+    assert client.get("/api/development/availability").status_code == 401
+
+
+def test_link_is_hidden_in_the_markup_by_default(client):
+    assert 'id="wiki-link" href="#wiki" hidden' in client.get("/").text
+
+
+@pytest.mark.skipif(NODE is None, reason="Node.js is not installed")
+@pytest.mark.parametrize("answer,hidden", [({"configured": True}, False), ({"configured": False}, True),
+                                           (None, True)])
+def test_ui_shows_the_link_only_when_the_server_says_configured(answer, hidden):
+    api = {"/api/development/epics": make_service().epics()}
+    if answer is not None:
+        api["/api/development/availability"] = answer  # None: the request fails, link stays hidden
+    assert run_ui(["#home"], api)["linkHiddenAtLoad"] is hidden

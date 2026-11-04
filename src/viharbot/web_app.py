@@ -158,6 +158,13 @@ class WikiEpicsResponse(BaseModel):
     epics: list[WikiEpicSummary]
 
 
+@app.get("/api/development/availability", include_in_schema=False)
+def development_availability(response: Response, _: None = Depends(require_web_access)) -> dict:
+    """Whether the wiki is configured. Makes no GitHub call, so the page can ask on every load."""
+    _wiki_headers(response)
+    return {"configured": dev_wiki_service().config.configured}
+
+
 @app.get("/api/development/epics", response_model=WikiEpicsResponse, include_in_schema=False)
 def development_epics(response: Response, _: None = Depends(require_web_access)) -> dict:
     _wiki_headers(response)

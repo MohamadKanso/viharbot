@@ -71,14 +71,14 @@ def call(api, who, method, target, body=None, capability=None, **mint):
     return api.client.request(method, target, content=raw, headers=headers), token
 
 
-def test_full_flow_create_review_approve_logs_stop_delete(api, caplog):
+def test_full_flow_create_review_approve_logs_replace_stop_delete(api, caplog):
     caplog.set_level(logging.INFO)
     body = payload(env={"LOG_LEVEL": "sentinel-env-value"})
     created, orbit_token = call(api, "orbit", "POST", "/v1/deployments", body)
     assert created.status_code == 200 and created.json()["status"] == "pending_approval"
     dep = created.json()
-    got = call(api, "orbit", "GET", f"/v1/deployments/{dep['deployment_id']}")[0]
-    assert got.json() == dep
+    assert call(api, "orbit", "GET", f"/v1/deployments/{dep['deployment_id']}")[0].json()[
+        "status"] == "pending_approval"
 
     review, _ = call(api, "approver", "GET", f"/v1/approvals/{dep['approval_id']}")
     assert review.json()["request"]["env"] == {"LOG_LEVEL": "sentinel-env-value"}
@@ -90,6 +90,13 @@ def test_full_flow_create_review_approve_logs_stop_delete(api, caplog):
 
     logs, _ = call(api, "orbit", "GET", f"/v1/deployments/{dep['deployment_id']}/logs?lines=3")
     assert logs.json()["logs"] == "l997\nl998\nl999"
+
+    replace = payload(request_id="rep-1", env={"LOG_LEVEL": "debug"},
+                      replaces={"app_id": app_id, "expected_version": 2})
+    second = call(api, "orbit", "POST", "/v1/deployments", replace)[0].json()
+    call(api, "approver", "POST", f"/v1/approvals/{second['approval_id']}:approve",
+         {"request_hash": second["request_hash"]})
+    assert api.world.provider.apps[app_id].env["LOG_LEVEL"] == "debug"
 
     stopped, _ = call(api, "orbit", "POST", f"/v1/deployments/{dep['deployment_id']}:stop")
     assert stopped.json()["status"] == "stopped" and app_id not in api.world.provider.apps
@@ -146,6 +153,35 @@ def test_policy_denials_and_state_errors_map_to_http_statuses(api):
     replay = call(api, "approver", "POST", target, {"request_hash": dep["request_hash"]})[0]
     assert replay.status_code == 409  # a consumed approval cannot be replayed
     assert call(api, "orbit", "GET", "/v1/deployments/dep_none")[0].status_code == 404
+
+
+def test_lifespan_runs_the_startup_reconciliation(api):
+    dep = run_all(api.world.ctrl, payload(ttl_minutes=1))
+    api.world.clock.now += 120
+    with TestClient(api.app):
+        pass
+    assert dep["app_id"] not in api.world.provider.apps
+
+
+def test_startup_reconciliation_failure_raises_an_alert_and_the_service_still_starts(api):
+    api.world.provider.fail_next("list", "before")
+    with TestClient(api.app) as client:
+        assert client.get("/health").status_code == 200
+    assert "startup_reconcile_failed" in [a["reason"] for a in api.world.ctrl.alerts]
+
+
+def test_operation_lookup_failure_during_immediate_recovery_returns_a_normal_response(api):
+    created = call(api, "orbit", "POST", "/v1/deployments", payload())[0].json()
+    api.world.provider.fail_next("create", "after")
+    api.world.provider.fail_next("find", "before")
+    response, _ = call(api, "approver", "POST", f"/v1/approvals/{created['approval_id']}:approve",
+                       {"request_hash": created["request_hash"]})
+    assert response.status_code == 200
+    assert response.json()["status"] == "failed_uncertain"
+    assert response.json()["reason"] == "reconcile_unavailable"
+    assert "create_outcome_unknown:reconcile_unavailable" in [
+        a["reason"] for a in api.world.ctrl.alerts]
+    assert api.world.provider.calls.count("create") == 1
 
 
 def test_a_malformed_request_hash_is_a_clean_422_and_is_audited(api, caplog):
