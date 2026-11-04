@@ -42,6 +42,11 @@ class ImageRef(_Strict):
     digest: str
 
 
+class Replace(_Strict):
+    app_id: str
+    expected_version: StrictInt
+
+
 class DeploymentRequest(_Strict):
     request_id: str = Field(pattern=r"^[A-Za-z0-9._-]{1,128}$")
     name: str
@@ -51,6 +56,7 @@ class DeploymentRequest(_Strict):
     port: StrictInt | None = None
     env: dict[str, str] = Field(default_factory=dict)
     ttl_minutes: StrictInt = 120
+    replaces: Replace | None = None
 
 
 @dataclass(frozen=True)
@@ -106,7 +112,8 @@ class Policy:
 
 def canonical_request(req: DeploymentRequest, team_id: str) -> str:
     """The complete canonical request: every field, the full env mapping, the spec-template
-    version and the provider team."""
+    version and the provider team. For a replacement ``replaces`` carries the immutable app id and
+    the expected version, so an approval cannot move to another resource."""
     body = req.model_dump()
     body["env"] = dict(sorted(req.env.items()))
     body["template_version"] = TEMPLATE_VERSION

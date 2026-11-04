@@ -7,6 +7,7 @@ later change that waits for a separately approved live test and contract fixture
 from __future__ import annotations
 
 import copy
+import json
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
@@ -38,9 +39,10 @@ class ProviderApp:
 
 class Provider(Protocol):
     team_id: str
-    # True only if the provider enforces expected_version itself; the controller then passes the
-    # just-read version on every update. If False it writes unconditionally under the store lock and
-    # verifies by read-back: a foreign version is failed_uncertain plus an alert (ADR-007).
+    # True only if the provider enforces expected_version itself. The controller then passes the
+    # just-read version on EVERY update (bind and replace) and never writes unconditionally. If
+    # False it writes unconditionally under the store lock and verifies by read-back: a foreign
+    # version means failed_uncertain plus an alert (detection, not prevention; ADR-007).
     conditional_update: bool
 
     def create_app(self, name: str, spec: dict) -> ProviderApp: ...
@@ -51,6 +53,9 @@ class Provider(Protocol):
     ) -> ProviderApp: ...
     def destroy_app(self, app_id: str) -> None: ...
     def list_apps(self) -> list[ProviderApp]: ...
+    def find_operation(self, claim_id: str) -> str | None:
+        """Provider-backed link from a create operation to its app id, or None if unsupported."""
+        ...
 
 
 class FakeProvider:
@@ -61,14 +66,17 @@ class FakeProvider:
     """
 
     def __init__(
-        self, team_id: str = "team-1", *, conditional_update: bool = True
+        self, team_id: str = "team-1", *, conditional_update: bool = True,
+        operation_lookup: bool = True,
     ) -> None:
         self.team_id = team_id
         self.conditional_update = conditional_update
+        self.operation_lookup = operation_lookup
         self.apps: dict[str, ProviderApp] = {}
         self.calls: list[str] = []
         self.logs: dict[str, str] = {}
         self.before_update: Callable[[FakeProvider, str], None] | None = None
+        self._operations: dict[str, str] = {}
         self._faults: dict[str, str] = {}
         self._counter = 0
 
@@ -95,6 +103,9 @@ class FakeProvider:
         if any(app.name == name for app in self.apps.values()):
             raise ProviderError("name_conflict")
         app = self._new(name, spec)
+        claim = app.env.get("ORBIT_CLAIM")
+        if claim:
+            self._operations[json.loads(claim)["claim_id"]] = app.app_id
         if fault == "after":
             raise ProviderTimeout("create")
         return copy.deepcopy(app)
@@ -134,7 +145,13 @@ class FakeProvider:
         self._enter("list")
         return [copy.deepcopy(app) for app in self.apps.values()]
 
-    # --- test helpers: situations the controller must survive ---
+    def find_operation(self, claim_id: str) -> str | None:
+        if self._faults.pop("find", None):
+            raise ProviderTimeout("find")
+        return self._operations.get(claim_id) if self.operation_lookup else None
+
+    # --- test helpers: situations the controller must survive ---------------------------------
+
     def add_foreign(
         self, name: str, env: dict[str, str] | None = None, team_id: str | None = None
     ) -> ProviderApp:

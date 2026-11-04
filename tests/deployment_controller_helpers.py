@@ -96,3 +96,14 @@ def app_of(world, dep):
 
 def alert_reasons(ctrl):
     return [a["reason"] for a in ctrl.alerts]
+
+
+def replacement(world, n: int = 1, **overrides) -> tuple[dict, dict]:
+    """A running app plus an approved replacement request for it (not yet executed)."""
+    running = run_all(world.ctrl, payload(n))
+    app = world.provider.apps[running["app_id"]]
+    body = payload(
+        n, request_id=f"rep-{n}", env={"LOG_LEVEL": "debug"},
+        replaces={"app_id": app.app_id, "expected_version": app.version}, **overrides,
+    )
+    return running, submit_approved(world.ctrl, body)

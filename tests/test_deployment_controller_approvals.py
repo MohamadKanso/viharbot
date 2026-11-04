@@ -95,20 +95,6 @@ def test_happy_create_binds_and_a_replayed_approval_is_refused(world):
 
 
 # --- reserve-then-execute: create ---
-@pytest.mark.parametrize("when", ["after", "before"])
-def test_create_timeout_is_uncertain_stays_reserved_and_never_a_second_create(world, when):
-    dep = submit_approved(world.ctrl, payload())
-    world.provider.fail_next("create", when)
-    done = execute(world, dep)
-    assert done["status"] == "failed_uncertain" and done["reason"] == "create_outcome_unknown"
-    assert world.ctrl.get_approval(dep["approval_id"])["state"] == "reserved"
-    assert reason_of(execute, world, dep) == "approval_not_pending"
-    assert world.provider.calls.count("create") == 1
-    assert bool(world.provider.apps) == (when == "after")  # an app exists only if it landed
-    assert all(markers.BOUND_KEY not in app.env for app in world.provider.apps.values())
-    assert "create_outcome_unknown" in alert_reasons(world.ctrl)
-
-
 def test_definite_provider_error_on_create_never_returns_to_pending(world):
     world.provider.add_foreign("orbit-demo-1")  # name conflict, a definite refusal
     dep = submit_approved(world.ctrl, payload())

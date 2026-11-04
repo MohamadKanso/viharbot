@@ -1,12 +1,12 @@
-"""The controller core: approval state machine, reserve-then-execute, create and bind (ADR-007).
+"""The controller core: approval state machine, reserve-then-execute, create, bind (ADR-007).
 
 Approval states are ``pending -> reserved(claim_id) -> executed | expired``. A reservation is
 durably recorded before any provider call and is never returned to ``pending``. A provider timeout
 is an unknown outcome and never produces a second create. Everything runs under
 ``RecordStore.locked()`` (a file lock plus reload), so only one instance can consume an approval.
 
-Reconciliation, timeout recovery and replacement updates are part 2, not here: a create timeout is
-recorded as ``failed_uncertain`` with an alert and is never retried.
+Reconciliation and timeout recovery live in ``reconcile.py`` and replacement updates in
+``replace.py``, as mixins of the controller below.
 """
 
 from __future__ import annotations
@@ -27,12 +27,14 @@ from .policy import (
     DeploymentRequest, Policy, PolicyDenied, build_spec, request_hash,
 )
 from .provider import Provider, ProviderApp, ProviderError, ProviderTimeout, VersionConflict
+from .reconcile import LIVE, ReconcileMixin
+from .replace import ReplaceMixin
 from .store import RecordStore, StoreError
 
 HOUR, DAY = 3600, 86400
 
 
-class DeploymentController:
+class DeploymentController(ReplaceMixin, ReconcileMixin):
     def __init__(
         self, *, provider: Provider, store: RecordStore, policy: Policy, marker_key: bytes,
         audit: AuditLog | None = None, clock: Callable[[], float] = time.time,
@@ -130,7 +132,7 @@ class DeploymentController:
                 "image_digest": req.image.digest, "size": req.size, "region": req.region,
                 "ttl_minutes": req.ttl_minutes, "request_hash": digest, "app_id": None,
                 "expires_at": None, "reason": None,
-                "kind": "create",
+                "kind": "replace" if req.replaces else "create",
             }
             appr = {
                 "approval_id": appr_id, "deployment_id": dep_id, "request": req.model_dump(),
@@ -211,6 +213,8 @@ class DeploymentController:
                 raise refuse("request_changed_after_approval", 409)
             try:
                 self.policy.check(req)
+                if req.replaces:
+                    self._preflight(appr, req)
                 self._check_quota(req, now)
             except PolicyDenied as denied:
                 raise refuse(denied.reason, denied.status) from None
@@ -225,11 +229,14 @@ class DeploymentController:
             action = {"ts": now, "kind": dep["kind"]}
             self._save(approvals={approval_id: appr}, deployments={dep["deployment_id"]: dep},
                        actions=[action])  # durable before any provider call
-            return self._create(appr, dep, req, claim, request_id, caller, started)
+            args = (appr, dep, req, claim, request_id, caller, started)
+            return self._replace(*args) if req.replaces else self._create(*args)
 
     def _check_quota(self, req: DeploymentRequest, now: float) -> None:
         if self._recent(now, DAY) >= self.policy.max_actions_per_day:
             raise PolicyDenied("daily_quota_exhausted", 429)
+        if req.replaces:
+            return
         if self._recent(now, HOUR, "create") >= self.policy.max_creates_per_hour:
             raise PolicyDenied("hourly_quota_exhausted", 429)
         live = [a for a in self.provider.list_apps() if a.name.startswith(self.policy.name_prefix)]
@@ -241,10 +248,8 @@ class DeploymentController:
         ctx = dict(request_id=request_id, caller=caller, started=started)
         try:
             app = self.provider.create_app(req.name, spec)
-        except ProviderTimeout:  # unknown outcome: never a second create
-            self._alert("create_outcome_unknown", request_id=request_id, dep=dep)
-            return self._finish(
-                appr, dep, "failed_uncertain", reason="create_outcome_unknown", **ctx)
+        except ProviderTimeout:
+            return self._resolve_unknown_create(appr, dep, claim, **ctx)
         except ProviderError:
             return self._finish(appr, dep, "failed", reason="provider_error_on_create", **ctx)
         dep.update(app_id=app.app_id, status="created_unbound")
@@ -364,6 +369,10 @@ class DeploymentController:
                                    caller=caller, dep=dep) from None
             dep["status"] = "stopped"
             changed = {deployment_id: dep}
+            for other in self._deps_for(dep["app_id"], deployment_id):  # same app, same fate
+                if other["status"] in LIVE:
+                    other["status"] = "stopped"
+                    changed[other["deployment_id"]] = other
             self._save(deployments=changed,
                        remove_deployments=() if keep_record else (deployment_id,))
             self.audit.emit(action, "allow", request_id=request_id, caller=caller,
