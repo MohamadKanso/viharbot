@@ -1,0 +1,64 @@
+name: CLA acceptance
+
+# Merge gate for the contribution agreement. It fails a pull request whose author, or any commit
+# author, has no recorded acceptance on the protected base branch. While the agreement is a draft
+# it fails every non-exempt author, which is what "external code is not merged until a CLA is
+# approved" means in practice. It never approves, never merges and grants no trust. See
+# docs/governance/cla-acceptance.md.
+#
+# Why pull_request_target: the workflow and the script must come from the protected base branch,
+# so a pull request cannot edit the check that judges it, and acceptance is read from the base
+# branch's CLA-ACCEPTANCES.md, never the pull request's copy. The pull request's code is never
+# checked out or executed. Its commit authors are fetched through the API as plain data. The
+# token is read-only and no secret is used.
+on:
+  pull_request_target:
+    branches: [main]
+
+# Runs on every pull request, with no path filter, so the check can be required without ever
+# leaving an unrelated pull request waiting for a result that will not come.
+concurrency:
+  group: cla-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cla:
+    name: CLA acceptance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      # Base branch only. The default for this event is the base branch; the SHA makes it explicit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - name: Check acceptance of the agreement
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          AUTHOR_ID: ${{ github.event.pull_request.user.id }}
+          AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
+          COMMIT_COUNT: ${{ github.event.pull_request.commits }}
+        run: |
+          set -euo pipefail
+          commits="$RUNNER_TEMP/commits.jsonl"
+          gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/commits" \
+            --jq '.[] | {sha: .sha, id: .author.id, login: .author.login}' > "$commits"
+          changed="$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/files" \
+            --jq '.[] | .filename, (.previous_filename // empty)' | paste -sd, -)"
+          python3 .github/scripts/cla_gate.py check \
+            --acceptances-file CLA-ACCEPTANCES.md \
+            --registry-file CONTRIBUTORS.md \
+            --author-id "$AUTHOR_ID" \
+            --author-login "$AUTHOR_LOGIN" \
+            --commits-file "$commits" \
+            --commit-count "$COMMIT_COUNT" \
+            --changed-files "$changed"

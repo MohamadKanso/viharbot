@@ -28,6 +28,7 @@
         "required_status_checks": [
           { "context": "CI result" },
           { "context": "Contributor registry" },
+          { "context": "CLA acceptance" },
           { "context": "Dependency review" }
         ]
       }

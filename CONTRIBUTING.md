@@ -44,7 +44,7 @@ Trusted contributors branch from current `main` in this repository, push to a fe
 
 Both paths follow the same rule: **never push directly to `main`.**
 
-The `protect-main` ruleset is **active** on `main`. It is defined in [`.github/rulesets/protect-main.json`](.github/rulesets/protect-main.json). GitHub enforces it: it blocks deletion and force pushes, requires a pull request with one approval and resolved conversations, and requires the `CI result`, `Contributor registry` and `Dependency review` checks to pass. A repository admin may merge their own pull request once those checks pass (bypass mode `pull_request`), but cannot push to `main` directly. The Sage review is advisory and is deliberately **not** a required check.
+The `protect-main` ruleset is **active** on `main`. It is defined in [`.github/rulesets/protect-main.json`](.github/rulesets/protect-main.json). GitHub enforces it: it blocks deletion and force pushes, requires a pull request with one approval and resolved conversations, and requires the `CI result`, `Contributor registry`, `CLA acceptance` and `Dependency review` checks to pass (the ruleset file lists `CLA acceptance`; it is enforced only once the founder applies it, see [CLA acceptance](docs/governance/cla-acceptance.md)). A repository admin may merge their own pull request once those checks pass (bypass mode `pull_request`), but cannot push to `main` directly. The Sage review is advisory and is deliberately **not** a required check.
 
 ### Branches, commits and pull requests
 
@@ -57,7 +57,9 @@ The `protect-main` ruleset is **active** on `main`. It is defined in [`.github/r
 
 External contributions will not be merged until the founder has approved a contribution agreement and the contributor has accepted it.
 
-The intended mechanism is a Contributor License Agreement (CLA) that supports possible future commercial distribution and relicensing. **No CLA exists yet.** Until one is approved, external pull requests can be opened, reviewed and discussed, but external code will not be merged. This restriction is temporary and stays in force until the agreement is approved and published. A Developer Certificate of Origin (DCO) sign-off is not required and is not being introduced.
+The intended mechanism is a Contributor License Agreement (CLA) that supports possible future commercial distribution and relicensing. **No CLA is in force yet.** A [draft](docs/governance/contributor-license-agreement.md) exists for the founder's review; it has not had legal review and binds no one. Until the founder approves one, external pull requests can be opened, reviewed and discussed, but external code will not be merged. This restriction is temporary and stays in force until the agreement is approved and published. A Developer Certificate of Origin (DCO) sign-off is not required and is not being introduced.
+
+Once an agreement is in force, you accept it by posting the statement it specifies as a comment on your pull request. The founder records your acceptance in [CLA-ACCEPTANCES.md](CLA-ACCEPTANCES.md), and the `CLA acceptance` check recognises you only after that record is merged. While no agreement is in force, the check fails for external authors, which is how this rule is enforced. How it works and what the founder must still do are in [CLA acceptance](docs/governance/cla-acceptance.md).
 
 When the CLA is drafted it is expected to cover these subjects, so you can see what you would be asked to confirm:
 
@@ -157,4 +159,4 @@ GitHub private vulnerability reporting is **not enabled** for this repository at
 
 ## Not yet decided
 
-These are open and are not resolved by this document: the contribution agreement and its wording; the repository's licence terms and any notice; contribution terms for trusted contributors; and a private channel for security reports.
+These are open and are not resolved by this document: the contribution agreement's final wording and legal review (a draft exists); the repository's licence terms and any notice; contribution terms for trusted contributors; and a private channel for security reports.
