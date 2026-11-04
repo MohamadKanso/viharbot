@@ -11,13 +11,14 @@ from typing import Literal
 from uuid import uuid4
 
 import uvicorn
-from fastapi import Depends, FastAPI, Header, HTTPException, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field
 
 from .demo import AgentPipelineError, run_pipeline
+from .dev_wiki import get_service as dev_wiki_service
 from .agentcore_runtime import add_agentcore_routes
 from .iterative_execution import iterative_orchestration_enabled, run_iterative_pipeline
 from .orchestration_view import OrchestrationMeta, build_orchestration_meta  # noqa: F401
@@ -117,6 +118,92 @@ def team_models_route(_: None = Depends(require_web_access)) -> dict:
         **({"sage": sage} if (sage := sage_url()) else {}),
     }
     return {"identities": team_models(services)}
+
+
+# ---- Development Wiki: read-only GitHub progress and docs. No inference, no writes. ----
+
+def _wiki_headers(response: Response) -> None:
+    response.headers["Cache-Control"] = "no-store"
+
+
+class WikiSync(BaseModel):
+    state: Literal["ok", "stale", "unavailable"]
+    stale: bool
+    error: str | None = None
+    synced_at: str | None = None
+    cache_seconds: int
+    repo: str
+    head_sha: str | None = None
+    rate_limit: dict | None = None
+    retry_after_seconds: int | None = None
+
+
+class WikiEpicSummary(BaseModel):
+    number: int
+    title: str
+    url: str
+    state: str
+    status: Literal["completed", "active", "planned", "blocked"]
+    agent: str | None = None
+    phase: str | None = None
+    progress: dict
+    counts: dict
+    labels: list[str]
+
+
+class WikiEpicsResponse(BaseModel):
+    sync: WikiSync
+    counts: dict | None = None
+    dashboard: dict | None = None
+    epics: list[WikiEpicSummary]
+
+
+@app.get("/api/development/epics", response_model=WikiEpicsResponse, include_in_schema=False)
+def development_epics(response: Response, _: None = Depends(require_web_access)) -> dict:
+    _wiki_headers(response)
+    return dev_wiki_service().epics()
+
+
+@app.get("/api/development/epics/{number}", include_in_schema=False)
+def development_epic(number: int, response: Response, _: None = Depends(require_web_access)) -> dict:
+    _wiki_headers(response)
+    found, meta = dev_wiki_service().epic(number)
+    if found is None:
+        if meta["state"] == "unavailable":
+            raise HTTPException(status_code=503, detail={"state": "unavailable", "sync": meta})
+        raise HTTPException(status_code=404, detail="Epic not found")
+    return found
+
+
+@app.get("/api/development/activity", include_in_schema=False)
+@app.get("/api/development/timeline", include_in_schema=False)
+def development_timeline(
+    response: Response,
+    epic: int | None = None,
+    agent: str | None = Query(default=None, max_length=40),
+    phase: str | None = Query(default=None, max_length=20),
+    status: str | None = Query(default=None, max_length=20),
+    _: None = Depends(require_web_access),
+) -> dict:
+    _wiki_headers(response)
+    return dev_wiki_service().timeline(epic, agent, phase, status)
+
+
+@app.get("/api/development/docs", include_in_schema=False)
+def development_docs(response: Response, _: None = Depends(require_web_access)) -> dict:
+    _wiki_headers(response)
+    return dev_wiki_service().docs()
+
+
+@app.get("/api/development/docs/{path:path}", include_in_schema=False)
+def development_doc(path: str, response: Response, _: None = Depends(require_web_access)) -> dict:
+    _wiki_headers(response)
+    found, meta = dev_wiki_service().document(path)
+    if found is None:
+        if meta["state"] == "unavailable":
+            raise HTTPException(status_code=503, detail={"state": "unavailable", "sync": meta})
+        raise HTTPException(status_code=404, detail="Document not found")
+    return found
 
 
 TEAM_IMAGES = {
