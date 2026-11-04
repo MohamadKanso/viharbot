@@ -14,7 +14,7 @@ ViharBot shall retain its eight established agent identities:
 
 **Charlie, Nova, Atlas, Pixel, Sage, Cipher, Scout, and Orbit.**
 
-> **Amendment (proposed):** the education-agents specification adds two further identities, Archie and Ada, without changing these eight. See [Education agents](../education-agents.md). This amendment is not yet adopted by the founders.
+> **Amendment (adopted):** the education-agents specification adds two further identities, Archie and Ada, without changing these eight, for ten in total. The founder adopted this amendment on 2026-11-03 in a comment on pull request #98. See [Education agents](../education-agents.md). Adoption covers the identities only; it does not authorize any execution capability, which still needs its own approval.
 
 No existing identity shall be renamed, replaced, or removed to accommodate new consulting responsibilities.
 
