@@ -82,8 +82,14 @@ def test_resolver_accepts_no_request_data():
     import inspect
 
     params = set(inspect.signature(resolve_inference_config).parameters)
+    # `use_persona` (Epic #157 Phase B) is set by effective_inference from the service's own
+    # environment flag; `personas` is a trusted test-injection point like `registry`. Neither
+    # carries request data, and both are keyword-only.
     assert params == {"service_name", "capability_instructions", "service_alias", "registry",
-                      "bindings"}
+                      "bindings", "use_persona", "personas"}
+    keyword_only = {name for name, p in inspect.signature(resolve_inference_config).parameters.items()
+                    if p.kind is inspect.Parameter.KEYWORD_ONLY}
+    assert keyword_only == {"use_persona", "personas"}
 
 
 # 2, 3, 4, 5. rejections

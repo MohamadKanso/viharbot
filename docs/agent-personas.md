@@ -1,6 +1,6 @@
 # Agent personas
 
-**Status: Phase A of Epic #157. Draft, declarative only.** The eight persona files describe how each established agent works and sounds. Nothing in the application reads them yet: they change no prompt, binding, permission, endpoint, event or model call. Design and phasing: [persona and community specification](persona-community-specification.md).
+**Status: Phases A and B of Epic #157. Draft personas.** The eight persona files describe how each established agent works and sounds. By default nothing reads them. Only when `VIHARBOT_PERSONALITY_INFERENCE_ENABLED` **and** `VIHARBOT_PERSONA_PROMPT_ENABLED` are both on in a service's own environment does that service add a rendered persona section to its system prompt (see [personality-aware inference](personality-aware-inference.md)). Personas never change a binding, permission, endpoint, event, output schema or model alias. Design and phasing: [persona and community specification](persona-community-specification.md).
 
 ## Identity, persona, authorization
 
@@ -66,4 +66,4 @@ Loading is deterministic (ordered by agent id) and makes no network, LiteLLM, AW
 
 ## Not implemented
 
-Persona-aware prompt composition, peer review, relationship records, collaboration memory, collaboration events and profile UI are proposals (phases B to E). Personas for `archie` and `ada` are not included.
+Peer review, relationship records, collaboration memory, collaboration events and profile UI are proposals (phases C to E). The persona is not applied to Charlie's planner, Sage or Sage's code review. Personas for `archie` and `ada` are not included.

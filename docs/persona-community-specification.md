@@ -136,12 +136,12 @@ Each phase is one reviewable PR, backward compatible, and ends with founder appr
 | Phase | Deliverable | Status |
 |---|---|---|
 | A | Persona schema, eight persona definitions, loader, tests, docs | **Implemented in this PR (draft)** |
-| B | Persona-aware prompt composition; consistent voice; governance precedence tests | Proposed |
+| B | Persona-aware prompt composition; consistent voice; governance precedence tests | **Implemented, flag off** (second flag `VIHARBOT_PERSONA_PROMPT_ENABLED`; see [personality-aware inference](personality-aware-inference.md)) |
 | C | Community interaction contracts, peer review, bounded collaboration, relationship records | Proposed |
 | D | Collaboration history, governed memory interfaces, measurable outcomes | Proposed; needs ADR-009 decision |
 | E | Real collaboration events, agent profile and community UI requirements, avatar metadata | Proposed |
 
-**Phase B design (proposed).** Add an opt-in composer behind the existing `VIHARBOT_PERSONALITY_INFERENCE_ENABLED` flag that renders selected persona fields (voice, reasoning, self-assessment) into the identity prompt section, keeping the precedence clause and the service prompt verbatim. Decision D3 (single source of truth for prompt text) must be settled first. Default stays off.
+**Phase B (implemented, flag off).** A renderer (`personas/prompt.py`) turns selected persona fields into a section placed after the identity prompt and before the precedence clause, so task instructions outrank it and the service prompt stays verbatim. It is gated by a **second** flag, `VIHARBOT_PERSONA_PROMPT_ENABLED`, that does nothing unless the personality flag is also on, so enabling personality inference alone cannot change behavior. D3 was resolved conservatively: the persona is **additive** to `prompts/<id>.md`, nothing is removed or moved, and the long-term single source of truth is still open. Personas are `draft`; the flag is the opt-in and logs carry persona id, version and status. Real voice quality is not measured here; that is B2.
 
 **Phase C design (proposed).** New review and challenge contracts as pydantic models (`ReviewRequest`, `ReviewFinding`, `Challenge`), each with sender, recipient, engagement, task, message type and correlation ids per Constitution section 5.4, validated by the application. Policy table of allowed review edges. Reuses existing budgets.
 
@@ -174,7 +174,7 @@ Not created. Titles are proposals for the founder to file under #157. #161 (pers
 | Phase | Create | Modify |
 |---|---|---|
 | A (this PR) | `src/viharbot/personas/{__init__,models,registry}.py`, `personas/definitions/*.toml` (8), `tests/test_persona_registry.py`, `docs/persona-community-specification.md`, `docs/agent-personas.md` | none in `src/` outside the new package |
-| B | persona composer module, tests | `inference_config.py`, `identity_registry.py` (only if single-source decision requires it) |
+| B (done) | `personas/prompt.py`, `tests/test_persona_prompt.py` | `inference_config.py`, `tests/test_persona_registry.py` (import allowlist), `docs/personality-aware-inference.md`, `docs/development-status.md` |
 | C | `community/` contracts and policy, tests | `orchestration_policy.py`, `iterative_execution.py`, `orchestration_planner.py` |
 | D | collaboration record models, tests | memory client once ADR-009 is accepted |
 | E | event models, UI requirements | `live_events.py`, `live_hooks.py`, `docs/live-observability.md`, `static/index.html` |
