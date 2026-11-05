@@ -1,0 +1,84 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PullOwnImage",
+      "Effect": "Allow",
+      "Action": ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"],
+      "Resource": "arn:aws:ecr:us-west-2:ACCOUNT_ID:repository/viharbot/kepler"
+    },
+    {
+      "Sid": "EcrAuthToken",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "WriteOwnLogs",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"],
+      "Resource": "arn:aws:logs:us-west-2:ACCOUNT_ID:log-group:/aws/bedrock-agentcore/runtimes/*"
+    },
+    {
+      "Sid": "PublishOwnMetricsOnly",
+      "Effect": "Allow",
+      "Action": "cloudwatch:PutMetricData",
+      "Resource": "*",
+      "Condition": { "StringEquals": { "cloudwatch:namespace": "ViharBot/Kepler" } }
+    },
+    {
+      "Sid": "ReadOnlyTheSecretsKeplerNeeds",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": [
+        "arn:aws:secretsmanager:us-west-2:ACCOUNT_ID:secret:viharbot/kepler/github-app-reader-*",
+        "arn:aws:secretsmanager:us-west-2:ACCOUNT_ID:secret:viharbot/kepler/litellm-api-key-*"
+      ]
+    },
+    {
+      "Sid": "MutableDeduplicationState",
+      "Effect": "Allow",
+      "Action": ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query", "dynamodb:UpdateItem"],
+      "Resource": [
+        "arn:aws:dynamodb:us-west-2:ACCOUNT_ID:table/viharbot-kepler-state",
+        "arn:aws:dynamodb:us-west-2:ACCOUNT_ID:table/viharbot-kepler-state/index/*"
+      ]
+    },
+    {
+      "Sid": "AuditTableWriteAndReadOnly",
+      "Effect": "Allow",
+      "Action": ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"],
+      "Resource": "arn:aws:dynamodb:us-west-2:ACCOUNT_ID:table/viharbot-kepler-audit"
+    },
+    {
+      "Sid": "HandAlertsToTheSeparateWriter",
+      "Effect": "Allow",
+      "Action": "lambda:InvokeFunction",
+      "Resource": "arn:aws:lambda:us-west-2:ACCOUNT_ID:function:viharbot-kepler-alert-writer"
+    },
+    {
+      "Sid": "NeverInvokeFoundationModelsDirectly",
+      "Effect": "Deny",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NeverDeleteAnything",
+      "Effect": "Deny",
+      "Action": ["dynamodb:DeleteItem", "dynamodb:BatchWriteItem", "dynamodb:DeleteTable"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NeverAlterAuditRecords",
+      "Effect": "Deny",
+      "Action": ["dynamodb:UpdateItem", "dynamodb:UpdateTable", "dynamodb:UpdateTimeToLive"],
+      "Resource": "arn:aws:dynamodb:us-west-2:ACCOUNT_ID:table/viharbot-kepler-audit"
+    },
+    {
+      "Sid": "NeverReadTheAlertWriterSecret",
+      "Effect": "Deny",
+      "Action": "secretsmanager:*",
+      "Resource": "arn:aws:secretsmanager:us-west-2:ACCOUNT_ID:secret:viharbot/kepler/github-app-alert-writer-*"
+    }
+  ]
+}
