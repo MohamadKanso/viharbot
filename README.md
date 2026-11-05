@@ -101,7 +101,7 @@ The default suite mocks all model and LiteLLM calls and is the authoritative one
 python -m pytest -q
 ```
 
-Two environment notes. A local `.env` is loaded by python-dotenv and can flip the feature flags on, which makes about 15 tests fail on the host; move `.env` aside when running tests there. The Docker profile runs the same offline suite in a container:
+Two environment notes. LiteLLM loads a `.env` it finds above its install location when it is imported, which used to flip feature flags on and fail tests on the host. The test configuration (`tests/conftest.py`) now sets `LITELLM_MODE=PRODUCTION` before that import, so a local `.env` no longer affects the offline suite and there is no need to move it aside. This applies to tests only; the application is unchanged. It is skipped when you opt in to the live checks from the shell (`RUN_LITELLM_INTEGRATION=1` or `RUN_LITELLM_INFERENCE=1`), which may need a key kept in `.env`, and you can set `LITELLM_MODE=DEV` yourself to load it on purpose. The Docker profile runs the same offline suite in a container:
 
 ```bash
 docker compose --profile tests run --build --rm tests
@@ -121,7 +121,7 @@ Test results, coverage (XML and HTML) and scan reports are uploaded as artifacts
 
 ```bash
 python -m pip install -e ".[test]" ruff==0.17.3
-python -m pytest --cov              # also needs Node for the UI tests; move any .env aside
+python -m pytest --cov              # also needs Node for the UI tests; a local .env is ignored
 ruff check src tests scripts .github/scripts
 ```
 

@@ -59,13 +59,13 @@ The page has no npm dependencies and no `package.json`. Its tests are pytest mod
 
 ```bash
 python -m pip install -e ".[test]" ruff==0.17.3
-python -m pytest --cov            # needs Node for the UI tests; move any local .env aside
+python -m pytest --cov            # needs Node for the UI tests; a local .env is ignored
 ruff check src tests scripts .github/scripts
 docker compose config --quiet && docker compose --profile demo --profile tests build
 docker compose --profile tests run --build --rm tests   # the same offline suite, in the test image
 ```
 
-A local `.env` is loaded by python-dotenv and can turn the orchestration flags on, which makes about 15 tests fail. CI has no `.env`, so it never sees this.
+LiteLLM loads a `.env` it finds above its install location on import, which used to turn the orchestration flags on and fail tests on a developer's machine (CI has no `.env`, so it never saw this). `tests/conftest.py` now sets `LITELLM_MODE=PRODUCTION` before that import, so the offline suite gives the same result with or without a local `.env`; `tests/test_env_isolation.py` checks it against the installed LiteLLM. The live opt-ins (`RUN_LITELLM_INTEGRATION=1`, `RUN_LITELLM_INFERENCE=1`) skip the isolation, since they may need a key kept in `.env`.
 
 ## Coverage
 
