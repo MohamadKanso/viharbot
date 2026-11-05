@@ -79,8 +79,8 @@ Made by the founder on 2026-11-05 (in the supervising session):
 | Monthly budget | USD 50, filtered by the `project=viharbot` tag |
 | Polling interval | every 15 minutes (96 runs a day) |
 
-Proposed defaults, not yet confirmed: budget alerts at 50%, 80% and 100% of actual spend and at 100% of forecast; CloudWatch log retention 30 days; deduplication keys expire after 30 days by TTL; audit rows never expire (they are append-only and the runtime role cannot delete them). Still needed: the email address for budget and alarm notifications.
+Also confirmed by the founder: budget alerts at 50%, 80% and 100% of actual spend and at 100% of forecast; CloudWatch log retention 30 days; deduplication keys expire after 30 days by TTL; audit rows never expire (they are append-only and the runtime role cannot delete them). Budget and alarm notifications go to the founder's work email address. The address is deliberately not recorded in this public repository; it is supplied as a parameter when the budget and alarm topic are created.
 
-Budget caveat: a budget filtered by tag only works once the management account activates the cost allocation tags (see Tags and billing). Until then, set the budget on the whole account or accept that it will not isolate Kepler's cost.
+Budget caveat (accepted by the founder): a budget filtered by tag only works once the management account activates the cost allocation tags (see Tags and billing). Until then, the budget cannot isolate Kepler's cost and will cover the whole account.
 
 The governance wording for this mission will be proposed as a separate human-reviewed PR. The change record is [aws-lab-change-record.md](aws-lab-change-record.md). The one-time administrator steps are in [`deploy/agentcore/kepler/iam/README.md`](../deploy/agentcore/kepler/iam/README.md).
