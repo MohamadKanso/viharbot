@@ -4,7 +4,7 @@
     {
       "Sid": "AgentCoreCreateOnlyTaggedKepler",
       "Effect": "Allow",
-      "Action": ["bedrock-agentcore:CreateAgentRuntime", "bedrock-agentcore:TagResource"],
+      "Action": "bedrock-agentcore:CreateAgentRuntime",
       "Resource": "*",
       "Condition": {
         "StringEquals": { "aws:RequestTag/project": "viharbot", "aws:RequestTag/agent": "kepler" }
@@ -21,7 +21,8 @@
         "bedrock-agentcore:UpdateAgentRuntimeEndpoint",
         "bedrock-agentcore:DeleteAgentRuntimeEndpoint",
         "bedrock-agentcore:GetAgentRuntimeEndpoint",
-        "bedrock-agentcore:InvokeAgentRuntime"
+        "bedrock-agentcore:InvokeAgentRuntime",
+        "bedrock-agentcore:TagResource"
       ],
       "Resource": "*",
       "Condition": { "StringEquals": { "aws:ResourceTag/project": "viharbot", "aws:ResourceTag/agent": "kepler" } }
@@ -76,7 +77,6 @@
       "Action": ["logs:CreateLogGroup", "logs:PutRetentionPolicy", "logs:TagResource", "logs:DeleteLogGroup", "logs:PutMetricFilter", "logs:GetLogEvents", "logs:FilterLogEvents"],
       "Resource": [
         "arn:aws:logs:us-west-2:ACCOUNT_ID:log-group:/viharbot/kepler*",
-        "arn:aws:logs:us-west-2:ACCOUNT_ID:log-group:/aws/bedrock-agentcore/runtimes/*",
         "arn:aws:logs:us-west-2:ACCOUNT_ID:log-group:/aws/lambda/viharbot-kepler-*"
       ]
     },
@@ -120,7 +120,12 @@
       "Sid": "CreateKeplerRolesOnlyWithTheBoundary",
       "Effect": "Allow",
       "Action": ["iam:CreateRole", "iam:PutRolePolicy", "iam:AttachRolePolicy"],
-      "Resource": "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-*",
+      "Resource": [
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-runtime",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-scheduler",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-alert-writer",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-test-*"
+      ],
       "Condition": {
         "StringEquals": { "iam:PermissionsBoundary": "arn:aws:iam::ACCOUNT_ID:policy/viharbot-kepler-boundary" }
       }
@@ -132,7 +137,18 @@
         "iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
         "iam:UpdateAssumeRolePolicy", "iam:TagRole", "iam:DeleteRolePolicy", "iam:DetachRolePolicy", "iam:DeleteRole"
       ],
-      "Resource": "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-*"
+      "Resource": [
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-runtime",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-scheduler",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-alert-writer",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-test-*"
+      ]
+    },
+    {
+      "Sid": "ReadTheDeployerRoleItself",
+      "Effect": "Allow",
+      "Action": ["iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies"],
+      "Resource": "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-deployer"
     },
     {
       "Sid": "KeplerBoundaryPolicyReadOnly",
@@ -144,7 +160,11 @@
       "Sid": "PassOnlyKeplerRolesToTheirServices",
       "Effect": "Allow",
       "Action": "iam:PassRole",
-      "Resource": "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-*",
+      "Resource": [
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-runtime",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-scheduler",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-alert-writer"
+      ],
       "Condition": {
         "StringEquals": {
           "iam:PassedToService": ["bedrock-agentcore.amazonaws.com", "scheduler.amazonaws.com", "lambda.amazonaws.com"]
@@ -156,6 +176,17 @@
       "Effect": "Allow",
       "Action": ["ce:GetCostAndUsage", "tag:GetResources", "sts:GetCallerIdentity"],
       "Resource": "*"
+    },
+    {
+      "Sid": "NeverChangeOrUseTheDeployerRoleItself",
+      "Effect": "Deny",
+      "Action": [
+        "iam:UpdateAssumeRolePolicy", "iam:UpdateRole", "iam:UpdateRoleDescription", "iam:TagRole",
+        "iam:UntagRole", "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy", "iam:DeleteRole", "iam:PutRolePermissionsBoundary",
+        "iam:DeleteRolePermissionsBoundary", "iam:PassRole"
+      ],
+      "Resource": "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-deployer"
     },
     {
       "Sid": "NeverRemoveTheBoundaryOrUseIdentityAdmin",

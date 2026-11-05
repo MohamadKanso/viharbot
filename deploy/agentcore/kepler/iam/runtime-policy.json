@@ -36,13 +36,19 @@
       ]
     },
     {
-      "Sid": "AppendOnlyStateAndAudit",
+      "Sid": "MutableDeduplicationState",
       "Effect": "Allow",
       "Action": ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query", "dynamodb:UpdateItem"],
       "Resource": [
         "arn:aws:dynamodb:us-west-2:ACCOUNT_ID:table/viharbot-kepler-state",
         "arn:aws:dynamodb:us-west-2:ACCOUNT_ID:table/viharbot-kepler-state/index/*"
       ]
+    },
+    {
+      "Sid": "AuditTableWriteAndReadOnly",
+      "Effect": "Allow",
+      "Action": ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"],
+      "Resource": "arn:aws:dynamodb:us-west-2:ACCOUNT_ID:table/viharbot-kepler-audit"
     },
     {
       "Sid": "HandAlertsToTheSeparateWriter",
@@ -57,10 +63,16 @@
       "Resource": "*"
     },
     {
-      "Sid": "NeverDeleteAuditRecords",
+      "Sid": "NeverDeleteAnything",
       "Effect": "Deny",
       "Action": ["dynamodb:DeleteItem", "dynamodb:BatchWriteItem", "dynamodb:DeleteTable"],
       "Resource": "*"
+    },
+    {
+      "Sid": "NeverAlterAuditRecords",
+      "Effect": "Deny",
+      "Action": ["dynamodb:UpdateItem", "dynamodb:UpdateTable", "dynamodb:UpdateTimeToLive"],
+      "Resource": "arn:aws:dynamodb:us-west-2:ACCOUNT_ID:table/viharbot-kepler-audit"
     },
     {
       "Sid": "NeverReadTheAlertWriterSecret",
