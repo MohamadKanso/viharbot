@@ -29,6 +29,9 @@ class ClaGateUnavailable(RuntimeError):
 
 
 def default_gate_dir() -> Path:
+    """Where the gate lives. `KEPLER_CLA_GATE_DIR` wins. The fallback is a source checkout's
+    `.github/scripts`; an installed package has no such neighbour, so a deployed image must set
+    the variable (and a missing gate fails closed with a message that says so)."""
     override = os.environ.get(_GATE_ENV)
     if override:
         return Path(override)
@@ -42,7 +45,9 @@ def load_gate(directory: Path | None = None) -> ModuleType:
         return _loaded[key]
     script = base / "cla_gate.py"
     if not script.is_file() or not (base / "contributor_registry.py").is_file():
-        raise ClaGateUnavailable("cla_gate.py or contributor_registry.py was not found")
+        raise ClaGateUnavailable(
+            f"cla_gate.py or contributor_registry.py was not found in {base}; set {_GATE_ENV} "
+            "to the directory that holds them (the default only fits a source checkout)")
     # The gate imports its sibling module by putting its own directory on sys.path.
     spec = importlib.util.spec_from_file_location("cla_gate", script)
     if spec is None or spec.loader is None:

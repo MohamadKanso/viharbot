@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import re
 from pathlib import Path
 
@@ -31,11 +32,14 @@ from viharbot.steward.snapshot import (
 
 ROOT = Path(__file__).resolve().parent.parent
 GATE_DIR = ROOT / ".github" / "scripts"
+# The package may be installed apart from the repository (as in the Docker test image), so the
+# gate's location is given explicitly, exactly as a deployed image will have to do.
+os.environ["KEPLER_CLA_GATE_DIR"] = str(GATE_DIR)
 pytestmark = pytest.mark.skipif(
     not (GATE_DIR / "cla_gate.py").exists() or not (ROOT / "CLA-ACCEPTANCES.md").exists(),
     reason=".github or the CLA record is not in this environment",
 )
-GATE = steward_cla.load_gate()
+GATE = steward_cla.load_gate() if (GATE_DIR / "cla_gate.py").exists() else None
 REPO = "vchokshi/viharbot"
 FOUNDER = {"id": 8943966, "login": "vchokshi", "type": "User"}
 AUTHOR = {"id": 91088196, "login": "MohamadKanso", "type": "User"}
