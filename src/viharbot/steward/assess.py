@@ -151,7 +151,10 @@ def assess(
         requirements.append(Requirement("ci", "Automated checks", NEEDS_HUMAN,
                                         "CI state could not be read. It will be retried."))
     else:
-        ci_state, _ = summarize_ci(snapshot.ci_runs)
+        # The CLA gate fails by design until the founder records an acceptance. Counting it as a
+        # CI failure would report the same blocker twice, so it is judged under "cla_recorded".
+        ci_runs = tuple(r for r in snapshot.ci_runs if r.get("name") != gate.CHECK_NAME)
+        ci_state, _ = summarize_ci(ci_runs)
         ci_text = {
             "awaiting_approval": (NEEDS_HUMAN, "Some workflows are waiting for the maintainer to "
                                   "approve running a fork's code. Review the diff first."),

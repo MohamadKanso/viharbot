@@ -278,6 +278,22 @@ def test_ci_states(runs, expected, state):
     assert status_of(assessment, "ci") == state
 
 
+def test_the_cla_gate_failing_is_not_double_counted_as_a_ci_failure():
+    """Found by running against the live PR #179: its only failing check was the CLA gate."""
+    runs = ({"name": "CI", "status": "completed", "conclusion": "success"},
+            {"name": "CodeQL", "status": "completed", "conclusion": "success"},
+            {"name": "CLA acceptance", "status": "completed", "conclusion": "failure"})
+    assessment, _ = run(snapshot(ci_runs=runs))
+    assert status_of(assessment, "ci") == DONE
+    assert status_of(assessment, "cla_recorded") == OUTSTANDING  # reported once, under the CLA
+    # a real failure alongside it is still a failure
+    real = runs + ({"name": "Python tests", "status": "completed", "conclusion": "failure"},)
+    assert status_of(run(snapshot(ci_runs=real))[0], "ci") == OUTSTANDING
+    # and only the CLA check present means no other checks have run
+    only_cla = (runs[2],)
+    assert status_of(run(snapshot(ci_runs=only_cla))[0], "ci") == INFO
+
+
 def test_unreadable_ci_is_reported_not_assumed_green():
     assessment, _ = run(snapshot(ci_runs=(), ci_error=True))
     assert status_of(assessment, "ci") == NEEDS_HUMAN
