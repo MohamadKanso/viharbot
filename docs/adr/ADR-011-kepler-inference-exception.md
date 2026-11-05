@@ -1,6 +1,6 @@
 # ADR-011: Kepler may use Bedrock-hosted non-Anthropic models (scoped exception to LiteLLM-only inference)
 
-**Status: Proposed.** Nothing here is implemented, provisioned or deployed. The founder confirms the numbering and accepts or rejects the decision. Tracking issue: [#198](https://github.com/vchokshi/viharbot/issues/198).
+**Status: Accepted (2026-11-05, founder).**. The founder confirms the numbering and accepts the decision. Tracking issue: [#198](https://github.com/vchokshi/viharbot/issues/198).
 
 ## Context
 
