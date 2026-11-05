@@ -92,7 +92,7 @@ Assets: `scripts/fact_check_eval/cases.json` (31 cases, 37 claims) and `run.py` 
 * The live stream cannot send a terminal event after a lost connection, and would also end without one if the emitter hit an internal contract error (untested path).
 * The failure code `cancelled` is defined and never emitted.
 * Aliases in `agent_activity` of the final response are present even when diagnostics are off.
-* **D1** the Docker test profile does not run the suite (addressed by the pull request for #19, pending merge). **D2** `test_the_fact_check_section_shows_the_cited_quote_and_whether_it_was_found` lacks `@needs_node` (addressed by the pull request for #20, pending merge). **D3** a local `.env` changes test results. Details in the audit.
+* **D1** the Docker test profile does not run the suite (fixed in #192, merged). **D2** `test_the_fact_check_section_shows_the_cited_quote_and_whether_it_was_found` lacks `@needs_node` (fixed in #192, merged). **D3** a local `.env` changes test results (fixed by the pull request for #21, pending merge). Details in the audit.
 * Model availability is account-specific: on this account Gemini 2.5 aliases return 404, 3.7 and 3.8 flash returned 503, and the Pro models returned 429 on 2026-10-27.
 * Streaming is not bridged through AgentCore.
 
