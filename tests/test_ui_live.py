@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from test_ui_orchestration import INDEX, NODE, needs_node, text_of, with_class, elements, walk
+from viharbot.live_events import FAILURE_MESSAGES
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "live_events"
 HARNESS = Path(__file__).resolve().parent / "js" / "run_stream.mjs"
@@ -223,3 +224,52 @@ def test_the_fact_check_section_shows_the_cited_quote_and_whether_it_was_found()
     assert "“the audit found 4%” (found in the supplied evidence)" in shown
     assert "“an invented line” (not found in the supplied evidence)" in shown
     assert shown.count("Evidence cited") == 2  # none is claimed for a claim with no quote
+
+
+# ---- #22: the page never shows success for a stream that did not end with a valid terminal event ----
+def _only_the_interruption_is_shown(result):
+    tree = result["final"]
+    assert "Connection interrupted. Completion could not be verified." in text_of(tree)
+    # no answer card: nothing that looks like a successful, verified response
+    assert not [n for n in with_class(tree, "response-card") if "error-card" not in n["class"]]
+
+
+@needs_node
+def test_a_stream_that_ends_right_after_the_final_response_is_shown_as_interrupted_not_success():
+    events = load("A_successful_request")
+    last_answer = max(i for i, e in enumerate(events) if e["event_type"] == "final_response")
+    result = stream({"chunks": [frame(e) for e in events[:last_answer + 1]],
+                     "headers": {"X-Request-ID": events[0]["request_id"]}})
+    _only_the_interruption_is_shown(result)
+
+
+@needs_node
+def test_a_failure_after_the_final_response_is_refused_not_shown_as_either_outcome():
+    events = [dict(e) for e in load("A_successful_request")]
+    done = events[-1]
+    assert done["event_type"] == "orchestration_completed"
+    contradiction = {**done, "event_type": "orchestration_failed",
+                     "data": {"status": "failed", "error_code": "internal_error",
+                              "message": FAILURE_MESSAGES["internal_error"], "elapsed_ms": 1.0}}
+    result = stream({"chunks": [frame(e) for e in events[:-1] + [contradiction]],
+                     "headers": {"X-Request-ID": events[0]["request_id"]}})
+    _only_the_interruption_is_shown(result)
+
+
+@needs_node
+def test_a_late_event_after_the_terminal_event_is_ignored_and_cannot_flip_the_outcome():
+    # The page takes the first valid terminal event as final and ignores everything after it (it
+    # stops reading; a later frame in the same read is dropped too). The server can never send one,
+    # because the emitter refuses, so this pins the client's behaviour rather than an expected case:
+    # a late, contradictory orchestration_failed must not turn a verified success into a failure.
+    events = [dict(e) for e in load("A_successful_request")]
+    last = events[-1]
+    late = {**last, "event_type": "orchestration_failed", "event_id": f"evt-{last['sequence'] + 1:06d}",
+            "sequence": last["sequence"] + 1,
+            "data": {"status": "failed", "error_code": "internal_error",
+                     "message": FAILURE_MESSAGES["internal_error"], "elapsed_ms": 1.0}}
+    chunks = [frame(e) for e in events[:-1]] + [frame(last) + frame(late)]
+    result = stream({"chunks": chunks, "headers": {"X-Request-ID": events[0]["request_id"]}})
+    shown = text_of(result["final"])
+    assert "could not be verified" not in shown and FAILURE_MESSAGES["internal_error"] not in shown
+    assert [n for n in with_class(result["final"], "response-card") if "error-card" not in n["class"]]

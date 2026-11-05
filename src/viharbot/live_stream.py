@@ -44,6 +44,10 @@ SINK_TIMEOUT_SECONDS = 10.0
 KEEPALIVE_SECONDS = 15.0
 MAX_CONCURRENT_STREAMS = 8
 DIAGNOSTICS_FLAG = "VIHARBOT_DEV_DIAGNOSTICS_ENABLED"
+# `cancelled` is declared in the schema but can never be delivered: a run is cancelled only when the
+# client has disconnected or stopped reading, so there is nobody to send it to. The emitter refuses
+# it, which keeps the documented behaviour ("a cancelled run emits no terminal event") enforced.
+NEVER_EMITTED_FAILURE_CODES = frozenset({"cancelled"})
 
 _streams = threading.BoundedSemaphore(MAX_CONCURRENT_STREAMS)
 
@@ -234,6 +238,8 @@ class EventEmitter(LiveReporter):
     def failed(self, error_code: str) -> None:
         if error_code not in FAILURE_MESSAGES:
             raise EventContractError("orchestration_failed needs a documented error code")
+        if error_code in NEVER_EMITTED_FAILURE_CODES:
+            raise EventContractError("this failure code is reserved and is never sent")
         if self._final_sent:
             raise EventContractError("a run that produced a final_response cannot fail")
         self._emit("orchestration_failed", self._source(APPLICATION_IDENTITY, "application"),
@@ -243,6 +249,10 @@ class EventEmitter(LiveReporter):
     @property
     def terminal(self) -> str | None:
         return self._terminal
+
+    @property
+    def final_sent(self) -> bool:
+        return self._final_sent
 
 
 def classify_failure(exc: BaseException) -> str:
@@ -268,6 +278,12 @@ def drive(emitter: EventEmitter, work: "Work", cancel: CancelToken) -> None:
     On success: final_response, then orchestration_completed. On any failure: orchestration_failed
     with a sanitized code and no final_response. A cancelled run emits no terminal event, because
     nobody is listening. This is the sequencing the live endpoint uses, in one place.
+
+    One case cannot end in a terminal event: the answer has been sent but orchestration_completed
+    could not be (an application bug, an EventContractError). orchestration_failed would contradict
+    the answer already on the wire, and a second terminal is forbidden, so nothing more is sent and
+    EventContractError is raised. The stream then closes without a terminal event, the client
+    reports it as unverified, and the server logs it (see `event_stream`).
     """
     try:
         response, summary = work(emitter, cancel)
@@ -276,6 +292,8 @@ def drive(emitter: EventEmitter, work: "Work", cancel: CancelToken) -> None:
     except OrchestrationCancelled:
         raise
     except BaseException as exc:  # noqa: BLE001 - every failure becomes one sanitized terminal event
+        if emitter.final_sent or emitter.terminal is not None:
+            raise EventContractError("the closing event could not be sent after the answer") from None
         emitter.failed(classify_failure(exc))
 
 
@@ -339,7 +357,7 @@ async def event_stream(
             drive(emitter, work, cancel)
         except OrchestrationCancelled:
             outcome["cancelled"] = True
-        except EventContractError:  # pragma: no cover - a bug; the stream still ends cleanly
+        except EventContractError:  # a bug; the stream still ends cleanly, and it is logged below
             outcome["contract_error"] = True
         finally:
             outcome["terminal"] = emitter.terminal
@@ -377,8 +395,10 @@ async def event_stream(
                 queue.get_nowait()
             except asyncio.QueueEmpty:
                 break
-        logger.info("live stream ended", extra={
+        # Fixed codes only: never the exception text, an event body or the question.
+        logger.log(logging.ERROR if outcome.get("contract_error") else logging.INFO, "live stream ended", extra={
             "agent": "web", "request_id": request_id,
             "duration_ms": round((time.perf_counter() - started) * 1000, 2),
             "action_status": outcome.get("terminal") or "no_terminal_event",
-            **({"error": "cancelled"} if outcome.get("cancelled") else {})})
+            **({"error": "cancelled"} if outcome.get("cancelled") else {}),
+            **({"error": "terminal_event_not_sent"} if outcome.get("contract_error") else {})})
