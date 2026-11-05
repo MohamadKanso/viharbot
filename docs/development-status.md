@@ -53,6 +53,7 @@ All default to `false`. None is set in the committed `compose.yaml` defaults or 
 | *(no flag)* the live team conversation | iterative loop, the live stream and Pixel in the conversation | a planner alias (`gpt-6-luna` by default) and `WEB_LITELLM_API_KEY` for the web container |
 | `VIHARBOT_PPT_GENERATION_ENABLED` | slide-deck generation by the pixel service (true in local Compose while testing) | `PIXEL_MODEL`, `LITELLM_API_KEY` on the pixel service |
 | `VIHARBOT_PERSONALITY_INFERENCE_ENABLED` | identity prompts on services | identity routing |
+| `VIHARBOT_PERSONA_PROMPT_ENABLED` | adds the persona section (Epic #157 Phase B) on top of identity prompts; ignored unless the personality flag is also on in the same service | `VIHARBOT_PERSONALITY_INFERENCE_ENABLED` |
 | `VIHARBOT_DEV_DIAGNOSTICS_ENABLED` | planner rationale and model aliases in the stream | iterative mode |
 
 A developer's `.env` can turn these on and changes test outcomes (see below).

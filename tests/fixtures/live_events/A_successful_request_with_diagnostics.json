@@ -423,6 +423,7 @@
      "fact_check": null,
      "source_quality": null,
      "privacy_review": null,
+     "sage": null,
      "synthesis": null,
      "agent_activity": [
       {

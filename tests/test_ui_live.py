@@ -226,6 +226,25 @@ def test_the_fact_check_section_shows_the_cited_quote_and_whether_it_was_found()
     assert shown.count("Evidence cited") == 2  # none is claimed for a claim with no quote
 
 
+# ---- #53: the page renders the complete ChatResponse a full-team stream delivers ----
+@needs_node
+def test_the_page_shows_every_section_of_a_complete_full_team_response():
+    events, result = run("F_full_team")
+    shown = text_of(result["final"])
+    assert "could not be verified" not in shown
+    for heading in ("Fact Check · supplied evidence only", "Source Quality",
+                    "Sage · human and organizational perspective", "Privacy review"):
+        assert heading in shown, heading
+    sage = next(e for e in events if e["event_type"] == "final_response")["data"]["response"]["sage"]
+    assert sage["executive_summary"] in shown
+    assert sage["ethical_considerations"][0]["statement"] in shown
+    # the same page, given the ordinary two-agent stream, does not invent those sections
+    _, plain = run("A_successful_request")
+    plain_text = text_of(plain["final"])
+    assert "Fact Check · supplied" not in plain_text and "Source Quality" not in plain_text
+    assert "Sage · human" not in plain_text
+
+
 # ---- #22: the page never shows success for a stream that did not end with a valid terminal event ----
 def _only_the_interruption_is_shown(result):
     tree = result["final"]

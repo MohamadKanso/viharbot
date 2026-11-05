@@ -344,10 +344,13 @@ def test_duplicate_and_repeated_entries_are_rejected(config_dir: Path):
 # --- Phase A does not change runtime behavior -----------------------------------------------
 
 
-def test_no_runtime_module_imports_personas():
+def test_only_the_prompt_composer_imports_personas():
+    # Phase B: inference_config is the single, flag-gated consumer. Any other importer is a
+    # change to what personas can influence and needs its own review.
+    allowed = {"inference_config.py"}
     offenders = []
     for path in sorted(SRC.rglob("*.py")):
-        if "personas" in path.relative_to(SRC).parts:
+        if "personas" in path.relative_to(SRC).parts or path.name in allowed:
             continue
         if re.search(r"^\s*(from|import)\s+[.\w]*personas\b", path.read_text(encoding="utf-8"), re.M):
             offenders.append(str(path.relative_to(SRC)))
