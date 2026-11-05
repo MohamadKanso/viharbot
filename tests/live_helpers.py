@@ -33,13 +33,14 @@ class VersionedSend(FakeSend):
         return {**raw, "findings": {**FINDINGS, "summary": f"research-v{self.research_calls}"}}
 
 
-def live_work(decide, send=None, *, request_id="req-123", question="hello", **kwargs):
+def live_work(decide, send=None, *, request_id="req-123", question="hello", specialist_urls=None, **kwargs):
     """The same closure the route builds: run the loop, assemble the response, summarize."""
     send = send or VersionedSend()
 
     def work(emitter, cancel):
         iterative = run_iterative_pipeline(
-            question, request_id, research_url="u-r", security_url="u-sec", specialist_urls=URLS,
+            question, request_id, research_url="u-r", security_url="u-sec",
+            specialist_urls=specialist_urls or URLS,
             send=send, decide=decide, emit=emitter, cancel=cancel, **kwargs)
         response = web_app.build_chat_response(
             iterative.to_legacy_dict(), request_id, build_orchestration_meta(iterative))

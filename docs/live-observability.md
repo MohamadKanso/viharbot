@@ -518,6 +518,7 @@ Sage (`philosophical_analysis`) is a normal loop capability. Its events use the 
       "fact_check": null,
       "source_quality": null,
       "privacy_review": null,
+      "sage": null,
       "synthesis": null,
       "agent_activity": [
         {
@@ -681,6 +682,19 @@ The page shows the model next to each speaker only when the event carries a `mod
 ## Developer diagnostics
 
 `VIHARBOT_DEV_DIAGNOSTICS_ENABLED` (default `false`) adds `rationale` and `model_alias` as described above. Token usage and cost are not reported by the services, and the Developer Metrics tab says so rather than estimating.
+
+## Contract fixtures and conformance
+
+`tests/fixtures/live_events/` holds seven executable scenarios, each a complete, schema-valid stream ending in exactly one terminal event: `A_successful_request`, `A_successful_request_with_diagnostics`, `B_policy_rejection`, `C_evidence_supersession`, `D_planner_failure`, `E_agent_failure` and `F_full_team`. Together they contain all 14 event types. `final_response` always carries a complete `ChatResponse` (validated by the schema, never a placeholder). Scenario F delegates to all seven specialists, so its `ChatResponse` has every optional section set: `fact_check`, `source_quality`, `privacy_review`, `sage` and `synthesis`.
+
+**They are checked against the code, not only against the schema.** `tests/test_live_stream_conformance.py` regenerates every scenario from the real orchestration loop (mocked inference, the production emitter) and compares it with the fixture: timestamps and durations are ignored for A to E, and F must match byte for byte. A fixture that drifts from what the application emits fails the build. `python tests/live_conformance_helpers.py F_full_team --write` rewrites F from the code; the other fixtures are not rewritten automatically. Every success fixture must also contain every `ChatResponse` field except `deck`, so adding a response field makes the stale fixtures fail until they are updated. `deck` is sent only when a deck was requested; the optional sections the response builder sets are sent as `null` when their agent did not run.
+
+**Discrepancies found while establishing this, recorded rather than absorbed:**
+
+* **Stale fixtures.** The four success fixtures predated `ChatResponse.sage` and lacked `"sage": null`, which the real stream carries. They were updated; each change is that one line.
+* **One request cannot populate every section under default settings.** The default execution budget is six (`VIHARBOT_ORCH_MAX_EXECUTIONS`, ceiling twelve) and there are seven specialists, so a run that delegates to all of them ends with `orchestration_completed` under `policy_budget` and the last agent missing. Scenario F therefore uses a budget of seven.
+* **No `403`.** Authentication is HTTP Basic: a bad or missing credential is `401`, and `503` means web authentication is not configured. The endpoint never returns `403`.
+* **After the first valid terminal event the page ignores everything** (see "Ordering and terminal guarantees").
 
 ## Local validation
 

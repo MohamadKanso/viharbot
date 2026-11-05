@@ -54,10 +54,10 @@ DELETE = object()
 
 
 # ---- the documented fixtures ------------------------------------------------------------------
-def test_there_are_five_scenarios_plus_the_diagnostics_variant():
+def test_the_scenarios_are_the_five_the_diagnostics_variant_and_the_full_team():
     assert SCENARIOS == ["A_successful_request", "A_successful_request_with_diagnostics",
                          "B_policy_rejection", "C_evidence_supersession", "D_planner_failure",
-                         "E_agent_failure"]
+                         "E_agent_failure", "F_full_team"]
 
 
 def test_all_fourteen_event_types_have_a_complete_validated_fixture():
