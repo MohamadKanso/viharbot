@@ -355,5 +355,9 @@ def test_no_runtime_module_imports_personas():
 
 
 def test_persona_definitions_ship_inside_the_package():
-    assert PERSONAS_DIR.is_relative_to(SRC)
+    # Relative to the imported package, not the repo checkout, so it also holds when the tests
+    # run against an installed wheel (the Docker test image).
+    import viharbot
+
+    assert PERSONAS_DIR.is_relative_to(Path(viharbot.__file__).parent)
     assert len(list(PERSONAS_DIR.glob("*.toml"))) == 8
