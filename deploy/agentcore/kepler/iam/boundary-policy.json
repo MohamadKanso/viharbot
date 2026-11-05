@@ -1,0 +1,39 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "OnlyWhatKeplerRolesCanEverNeed",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:GetAuthorizationToken",
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams",
+        "cloudwatch:PutMetricData",
+        "secretsmanager:GetSecretValue",
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:Query",
+        "dynamodb:UpdateItem",
+        "lambda:InvokeFunction",
+        "bedrock-agentcore:InvokeAgentRuntime"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NeverInvokeFoundationModelsDirectly",
+      "Effect": "Deny",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NeverChangeIdentityOrBilling",
+      "Effect": "Deny",
+      "Action": ["iam:*", "organizations:*", "account:*", "billing:*", "aws-portal:*", "sts:AssumeRole"],
+      "Resource": "*"
+    }
+  ]
+}
