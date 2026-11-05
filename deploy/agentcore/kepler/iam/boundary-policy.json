@@ -55,10 +55,22 @@
       "Resource": "arn:aws:bedrock-agentcore:*:ACCOUNT_ID:runtime/*"
     },
     {
-      "Sid": "NeverInvokeFoundationModelsDirectly",
+      "Sid": "InvokeAllowlistedNonAnthropicModelOnly",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      "Resource": "arn:aws:bedrock:*::foundation-model/meta.llama3-1-8b-instruct-v1:0"
+    },
+    {
+      "Sid": "DenyEveryOtherFoundationModel",
       "Effect": "Deny",
       "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
-      "Resource": "*"
+      "NotResource": "arn:aws:bedrock:*::foundation-model/meta.llama3-1-8b-instruct-v1:0"
+    },
+    {
+      "Sid": "NeverInvokeAnthropic",
+      "Effect": "Deny",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      "Resource": ["arn:aws:bedrock:*::foundation-model/anthropic.*", "arn:aws:bedrock:*:*:inference-profile/*anthropic*"]
     },
     {
       "Sid": "NeverChangeIdentityOrBilling",

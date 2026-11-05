@@ -50,3 +50,24 @@ aws iam delete-policy --policy-arn "arn:aws:iam::${ACCOUNT_ID}:policy/viharbot-k
 ```
 
 Delete the boundary policy last, and only after no role still uses it. If you later change a policy file, validate it first with `aws accessanalyzer validate-policy` (see the pull request that introduced these files) and add a new row to the change record.
+
+## Enable the Bedrock allowlist (ADR-011), administrator only
+
+Boundary version 3 and the runtime policy replace the blanket deny on `bedrock:InvokeModel*` with an allow for exactly one non-Anthropic model, `meta.llama3-1-8b-instruct-v1:0`, an explicit deny for every other model, and an explicit deny for Anthropic models and inference profiles. **Not applied by the pull request that adds these files.** Run as the SSO administrator, from the repository root, after confirming the account has Bedrock access to that model (the catalog listing does not prove it) and the current price:
+
+```sh
+export AWS_PAGER="" ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+WORK=$(mktemp -d)
+for f in boundary-policy runtime-policy; do
+  sed "s/ACCOUNT_ID/${ACCOUNT_ID}/g" deploy/agentcore/kepler/iam/$f.json > "$WORK/$f.json"
+  aws accessanalyzer validate-policy --policy-type IDENTITY_POLICY --policy-document "file://$WORK/$f.json"   # expect no findings
+done
+BOUNDARY="arn:aws:iam::${ACCOUNT_ID}:policy/viharbot-kepler-boundary"
+aws iam list-policy-versions --policy-arn "$BOUNDARY"          # a policy holds 5 versions; delete the oldest non-default if full
+aws iam create-policy-version --policy-arn "$BOUNDARY" --policy-document "file://$WORK/boundary-policy.json" --set-as-default
+aws iam put-role-policy --role-name viharbot-kepler-runtime --policy-name viharbot-kepler-runtime \
+  --policy-document "file://$WORK/runtime-policy.json"
+bash deploy/agentcore/kepler/iam/tests/policy-simulation.sh      # every check must pass
+```
+
+Record a new row in the change record with the approver. **Roll back:** `aws iam set-default-policy-version --policy-arn "$BOUNDARY" --version-id <previous>`, and `put-role-policy` the previous runtime policy from git history. Enabling this does not make Kepler call a model: no steward code does, and a model needs the in-code allowlist described in ADR-011 first.

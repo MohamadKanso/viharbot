@@ -32,6 +32,10 @@ This PR edits none of those files and runs no AWS command. Until the administrat
 - Negative: a second inference path to govern, audit and cost-track; per-token Bedrock spend appears on the AWS bill (a material cost change to report before any deployment); the "all inference through one gateway" audit story no longer covers Kepler.
 - The no-Claude rule is now enforced in two places (allowlist in code, IAM deny) that must stay in sync.
 
+## Allowlist chosen
+
+Initial allowlist, chosen by the founder as Meta Llama: `meta.llama3-1-8b-instruct-v1:0` only (on-demand, no inference profile; listed active in `us-west-2` on 2026-11-05 by a read-only catalog call, which does not prove the account has access or show price). Adding a model means editing the allowlist in the policy files and, once it exists, in code, and a new boundary version.
+
 ## Not decided
 
-Which Bedrock models; whether Kepler uses a model at all for its first build (it does not today); the founder's approval to include Claude later; changes to the governance architecture document, which describes LiteLLM-only inference and is founder-owned (`docs/governance/` is not edited here).
+Whether Kepler uses a model at all for its first build (it does not today); the founder's approval to include Claude later; changes to the governance architecture document, which describes LiteLLM-only inference and is founder-owned (`docs/governance/` is not edited here).
