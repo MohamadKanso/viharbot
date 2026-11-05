@@ -69,6 +69,18 @@ Not verified: the exact log-group naming and any further permissions AgentCore r
 
 Everything is created by the deployer role with the common tags, so teardown is: delete the schedule, runtime and endpoint, the Lambda, the alarms and topic, the secrets (with their recovery window), the log groups, the ECR repository, then the roles and, last, the state table. The DynamoDB table holds the audit trail, so export it before deleting. Source changes roll back by reverting the PR. Nothing deploys on merge.
 
-## Open decisions
+## Decisions
 
-Network mode (above); the monthly budget limit and alert email; log and audit retention; the polling interval; and the governance wording for this mission, which will be proposed as a separate human-reviewed PR. The change record is [aws-lab-change-record.md](aws-lab-change-record.md).
+Made by the founder on 2026-11-05 (in the supervising session):
+
+| Decision | Value |
+| --- | --- |
+| Network mode | `PUBLIC` now, with the code allowlist; move to `VPC` when Kepler gets any write capability |
+| Monthly budget | USD 50, filtered by the `project=viharbot` tag |
+| Polling interval | every 15 minutes (96 runs a day) |
+
+Proposed defaults, not yet confirmed: budget alerts at 50%, 80% and 100% of actual spend and at 100% of forecast; CloudWatch log retention 30 days; deduplication keys expire after 30 days by TTL; audit rows never expire (they are append-only and the runtime role cannot delete them). Still needed: the email address for budget and alarm notifications.
+
+Budget caveat: a budget filtered by tag only works once the management account activates the cost allocation tags (see Tags and billing). Until then, set the budget on the whole account or accept that it will not isolate Kepler's cost.
+
+The governance wording for this mission will be proposed as a separate human-reviewed PR. The change record is [aws-lab-change-record.md](aws-lab-change-record.md). The one-time administrator steps are in [`deploy/agentcore/kepler/iam/README.md`](../deploy/agentcore/kepler/iam/README.md).

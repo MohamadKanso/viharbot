@@ -8,7 +8,7 @@
       "Action": "sts:AssumeRole",
       "Condition": {
         "ArnLike": {
-          "aws:PrincipalArn": "arn:aws:iam::ACCOUNT_ID:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_AWSAdministratorAccess_*"
+          "aws:PrincipalArn": "arn:aws:iam::ACCOUNT_ID:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_AWSAdministratorAccess_*"
         }
       }
     }
