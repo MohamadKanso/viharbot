@@ -58,7 +58,7 @@ Fact Check reviews only the evidence Research supplied; it does not browse. Each
 
 ## Skills registry (proposed architecture)
 
-A declarative registry of 98 skills across ten identities (the original eight plus the education agents Archie and Ada, see [Education agents](docs/education-agents.md)) lives in `src/viharbot/skills/`. It is **metadata only**: every skill is `proposed`, none can execute, and nothing in the running application reads it. An identity says who an agent is; a skill says what professional work it could do; a capability says what it is suited to do and whether a service exists; an execution binding says which service runs it. Only bindings run anything. See [Skills registry](docs/skills-registry.md) for how to add and validate a skill and how skills would later be authorized, and the governance documents: [Founding Charter v2](docs/governance/founding-charter-v2.md), [Agent Constitution v1](docs/governance/agent-constitution-v1.md), [Agent Architecture v1.1](docs/governance/agent-architecture-v1.1.md) and [Skills Registry v1](docs/governance/agent-skills-registry-v1.md). These documents are proposed, not implemented, except where the repository says otherwise.
+A declarative registry of 98 skills across eleven identities (the original eight, the education agents Archie and Ada, see [Education agents](docs/education-agents.md), and the proposed coding agent Kepler, see [Kepler](docs/kepler.md), which has no skills yet) lives in `src/viharbot/skills/`. It is **metadata only**: every skill is `proposed`, none can execute, and nothing in the running application reads it. An identity says who an agent is; a skill says what professional work it could do; a capability says what it is suited to do and whether a service exists; an execution binding says which service runs it. Only bindings run anything. See [Skills registry](docs/skills-registry.md) for how to add and validate a skill and how skills would later be authorized, and the governance documents: [Founding Charter v2](docs/governance/founding-charter-v2.md), [Agent Constitution v1](docs/governance/agent-constitution-v1.md), [Agent Architecture v1.1](docs/governance/agent-architecture-v1.1.md) and [Skills Registry v1](docs/governance/agent-skills-registry-v1.md). These documents are proposed, not implemented, except where the repository says otherwise.
 
 ## Execution modes
 
@@ -101,7 +101,13 @@ The default suite mocks all model and LiteLLM calls and is the authoritative one
 python -m pytest -q
 ```
 
-Two environment notes. A local `.env` is loaded by python-dotenv and can flip the feature flags on, which makes about 15 tests fail; move `.env` aside when running tests. The Docker profile (`docker compose --profile tests run --build --rm tests`) does **not** run the full suite today: its image has no Node, no `compose.yaml`, no `.env.example` and no `images/`, so one test module fails to import and several others fail. See [development status](docs/development-status.md). Opt-in live checks (`RUN_LITELLM_INTEGRATION`, `RUN_LITELLM_INFERENCE`) and `scripts/fact_check_eval/run.py` make billable calls and are off by default.
+Two environment notes. A local `.env` is loaded by python-dotenv and can flip the feature flags on, which makes about 15 tests fail on the host; move `.env` aside when running tests there. The Docker profile runs the same offline suite in a container:
+
+```bash
+docker compose --profile tests run --build --rm tests
+```
+
+The test image (`Dockerfile.tests`) adds Node 24 and `git`, and its build context is an allowlist (`Dockerfile.tests.dockerignore`), so a local `.env`, credentials and `.git` never enter it. The `tests` service takes no values from your shell or `.env`, keeps the opt-in live checks off and has no network at run time, so it cannot make a model call. The image is for tests only; the production images contain neither pytest nor Node. A skipped test is not a pass: without Node the UI tests skip, and CI fails on any skip other than the opt-in live checks. Opt-in live checks (`RUN_LITELLM_INTEGRATION`, `RUN_LITELLM_INFERENCE`) and `scripts/fact_check_eval/run.py` make billable calls and are off by default.
 
 ## Development Wiki
 

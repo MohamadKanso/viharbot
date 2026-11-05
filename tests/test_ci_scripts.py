@@ -44,6 +44,30 @@ def test_junit_exit_status_reflects_failures_and_optionally_skips(tmp_path):
     assert junit.main([str(bad)]) == 1
 
 
+def test_junit_allow_skip_tolerates_only_the_named_skips(tmp_path, capsys):
+    junit = load("junit_summary")
+    allowed = r"^set RUN_LITELLM_"
+
+    def report(*messages):
+        cases = "".join(f'<testcase classname="t" name="n{i}"><skipped message="{m}"/></testcase>'
+                        for i, m in enumerate(messages))
+        path = tmp_path / f"r{len(messages)}{abs(hash(messages))}.xml"
+        path.write_text(f'<testsuite tests="{len(messages) + 1}" failures="0" errors="0" '
+                        f'skipped="{len(messages)}">{cases}</testsuite>')
+        return str(path)
+
+    live = "set RUN_LITELLM_INFERENCE=1 to make a real model call"
+    assert junit.main([report(live, live), "--fail-on-skipped", "--allow-skip", allowed]) == 0
+    # a Node skip is not an opt-in live check, so it fails the run and is named on stderr
+    assert junit.main([report(live, "Node.js is not installed"), "--fail-on-skipped",
+                       "--allow-skip", allowed]) == 1
+    assert "unexpected skip: t::n1: Node.js is not installed" in capsys.readouterr().err
+    # a skip with no message cannot be vouched for
+    assert junit.main([report(""), "--fail-on-skipped", "--allow-skip", allowed]) == 1
+    # without --fail-on-skipped the option changes nothing
+    assert junit.main([report("Node.js is not installed"), "--allow-skip", allowed]) == 0
+
+
 def test_coverage_is_rounded_down_and_never_overstated(tmp_path):
     cov = load("coverage_summary")
     path = tmp_path / "coverage.xml"

@@ -70,7 +70,7 @@ Run on 2026-10-28 against the audited revision plus the documentation changes of
 
 By area on the host (clean environment): streaming events, emitter and SSE transport 289 passed; frontend and team status 72 passed; Fact Check guard and eval scoring 27 passed; orchestration policy, state, freshness, deadline 315 passed; identity, delegation, personality, configuration and API contract 220 passed with 3 skipped. The frontend tests run the page's own script against a fake DOM in Node 24; they do not use a real browser.
 
-Why the Docker profile differs: `Dockerfile.tests` copies only `pyproject.toml`, `README.md`, `src`, `tests` and `scripts`, and has no Node. The host suite is the authoritative one.
+Why the Docker profile differed on 2026-10-28: `Dockerfile.tests` copied only `pyproject.toml`, `README.md`, `src`, `tests` and `scripts`, and had no Node. Issues #19 and #20 change this: the image now carries Node 24, `git` and the repository files the suite reads, and the Docker profile runs the whole offline suite with no network. The table above is the dated record and is not rewritten; the fresh Docker and host results for the fix are in its pull request, and the fix is not in a release until that pull request is merged. The host suite remains the reference.
 
 ## Verified and unverified
 
@@ -92,7 +92,7 @@ Assets: `scripts/fact_check_eval/cases.json` (31 cases, 37 claims) and `run.py` 
 * The live stream cannot send a terminal event after a lost connection, and would also end without one if the emitter hit an internal contract error (untested path).
 * The failure code `cancelled` is defined and never emitted.
 * Aliases in `agent_activity` of the final response are present even when diagnostics are off.
-* **D1** the Docker test profile does not run the suite. **D2** `test_the_fact_check_section_shows_the_cited_quote_and_whether_it_was_found` lacks `@needs_node`. **D3** a local `.env` changes test results. Details in the audit.
+* **D1** the Docker test profile does not run the suite (addressed by the pull request for #19, pending merge). **D2** `test_the_fact_check_section_shows_the_cited_quote_and_whether_it_was_found` lacks `@needs_node` (addressed by the pull request for #20, pending merge). **D3** a local `.env` changes test results. Details in the audit.
 * Model availability is account-specific: on this account Gemini 2.5 aliases return 404, 3.7 and 3.8 flash returned 503, and the Pro models returned 429 on 2026-10-27.
 * Streaming is not bridged through AgentCore.
 
