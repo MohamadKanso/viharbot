@@ -8,7 +8,19 @@ Status: **AWS foundation provisioned; the agent is not built or deployed.** Trac
 
 It watches for first-time contributors and their open pull requests, works out the onboarding steps still outstanding (CLA acceptance and its record, third-party rights disclosure, commit identity, branch freshness, CI and review state), tracks replies and new commits, drafts respectful follow-ups, and alerts the founder. First case: PR #179. Initial mode is **read-only monitoring plus internal alerts**. Contributor-facing text is drafted only and needs founder approval to post.
 
-Status facts come from the GitHub API and the trusted-base `CLA-ACCEPTANCES.md`, by deterministic code, never from a model and never from an unverified comment. A model is used only to draft message text. PR bodies, comments, commits and repository files are untrusted data and are never treated as instructions.
+Status facts come from the GitHub API and the trusted-base `CLA-ACCEPTANCES.md`, by deterministic code, never from a model and never from an unverified comment. PR bodies, comments, commits and repository files are untrusted data and are never treated as instructions.
+
+**No model in the first build.** Drafts are fixed templates filled only with the contributor's GitHub login, the legal-terms version and the exact acceptance statement from the CLA gate. A model may be added later for wording, through the LiteLLM gateway with `gpt-5.4-mini`, but nothing needs it today, which also means the "no Claude, directly or indirectly" rule cannot be broken by this code.
+
+### Assessment core (built, offline; not deployed)
+
+`src/viharbot/steward/` is a pure, read-only core with no AWS and no network of its own. It reuses the repository's own CLA gate (`.github/scripts/cla_gate.py`) by loading and calling it, so Kepler cannot disagree with the merge check about who is covered, and every verdict records a fingerprint of the gate code that produced it. The gate must be present in the runtime image; if it cannot be loaded the steward reports "cannot conclude" and never guesses.
+
+For one pull request it reports six requirements, each `done`, `outstanding`, `needs_human` or `info`: CLA acceptance recorded, third-party rights disclosure, commit identities linked to accounts, branch up to date, automated checks, and human review. It never marks the CLA done from a comment: a valid, unedited acceptance comment from the author is reported as "claimed, awaiting the founder to verify and record it". A reply from the contributor, or CI waiting for the founder to approve a fork's workflows, is `needs_human`, because only the founder can judge them.
+
+Each outstanding or needs-human requirement gets an observation ID built from the repository, PR number, requirement, status and, only where it depends on it, the head commit. The same facts always give the same ID (so a re-poll or a duplicate event never re-alerts), a new push changes the CI, branch and identity IDs but not the CLA one, and a changed status gives a new ID. The drafter never repeats a CLA request that is still fresh (72 hours), sends a reminder listing only what is still outstanding, and produces nothing when the contributor has already replied.
+
+Nothing a contributor writes reaches an assessment, an alert or a draft; only GitHub account logins, which GitHub restricts to letters, digits and hyphens, can surface. GitHub is read through GET requests only. Not yet built: state and audit persistence, the email alert, the AgentCore runtime adapter and the polling loop.
 
 ## Components
 
