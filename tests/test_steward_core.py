@@ -541,10 +541,20 @@ def test_the_verdict_names_its_judge():
 
 
 def test_the_package_has_no_write_path_and_no_model_calls():
+    """Only `github_auth` may send a non-GET request, and only the token exchange."""
     package = ROOT / "src" / "viharbot" / "steward"
-    text = "\n".join(p.read_text() for p in package.glob("*.py")).lower()
-    for verb in ('"post"', '"put"', '"patch"', '"delete"', "urlopen", "requests.", "http.client",
-                 "boto3", "subprocess", "os.system"):
-        assert verb not in text, verb
-    for banned in ("litellm", "openai", "anthropic", "strands", "bedrock", "claude"):
-        assert f"import {banned}" not in text and f"from {banned}" not in text
+    sources = {p.name: p.read_text().lower() for p in package.glob("*.py")}
+    for name, text in sources.items():
+        for banned in ("litellm", "openai", "anthropic", "strands", "bedrock", "claude"):
+            assert f"import {banned}" not in text and f"from {banned}" not in text, (name, banned)
+        for risky in ("import requests", "from requests", "http.client", "subprocess", "os.system"):
+            assert risky not in text, (name, risky)
+        if name != "aws.py":  # AWS is imported in exactly one module, so it is easy to audit
+            assert "boto3" not in text, name
+        if name != "github_auth.py":
+            for verb in ('"post"', '"put"', '"patch"', '"delete"', "urlopen", 'method="'):
+                assert verb not in text, (name, verb)
+    auth = sources["github_auth.py"]
+    assert auth.count('method="post"') == 1 and auth.count("urllib.request.request(") == 1
+    assert 'method="put"' not in auth and 'method="patch"' not in auth and 'method="delete"' not in auth
+    assert "/access_tokens" in auth and auth.count("/app/installations/") == 1
