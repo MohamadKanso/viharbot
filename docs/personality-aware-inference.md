@@ -124,6 +124,19 @@ The orchestrator's Phase 3 execution records are still planner attribution. They
 - The identity prompts were written as declarative assets in Phase 2 and have not been tuned for use as live system prompts.
 - Each identity has one prompt for all its capabilities. Scout and Cipher use the same persona prompt for two services.
 
+## Persona section (Epic #157 Phase B)
+
+`VIHARBOT_PERSONA_PROMPT_ENABLED` adds a rendered persona section to the identity part of the prompt. It is off by default, set nowhere, read per request in the service's own environment, and **ignored unless `VIHARBOT_PERSONALITY_INFERENCE_ENABLED` is also on**. With only the personality flag, behavior is exactly as described above.
+
+The prompt becomes, in order: identity prompt, persona section, precedence clause, the service's own instructions verbatim. The persona section is therefore always outranked by the task instructions, and the tail after the clause is byte-identical to the legacy prompt (tests compare it to the legacy hashes). The section carries character, values, principles, tone, sentence style, vocabulary, things to avoid, reasoning approach, evidence standard, uncertainty reporting and disagreement style, then a fixed scope clause: the persona applies only to the wording of free-text explanation and never changes output structure, field names, schemas, citations or facts, and grants no tools, access or abilities. It omits the biography, the illustrative examples (so they cannot become templates), the model preference, avatar and provenance. See [agent personas](agent-personas.md).
+
+* **Same trust boundary.** The persona comes from the identity chosen by the approved binding, never from the request. A request cannot select a persona.
+* **Fails closed.** A missing or invalid persona raises `InferenceConfigError` and the service's existing sanitized 502. There is no fallback persona.
+* **No change to model or contracts.** Alias precedence, structured output models and REST/SSE contracts are untouched.
+* **Draft personas.** The shipped personas are `draft`. The flag is the explicit opt-in; logs add `persona_id`, `persona_version` and `persona_status` (identifiers only, never text) so a run is attributable.
+* **Scope.** Only services that use `effective_inference` (the six pipeline services and Pixel). Charlie's planner, Sage and Sage's code review compose their own prompts and are not persona-aware.
+* **Not measured.** Tests prove ordering, precedence and contract preservation with a mocked model. Whether a persona actually changes real output quality or voice is not validated; that needs the separate, optional evaluation suite (proposed B2).
+
 ## Future work (not implemented)
 
 Choosing among identities, delegation between agents, planning, model fallback and tool permissions are all out of scope. They need their own designs, permission models and approval.
