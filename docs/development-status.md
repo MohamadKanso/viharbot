@@ -90,7 +90,7 @@ Assets: `scripts/fact_check_eval/cases.json` (31 cases, 37 claims) and `run.py` 
 * Agent memory is written and never read, and is ephemeral on App Platform.
 * Execution is sequential; cancellation is cooperative and does not stop in-flight model or agent calls.
 * The live stream cannot send a terminal event after a lost connection, and would also end without one if the emitter hit an internal contract error (untested path).
-* The failure code `cancelled` is defined and never emitted.
+* The failure code `cancelled` is declared, reserved and never emitted; the emitter refuses it (issue #22, pull request pending merge).
 * Aliases in `agent_activity` of the final response are present even when diagnostics are off.
 * **D1** the Docker test profile does not run the suite (fixed in #192, merged). **D2** `test_the_fact_check_section_shows_the_cited_quote_and_whether_it_was_found` lacks `@needs_node` (fixed in #192, merged). **D3** a local `.env` changes test results (fixed by the pull request for #21, pending merge). Details in the audit.
 * Model availability is account-specific: on this account Gemini 2.5 aliases return 404, 3.7 and 3.8 flash returned 503, and the Pro models returned 429 on 2026-10-27.
