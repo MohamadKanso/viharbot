@@ -12,6 +12,10 @@
 #   4. Log group /aws/lambda/viharbot-kepler-alert-writer (30-day retention)
 #   5. IAM role viharbot-kepler-runtime          (permissions boundary attached)
 #   6. SNS topic, a poll-failure alarm and a USD 50 monthly budget, notifying ALERT_EMAIL
+# This is a record of how the foundation was created, not an idempotent tool: re-running it fails
+# at the first step because the resources already exist. Note also that, since the IAM review, the
+# deployer is denied altering or deleting the audit table, so a rebuild would need the
+# administrator to enable that table's point-in-time recovery.
 # Nothing here runs a model, holds a secret or starts an agent. The email address is never stored
 # in the repository. Record the outcome in docs/aws-lab-change-record.md.
 set -u

@@ -60,6 +60,12 @@ denied "create an ECR repository outside viharbot/kepler" aws ecr create-reposit
 denied "create a Lambda outside the namespace" aws lambda create-function --function-name other-negtest --runtime python3.12 --role "arn:aws:iam::$ACCT:role/viharbot-kepler-test-neg" --handler x.y --zip-file "fileb://$WORK/empty.zip"
 denied "rewrite the deployer's own trust policy" aws iam update-assume-role-policy --role-name viharbot-kepler-deployer --policy-document "file://$WORK/deployer-trust.json"
 denied "tag the deployer role" aws iam tag-role --role-name viharbot-kepler-deployer --tags Key=probe,Value=1
+# Probes below are harmless even if the denial failed: identical document, already-enabled setting,
+# or a resource that does not exist (a ResourceNotFound answer would mean authorization passed).
+denied "rewrite a workload role's trust policy (identical document)" aws iam update-assume-role-policy --role-name viharbot-kepler-runtime --policy-document "file://$WORK/runtime-trust.json"
+denied "change the audit table's backup setting (already enabled)" aws dynamodb update-continuous-backups --table-name viharbot-kepler-audit --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true
+denied "set a resource policy on a Kepler secret (secret does not exist)" aws secretsmanager put-resource-policy --secret-id viharbot/kepler/negtest-nonexistent --resource-policy '{"Version":"2012-10-17","Statement":[{"Effect":"Deny","Principal":"*","Action":"secretsmanager:GetSecretValue","Resource":"*"}]}'
+denied "add a resource permission to a Kepler function (function does not exist)" aws lambda add-permission --function-name viharbot-kepler-negtest-nonexistent --statement-id x --action lambda:InvokeFunction --principal '*'
 denied "delete the deployer role" aws iam delete-role --role-name viharbot-kepler-deployer
 denied "modify the deployer's own permissions" aws iam put-role-policy --role-name viharbot-kepler-deployer --policy-name viharbot-kepler-deployer --policy-document "file://$WORK/boundary-policy.json"
 denied "rewrite the SSO administrator role's trust" aws iam update-assume-role-policy --role-name "$SSO_ROLE" --policy-document "file://$WORK/deployer-trust.json"

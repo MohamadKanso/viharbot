@@ -2,26 +2,57 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "OnlyWhatKeplerRolesCanEverNeed",
+      "Sid": "PullKeplerImageOnly",
       "Effect": "Allow",
-      "Action": [
-        "ecr:BatchGetImage",
-        "ecr:GetDownloadUrlForLayer",
-        "ecr:GetAuthorizationToken",
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "logs:DescribeLogStreams",
-        "cloudwatch:PutMetricData",
-        "secretsmanager:GetSecretValue",
-        "dynamodb:PutItem",
-        "dynamodb:GetItem",
-        "dynamodb:Query",
-        "dynamodb:UpdateItem",
-        "lambda:InvokeFunction",
-        "bedrock-agentcore:InvokeAgentRuntime"
-      ],
+      "Action": ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"],
+      "Resource": "arn:aws:ecr:*:ACCOUNT_ID:repository/viharbot/kepler"
+    },
+    {
+      "Sid": "EcrAuthToken",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
       "Resource": "*"
+    },
+    {
+      "Sid": "LogsInKeplerGroupsOnly",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"],
+      "Resource": [
+        "arn:aws:logs:*:ACCOUNT_ID:log-group:/aws/bedrock-agentcore/runtimes/*",
+        "arn:aws:logs:*:ACCOUNT_ID:log-group:/viharbot/kepler*",
+        "arn:aws:logs:*:ACCOUNT_ID:log-group:/aws/lambda/viharbot-kepler-*"
+      ]
+    },
+    {
+      "Sid": "OwnMetricsNamespaceOnly",
+      "Effect": "Allow",
+      "Action": "cloudwatch:PutMetricData",
+      "Resource": "*",
+      "Condition": { "StringEquals": { "cloudwatch:namespace": "ViharBot/Kepler" } }
+    },
+    {
+      "Sid": "ReadKeplerSecretsOnly",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:*:ACCOUNT_ID:secret:viharbot/kepler/*"
+    },
+    {
+      "Sid": "KeplerTablesDataOnly",
+      "Effect": "Allow",
+      "Action": ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query", "dynamodb:UpdateItem"],
+      "Resource": "arn:aws:dynamodb:*:ACCOUNT_ID:table/viharbot-kepler-*"
+    },
+    {
+      "Sid": "InvokeKeplerFunctionsOnly",
+      "Effect": "Allow",
+      "Action": "lambda:InvokeFunction",
+      "Resource": "arn:aws:lambda:*:ACCOUNT_ID:function:viharbot-kepler-*"
+    },
+    {
+      "Sid": "InvokeAgentRuntimesInThisAccountOnly",
+      "Effect": "Allow",
+      "Action": "bedrock-agentcore:InvokeAgentRuntime",
+      "Resource": "arn:aws:bedrock-agentcore:*:ACCOUNT_ID:runtime/*"
     },
     {
       "Sid": "NeverInvokeFoundationModelsDirectly",

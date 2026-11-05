@@ -40,8 +40,7 @@
         "ecr:CreateRepository", "ecr:DeleteRepository", "ecr:DescribeRepositories", "ecr:TagResource",
         "ecr:PutImage", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload",
         "ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer",
-        "ecr:DescribeImages", "ecr:PutImageScanningConfiguration", "ecr:PutLifecyclePolicy",
-        "ecr:SetRepositoryPolicy"
+        "ecr:DescribeImages", "ecr:PutImageScanningConfiguration", "ecr:PutLifecyclePolicy"
       ],
       "Resource": "arn:aws:ecr:us-west-2:ACCOUNT_ID:repository/viharbot/kepler"
     },
@@ -66,8 +65,7 @@
       "Effect": "Allow",
       "Action": [
         "secretsmanager:CreateSecret", "secretsmanager:DescribeSecret", "secretsmanager:PutSecretValue",
-        "secretsmanager:UpdateSecret", "secretsmanager:DeleteSecret", "secretsmanager:TagResource",
-        "secretsmanager:PutResourcePolicy"
+        "secretsmanager:UpdateSecret", "secretsmanager:DeleteSecret", "secretsmanager:TagResource"
       ],
       "Resource": "arn:aws:secretsmanager:us-west-2:ACCOUNT_ID:secret:viharbot/kepler/*"
     },
@@ -98,7 +96,7 @@
       "Action": [
         "lambda:CreateFunction", "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration",
         "lambda:DeleteFunction", "lambda:GetFunction", "lambda:TagResource", "lambda:PutFunctionConcurrency",
-        "lambda:InvokeFunction", "lambda:AddPermission", "lambda:RemovePermission"
+        "lambda:InvokeFunction"
       ],
       "Resource": "arn:aws:lambda:us-west-2:ACCOUNT_ID:function:viharbot-kepler-*"
     },
@@ -135,7 +133,7 @@
       "Effect": "Allow",
       "Action": [
         "iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
-        "iam:UpdateAssumeRolePolicy", "iam:TagRole", "iam:DeleteRolePolicy", "iam:DetachRolePolicy", "iam:DeleteRole"
+        "iam:TagRole", "iam:DeleteRolePolicy", "iam:DetachRolePolicy", "iam:DeleteRole"
       ],
       "Resource": [
         "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-runtime",
@@ -187,6 +185,15 @@
         "iam:DeleteRolePermissionsBoundary", "iam:PassRole"
       ],
       "Resource": "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-deployer"
+    },
+    {
+      "Sid": "OnlyTheAdministratorMayAlterOrDeleteTheAuditTable",
+      "Effect": "Deny",
+      "Action": [
+        "dynamodb:UpdateTable", "dynamodb:UpdateContinuousBackups", "dynamodb:UpdateTimeToLive",
+        "dynamodb:DeleteTable", "dynamodb:RestoreTableToPointInTime"
+      ],
+      "Resource": "arn:aws:dynamodb:us-west-2:ACCOUNT_ID:table/viharbot-kepler-audit"
     },
     {
       "Sid": "NeverRemoveTheBoundaryOrUseIdentityAdmin",
