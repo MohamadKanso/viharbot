@@ -8,6 +8,7 @@ ViharBot implements a browser-based chat app and six independently deployed Fast
 
 - All foundation model inference goes through the external LiteLLM project using its OpenAI-compatible API.
 - Configure each model-using agent with `LITELLM_BASE_URL`, `LITELLM_API_KEY`, and its own model alias. Never deploy or modify LiteLLM, add provider-native inference, or put credentials in source.
+- **Exception, Kepler only (accepted in ADR-011; effective):** Kepler may use Amazon Bedrock with its IAM role instead of LiteLLM, restricted to an explicit allowlist of non-Anthropic models that fails closed. No Claude/Anthropic model, direct or indirect, until the founder records licensing and organizational approval. Every other agent stays LiteLLM-only. The live IAM deny on `bedrock:InvokeModel*` stays in force until an administrator changes it.
 - Do not send real keys or sensitive prompts over public HTTP. Permit credentials over HTTPS or HTTP to a literal loopback/private IP only (for secure local tunnels/private networking).
 - Use plain JSON REST for agent communication. Do not add A2A, brokers, service meshes, or orchestration frameworks unless the user changes this direction.
 - Keep each agent independently deployable with independent configuration and memory. Start with simple isolated storage; do not add databases without a concrete need.
