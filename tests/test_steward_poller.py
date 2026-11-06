@@ -30,7 +30,7 @@ OTHER = {"id": 5555, "login": "second-contributor", "type": "User"}
 HEAD2 = "e" * 40
 
 
-def world(extra_pr: bool = False, slow_clock: Clock | None = None):
+def world(extra_pr: bool = False, slow_clock: Clock | None = None, slow_seconds: int = 10):
     """Fake GitHub holding PR #179 (and optionally a second first-time PR #180)."""
     routes, lists = core.pr_routes()
     routes[f"/repos/{REPO}/commits/main"] = {"sha": "9" * 40}
@@ -56,7 +56,7 @@ def world(extra_pr: bool = False, slow_clock: Clock | None = None):
     class Gh(core.FakeGH):
         def get(self, path):
             if slow_clock is not None:
-                slow_clock.advance(seconds=10)  # 5 reads of setup = 50 s, under a 60 s deadline
+                slow_clock.advance(seconds=slow_seconds)  # default: 5 setup reads = 50 s < 60 s
             return super().get(path)
 
     return Gh(routes, lists), lists
@@ -72,7 +72,8 @@ class Stack:
         self.sns, self.cw, self.gh = FakeSns(), FakeCloudWatch(), gh
         self.tokens = tokens or FakeTokens()
         self.state = ObservationState(self.db, self.cfg.state_table, self.clock,
-                                      self.cfg.dedup_ttl_days, self.cfg.pending_retry_minutes)
+                                      self.cfg.dedup_ttl_days, self.cfg.pending_retry_minutes,
+                                      self.cfg.max_alert_attempts)
         self.audit = AuditLog(self.db, self.cfg.audit_table, self.clock)
 
     def poll(self, **kwargs):
@@ -99,9 +100,14 @@ def test_the_first_poll_sends_one_email_for_pr179_and_records_everything():
     assert "@MohamadKanso" in message["Message"] and "pull/179" in message["Message"]
     assert "Nothing has been posted to GitHub" in message["Message"]
     events = s.events()
-    assert [e["event"] for e in events] == ["poll_started", "alert_sent", "poll_completed"]
+    # the intent is durable BEFORE the email leaves; the outcome is recorded after
+    assert [e["event"] for e in events] == [
+        "poll_started", "alert_intent", "alert_sent", "poll_completed"]
     assert events[1]["pr"] == 179 and events[1]["observation_count"] == 5
-    assert events[1]["gate_sha256"] == gate_fingerprint() and events[1]["destination"] == "sns"
+    assert events[2]["pr"] == 179 and events[2]["observation_count"] == 5
+    assert events[2]["gate_sha256"] == gate_fingerprint() and events[2]["destination"] == "sns"
+    from viharbot.steward.audit import uncertain_intents
+    assert uncertain_intents(s.audit.read_all()) == []  # every intent has its outcome
     verify_chain(s.audit.read_all())
     assert s.cw.last("PollCompleted") == 1 and s.cw.last("PollFailed") == 0
     assert s.cw.last("PRsAssessed") == 1 and s.cw.last("AlertsSent") == 1
@@ -223,13 +229,17 @@ def test_one_bad_pull_request_does_not_stop_the_others():
     assert s.cw.last("PollFailed") == 1 and s.cw.last("PollCompleted") == 1
 
 
-def test_a_run_never_outlives_its_deadline():
+def test_no_new_work_starts_once_the_budget_is_spent():
+    """Setup reads cost 50 s and the first PR 40 s more. With a 100 s deadline (85 s of work
+    budget) the first PR is assessed and alerted inside the deadline, and the second is not started."""
     clock = Clock(core.NOW)
     gh, _ = world(extra_pr=True, slow_clock=clock)
-    s = Stack(gh, clock=clock, config=good_config(deadline_seconds=60))
+    s = Stack(gh, clock=clock, config=good_config(deadline_seconds=100))
     result = s.poll()
-    assert result.status == "partial" and result.prs_assessed == 1
+    assert result.status == "partial" and result.prs_assessed == 1 and result.alerts_sent == 1
     assert any(e["event"] == "deadline_reached" for e in s.events())
+    assert result.duration_ms <= 100 * 1000  # the first PR's email left before the deadline
+    assert not any(p.endswith("pulls/180") for _, p in gh.paths)  # PR 180 was never read
 
 
 def test_the_sweep_is_bounded():
@@ -360,3 +370,102 @@ def test_the_cli_refuses_an_unsafe_configuration():
     gh, _ = world()
     code, output = run_cli(gh, environ={"KEPLER_REPOSITORY": "vchokshi/viharbot-onboarding-instructor"})
     assert code == 2 and "configuration problem" in output and not gh.paths
+
+
+# ---- Sage's HIGH findings on #203, reproduced as tests ------------------------------------------------
+
+
+def audit_names(stack):
+    return [e["event"] for e in audit_events_of(stack)]
+
+
+def audit_events_of(stack):
+    return [json.loads(i["body"]) for i in stack.audit.read_all()]
+
+
+def test_repeated_crashes_after_publishing_never_cause_more_than_one_duplicate():
+    """HIGH: the claimed 'one retry, one duplicate' bound was not enforced across repeated crashes."""
+    gh, _ = world()
+    s = Stack(gh)
+    original = s.state.mark_sent
+
+    def die(observation_id):
+        s.db.fail = {"update"}
+        return original(observation_id)
+
+    s.state.mark_sent = die
+    assert s.poll().status == "failed" and len(s.sns.messages) == 1  # published, never recorded
+    s.db.fail = set()
+    s.clock.advance(minutes=31)
+    assert s.poll().status == "failed" and len(s.sns.messages) == 2  # the one allowed duplicate
+    s.db.fail = set()
+    s.state.mark_sent = original
+    s.clock.advance(minutes=31)
+    result = s.poll()
+    assert len(s.sns.messages) == 2  # never a third copy
+    assert "alert_exhausted" in audit_names(s) and s.cw.last("AlertsAbandoned") == 1
+    assert result.status == "partial"  # visible, not silent
+    s.clock.advance(hours=5)
+    s.poll()
+    assert len(s.sns.messages) == 2 and audit_names(s).count("alert_exhausted") >= 1
+
+
+def test_no_email_goes_out_after_the_deadline_and_the_run_stays_within_it():
+    """HIGH: the deadline was only checked between pull requests, so an email could be sent late."""
+    clock = Clock(core.NOW)
+    gh, _ = world(slow_clock=clock)  # every GitHub read costs 10 simulated seconds
+    s = Stack(gh, clock=clock, config=good_config(deadline_seconds=60))
+    result = s.poll()
+    assert s.sns.messages == []  # the budget ran out while the PR was being read: nothing is sent
+    assert result.status in ("partial", "failed")
+    assert result.duration_ms <= (60 + 10) * 1000  # the deadline plus at most one in-flight read
+
+
+def test_setup_that_uses_up_the_budget_fails_the_run_and_sends_nothing():
+    clock = Clock(core.NOW)
+    gh, _ = world(slow_clock=clock, slow_seconds=30)
+    s = Stack(gh, clock=clock, config=good_config(deadline_seconds=60))
+    result = s.poll()
+    assert result.status == "failed" and result.error_code == "deadline"
+    assert s.sns.messages == [] and result.duration_ms <= (60 + 30) * 1000
+
+
+def test_an_audit_outage_before_publishing_sends_nothing():
+    """HIGH: fail-closed auditing held only for an outage at startup."""
+    gh, _ = world()
+    s = Stack(gh)
+    s.db.fail_audit_events = {"alert_intent"}
+    result = s.poll()
+    assert result.status == "failed" and result.error_code == "audit"
+    assert s.sns.messages == []
+    claims = s.db.tables.get(s.cfg.state_table, {})
+    assert claims and all(v["status"]["S"] == "pending" for v in claims.values())  # retried later
+
+
+def test_an_audit_outage_after_publishing_leaves_a_durable_intent_that_is_reported_uncertain():
+    gh, _ = world()
+    s = Stack(gh)
+    s.db.fail_audit_events = {"alert_sent"}
+    result = s.poll()
+    assert result.status == "failed" and result.error_code == "audit"
+    assert len(s.sns.messages) == 1  # an email cannot be unsent
+    names = audit_names(s)
+    assert "alert_intent" in names and "alert_sent" not in names  # the intent proves it
+    from viharbot.steward.audit import uncertain_intents
+    uncertain = uncertain_intents(s.audit.read_all())
+    assert [u["pr"] for u in uncertain] == [179]
+    s.db.fail_audit_events = set()
+    s.clock.advance(hours=1)
+    s.poll()  # a later healthy run does not send it again and does not hide it
+    assert len(s.sns.messages) == 1
+
+
+def test_the_final_status_decides_the_metrics():
+    """MEDIUM: metrics were published before the completion audit could change the status."""
+    gh, _ = world()
+    s = Stack(gh)
+    s.db.fail_audit_events = {"poll_completed"}
+    result = s.poll()
+    assert result.status == "partial" and result.error_code == "audit"
+    assert s.cw.last("PollFailed") == 1  # not 0: the returned status and the metric must agree
+    assert s.cw.last("PollCompleted") == 1

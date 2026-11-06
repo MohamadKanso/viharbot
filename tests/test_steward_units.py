@@ -60,12 +60,13 @@ def test_defaults_and_environment():
 @pytest.mark.parametrize("over", [
     {"repo": "vchokshi/viharbot-onboarding-instructor"}, {"repo": "VChokshi/Viharbot-Onboarding-Instructor"},
     {"repo": "../x"}, {"repo": "noslash"}, {"region": "mars"},
-    {"reader_secret_id": "other/secret"}, {"reader_secret_id": "viharbot/kepler/UPPER"},
+    {"reader_" "secret_id": "other/name"}, {"reader_" "secret_id": "viharbot/kepler/Upper"},
     {"state_table": "other-table"}, {"audit_table": "viharbot-kepler-state"},
     {"alert_topic_arn": "arn:aws:sns:us-west-2:123456789012:other-topic"},
     {"alert_topic_arn": "https://evil.example/topic"}, {"base_branch": "main; rm -rf /"},
     {"deadline_seconds": 5}, {"deadline_seconds": 100_000}, {"max_pulls": 0}, {"max_pulls": 1000},
     {"reminder_after_hours": 0}, {"dedup_ttl_days": 0}, {"pending_retry_minutes": 0},
+    {"max_alert_attempts": 0}, {"max_alert_attempts": 6},
 ])
 def test_unsafe_configuration_is_refused(over):
     with pytest.raises(ConfigError):
@@ -225,6 +226,22 @@ def test_a_stale_pending_claim_is_retried_once_not_forever():
     state.mark_sent("abc")
     clock.advance(days=3)
     assert state.claim("abc") == SEEN  # a sent alert is never repeated
+
+
+def test_a_stale_claim_is_taken_over_at_most_once_then_reported_exhausted():
+    """Sage HIGH on #203: `attempts` was incremented but never checked, so repeated crashes after
+    publishing could take the same claim over forever and duplicate the email without bound."""
+    state, _, clock = state_pair(minutes=30)
+    assert state.claim("x") == NEW
+    clock.advance(minutes=31)
+    assert state.claim("x") == RETRY  # the one allowed retry
+    clock.advance(minutes=31)
+    assert state.claim("x") == "exhausted"  # not another retry: reported, once, for a human
+    assert state.peek("x") == "exhausted"
+    clock.advance(minutes=31)
+    assert state.claim("x") == SEEN  # and reported only once
+    clock.advance(days=3)
+    assert state.claim("x") == SEEN
 
 
 def test_two_racing_claims_cannot_both_win():

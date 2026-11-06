@@ -38,8 +38,11 @@ class StewardConfig:
     reminder_after_hours: int = 72
     dedup_ttl_days: int = 30
     pending_retry_minutes: int = 30
+    max_alert_attempts: int = 2  # claims per alert in total: the first, plus one retry
 
     def __post_init__(self) -> None:
+        if not 1 <= self.max_alert_attempts <= 5:
+            raise ConfigError("max_alert_attempts must be between 1 and 5")
         if not _REPO.fullmatch(self.repo) or self.repo.casefold() in {
                 r.casefold() for r in FORBIDDEN_REPOSITORIES}:
             raise ConfigError("repository must be owner/name and not a forbidden repository")
@@ -97,4 +100,5 @@ def from_env(environ: Mapping[str, str]) -> StewardConfig:
         reminder_after_hours=number("KEPLER_REMINDER_HOURS", 72),
         dedup_ttl_days=number("KEPLER_DEDUP_TTL_DAYS", 30),
         pending_retry_minutes=number("KEPLER_PENDING_RETRY_MINUTES", 30),
+        max_alert_attempts=number("KEPLER_MAX_ALERT_ATTEMPTS", 2),
     )

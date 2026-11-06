@@ -75,6 +75,27 @@ def verify_chain(items: list[dict]) -> None:
         previous = item["sha256"]
 
 
+def uncertain_intents(items: list[dict]) -> list[dict]:
+    """Alert intents with no recorded outcome.
+
+    The poller records `alert_intent` before it publishes an email and `alert_sent` or
+    `alert_failed` after. An email cannot be unsent, so if the audit store fails between the two, the
+    intent is the durable proof that an alert was about to go out. This lists every intent that has
+    no later outcome for the same poll and pull request, so an operator can reconcile it by hand.
+    """
+    intents: list[tuple[tuple, dict]] = []
+    outcomes: set[tuple] = set()
+    for item in items:
+        body = json.loads(item["body"])
+        key = (body.get("poll_id"), body.get("pr"))
+        if body["event"] == "alert_intent":
+            intents.append((key, body))
+        elif body["event"] in ("alert_sent", "alert_failed"):
+            outcomes.add(key)
+    return [{"pr": body["pr"], "poll_id": body["poll_id"], "seq": body["seq"],
+             "timestamp": body["timestamp"]} for key, body in intents if key not in outcomes]
+
+
 class AuditLog:
     def __init__(self, client: Any, table: str, clock: Callable[[], datetime.datetime]) -> None:
         self._db, self._table, self._clock = client, table, clock

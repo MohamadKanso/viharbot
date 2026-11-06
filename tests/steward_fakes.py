@@ -40,6 +40,7 @@ class FakeDynamo:
         self.race_hook: Callable[[dict, tuple], None] | None = None
         self.races_left = 0
         self.page = page
+        self.fail_audit_events: set[str] = set()  # audit events whose write raises (an outage mid-run)
 
     def _table(self, name: str) -> dict:
         return self.tables.setdefault(name, {})
@@ -50,6 +51,8 @@ class FakeDynamo:
 
     def put_item(self, TableName, Item, ConditionExpression=None):
         self._check("put", TableName)
+        if "body" in Item and json.loads(Item["body"]["S"]).get("event") in self.fail_audit_events:
+            raise RuntimeError("simulated audit outage for this event")
         key = (Item["pk"]["S"], Item["sk"]["S"])
         table = self._table(TableName)
         if self.races_left > 0 and self.race_hook:
@@ -77,8 +80,17 @@ class FakeDynamo:
             if (item is None or item["claimed_at"]["S"] != values[":old"]["S"]
                     or item["status"]["S"] != values[":pending"]["S"]):
                 raise CondFail()
+        if ConditionExpression and "attempts < :max" in ConditionExpression:
+            if item is None or int(item["attempts"]["N"]) >= int(values[":max"]["N"]):
+                raise CondFail()
+        if ConditionExpression and "attempts >= :max" in ConditionExpression:
+            if (item is None or int(item["attempts"]["N"]) < int(values[":max"]["N"])
+                    or item["status"]["S"] != values[":pending"]["S"]):
+                raise CondFail()
         if UpdateExpression.startswith("SET #s = :sent"):
             item["status"], item["sent_at"] = {"S": "sent"}, values[":now"]
+        elif ":exhausted" in values:
+            item["status"], item["exhausted_at"] = {"S": "exhausted"}, values[":now"]
         else:
             item["claimed_at"] = values[":now"]
             item["attempts"] = {"N": str(int(item["attempts"]["N"]) + 1)}
