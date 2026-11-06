@@ -55,7 +55,11 @@ check "invoke a runtime in another account" implicitDeny "$(capped bedrock-agent
 # For CloudWatch Logs the simulator evaluates the log GROUP (NAME:*), never a log-stream ARN.
 check "write logs in a Kepler group"    allowed      "$(capped logs:PutLogEvents "arn:aws:logs:us-west-2:$ACCT:log-group:/aws/lambda/viharbot-kepler-alert-writer:*")"
 check "write logs in another group"     implicitDeny "$(capped logs:PutLogEvents "arn:aws:logs:us-west-2:$ACCT:log-group:/aws/lambda/payments:*")"
-check "invoke a foundation model"       explicitDeny "$(capped bedrock:InvokeModel '*')"
+LLAMA="arn:aws:bedrock:us-west-2::foundation-model/meta.llama3-1-8b-instruct-v1:0"
+check "invoke the allowlisted Llama model" allowed "$(capped bedrock:InvokeModel "$LLAMA")"
+check "invoke another Llama model"      explicitDeny "$(capped bedrock:InvokeModel "arn:aws:bedrock:us-west-2::foundation-model/meta.llama3-70b-instruct-v1:0")"
+check "invoke an Anthropic model"       explicitDeny "$(capped bedrock:InvokeModel "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0")"
+check "invoke an Anthropic profile"     explicitDeny "$(capped bedrock:InvokeModel "arn:aws:bedrock:us-west-2:$ACCT:inference-profile/us.anthropic.claude-3-haiku-20240307-v1:0")"
 check "create an IAM user"              explicitDeny "$(capped iam:CreateUser '*')"
 check "assume another role"             explicitDeny "$(capped sts:AssumeRole '*')"
 
@@ -83,7 +87,9 @@ check "delete a state row"              explicitDeny "$(principal "$RUNTIME" dyn
 check "pull its image"                  allowed      "$(principal "$RUNTIME" ecr:BatchGetImage "arn:aws:ecr:us-west-2:$ACCT:repository/viharbot/kepler")"
 check "write runtime logs"              allowed      "$(principal "$RUNTIME" logs:PutLogEvents "arn:aws:logs:us-west-2:$ACCT:log-group:/aws/bedrock-agentcore/runtimes/x:*")"
 check "invoke the alert writer"         allowed      "$(principal "$RUNTIME" lambda:InvokeFunction "arn:aws:lambda:us-west-2:$ACCT:function:viharbot-kepler-alert-writer")"
-check "invoke a foundation model"       explicitDeny "$(principal "$RUNTIME" bedrock:InvokeModel '*')"
+check "runtime: invoke the allowlisted Llama" allowed "$(principal "$RUNTIME" bedrock:InvokeModel "$LLAMA")"
+check "runtime: invoke an Anthropic model" explicitDeny "$(principal "$RUNTIME" bedrock:InvokeModel "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0")"
+check "runtime: invoke a non-allowlisted model" explicitDeny "$(principal "$RUNTIME" bedrock:InvokeModel "arn:aws:bedrock:us-west-2::foundation-model/amazon.nova-lite-v1:0")"
 
 echo "RESULT: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
