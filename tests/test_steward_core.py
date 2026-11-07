@@ -494,6 +494,41 @@ def test_a_snapshot_is_fetched_with_gets_only_and_keeps_no_free_text_but_comment
     assert status_of(assessment, "ci") == NEEDS_HUMAN
 
 
+class LazyMergeState(FakeGH):
+    """GitHub computes mergeable_state lazily: the first read of the PR says nothing."""
+
+    def __init__(self, routes, lists, later):
+        super().__init__(routes, lists)
+        self.later, self.reads = later, 0
+
+    def get(self, path):
+        data, headers = super().get(path)
+        if path == f"/repos/{REPO}/pulls/179":
+            self.reads += 1
+            if self.reads > 1:
+                data = {**data, "mergeable_state": self.later}
+        return data, headers
+
+
+def test_a_merge_state_github_has_not_computed_yet_is_read_again_once():
+    """Found by the first dry run with the real reader app: the first read said nothing."""
+    routes, lists = pr_routes()
+    routes[f"/repos/{REPO}/pulls/179"] = {**routes[f"/repos/{REPO}/pulls/179"], "mergeable_state": None}
+    gh = LazyMergeState(routes, lists, "behind")
+    snap = fetch_snapshot(gh, REPO, 179)
+    assert snap.mergeable_state == "behind" and gh.reads >= 2
+    assert status_of(run(snap)[0], "branch_current") == OUTSTANDING
+    # if it is still not ready, it stays unknown (info) and never guesses; one extra read only
+    gh = LazyMergeState(routes, lists, None)
+    snap = fetch_snapshot(gh, REPO, 179)
+    assert snap.mergeable_state == "unknown" and gh.reads <= 3
+    assert status_of(run(snap)[0], "branch_current") == INFO
+    # a state that is already known is not re-read for this purpose
+    routes[f"/repos/{REPO}/pulls/179"] = {**routes[f"/repos/{REPO}/pulls/179"], "mergeable_state": "clean"}
+    gh = LazyMergeState(routes, lists, "behind")
+    assert fetch_snapshot(gh, REPO, 179).mergeable_state == "clean"
+
+
 def test_a_ci_read_failure_or_a_strange_head_sha_marks_ci_unknown():
     routes, lists = pr_routes(ci_error=True)
     assert fetch_snapshot(FakeGH(routes, lists), REPO, 179).ci_error
@@ -541,10 +576,20 @@ def test_the_verdict_names_its_judge():
 
 
 def test_the_package_has_no_write_path_and_no_model_calls():
+    """Only `github_auth` may send a non-GET request, and only the token exchange."""
     package = ROOT / "src" / "viharbot" / "steward"
-    text = "\n".join(p.read_text() for p in package.glob("*.py")).lower()
-    for verb in ('"post"', '"put"', '"patch"', '"delete"', "urlopen", "requests.", "http.client",
-                 "boto3", "subprocess", "os.system"):
-        assert verb not in text, verb
-    for banned in ("litellm", "openai", "anthropic", "strands", "bedrock", "claude"):
-        assert f"import {banned}" not in text and f"from {banned}" not in text
+    sources = {p.name: p.read_text().lower() for p in package.glob("*.py")}
+    for name, text in sources.items():
+        for banned in ("litellm", "openai", "anthropic", "strands", "bedrock", "claude"):
+            assert f"import {banned}" not in text and f"from {banned}" not in text, (name, banned)
+        for risky in ("import requests", "from requests", "http.client", "subprocess", "os.system"):
+            assert risky not in text, (name, risky)
+        if name != "aws.py":  # AWS is imported in exactly one module, so it is easy to audit
+            assert "boto3" not in text, name
+        if name != "github_auth.py":
+            for verb in ('"post"', '"put"', '"patch"', '"delete"', "urlopen", 'method="'):
+                assert verb not in text, (name, verb)
+    auth = sources["github_auth.py"]
+    assert auth.count('method="post"') == 1 and auth.count("urllib.request.request(") == 1
+    assert 'method="put"' not in auth and 'method="patch"' not in auth and 'method="delete"' not in auth
+    assert "/access_tokens" in auth and auth.count("/app/installations/") == 1
