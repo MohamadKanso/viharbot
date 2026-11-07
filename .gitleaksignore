@@ -1,0 +1,5 @@
+# Reviewed false positive: a unit test lists a deliberately INVALID Secrets Manager secret *name*
+# ("viharbot/kepler/UPPER") to prove config validation rejects it. It is a name, not a credential.
+# The current test text no longer matches the rule; this entry only covers the historical commit
+# the full-history scan still reads. Narrow on purpose: one commit, one file, one line.
+9a6fdd8eeeba429ea9cc4d5c56db60e78f6a2677:tests/test_steward_units.py:generic-api-key:63

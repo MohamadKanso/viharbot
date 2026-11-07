@@ -51,6 +51,12 @@
       "Resource": "arn:aws:dynamodb:us-west-2:ACCOUNT_ID:table/viharbot-kepler-audit"
     },
     {
+      "Sid": "PublishAlertsToTheFoundersTopicOnly",
+      "Effect": "Allow",
+      "Action": "sns:Publish",
+      "Resource": "arn:aws:sns:us-west-2:ACCOUNT_ID:viharbot-kepler-alerts"
+    },
+    {
       "Sid": "HandAlertsToTheSeparateWriter",
       "Effect": "Allow",
       "Action": "lambda:InvokeFunction",
