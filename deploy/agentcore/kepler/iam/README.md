@@ -70,4 +70,8 @@ aws iam put-role-policy --role-name viharbot-kepler-runtime --policy-name viharb
 bash deploy/agentcore/kepler/iam/tests/policy-simulation.sh      # every check must pass
 ```
 
-Record a new row in the change record with the approver. **Roll back:** `aws iam set-default-policy-version --policy-arn "$BOUNDARY" --version-id <previous>`, and `put-role-policy` the previous runtime policy from git history. Enabling this does not make Kepler call a model: no steward code does, and a model needs the in-code allowlist described in ADR-011 first.
+Before applying, you can review exactly what the new files will do without touching any role: `bash deploy/agentcore/kepler/iam/tests/policy-simulation-files.sh` evaluates the runtime policy capped by the boundary from the repository files alone (27 checks: one model allowed, every other model and every inference profile denied, `sns:Publish` to the alerts topic only, and the existing protections unchanged). `policy-simulation.sh` checks the live roles, so it only passes after the change is applied.
+
+The same change also adds `sns:Publish` on `viharbot-kepler-alerts` to the runtime policy and a matching ceiling to the boundary, which the alert email needs whether or not a model is used.
+
+Record a new row in the change record with the approver. **Roll back:** `aws iam set-default-policy-version --policy-arn "$BOUNDARY" --version-id <previous>`, and `put-role-policy` the previous runtime policy from git history. Applying this does not make Kepler call a model: that also needs `KEPLER_MODEL_ID` set to the one allowlisted ID in the runtime's configuration, and the steward refuses any other ID.

@@ -14,6 +14,7 @@ ViharBot implements a browser-based chat app and six independently deployed Fast
 - Keep each agent independently deployable with independent configuration and memory. Start with simple isolated storage; do not add databases without a concrete need.
 - Begin with structured JSON logs, including agent, request ID, destination agent, model alias, duration, and errors. Avoid full prompts, secrets, and private memory in logs.
 - Do not provision AWS resources unless explicitly requested. AgentCore capabilities must be verified before depending on them.
+- **No agent acts autonomously (founder decision, 2026-11-06).** Agents observe, draft and recommend. A human approves anything that is posted to GitHub, merged, deployed or changed, including every contributor-facing message, and an agent says plainly that it is an AI agent and who posts what it drafted. Kepler's GitHub access is read-only; any later write capability needs the founder's written authorization and approval of each message. This is stricter than the Constitution (Section 2.4), which allows a narrowly defined policy to authorize autonomous execution; no such policy exists for any agent.
 
 ## Deployment choices
 

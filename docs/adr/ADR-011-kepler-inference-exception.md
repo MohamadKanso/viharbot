@@ -36,6 +36,15 @@ This PR edits none of those files and runs no AWS command. Until the administrat
 
 Initial allowlist, chosen by the founder as Meta Llama: `meta.llama3-1-8b-instruct-v1:0` only (on-demand, no inference profile; listed active in `us-west-2` on 2026-11-05 by a read-only catalog call, which does not prove the account has access or show price). Adding a model means editing the allowlist in the policy files and, once it exists, in code, and a new boundary version.
 
+## Update, 2026-11-06 (founder decisions, proposed for the record)
+
+- **Kepler uses the model in its first build, for drafting only.** The model may write one validated opening sentence of a first-contact welcome draft and nothing else: it never writes the AI introduction, the CLA statement, any request, or the closing disclaimer. A human reads and posts every message. It is off unless `KEPLER_MODEL_ID` is set, is never called in a dry run, and its reply is treated as hostile input that must pass a strict validator or the draft falls back to the plain template.
+- **Role-only, no key, no LiteLLM** for Kepler, as this ADR allows. The runtime refuses any model ID that is not exactly `meta.llama3-1-8b-instruct-v1:0`, matching the single ARN in the IAM allow. Read-only checks on 2026-11-06 showed that model supports on-demand invocation in `us-west-2` and that the account is `AUTHORIZED` for it. The larger Llama 3.3 70B runs only through a cross-region inference profile, which would route contributor text through other regions, so it is not used.
+- **No agent acts autonomously.** Recorded in `AGENTS.md`: agents observe, draft and recommend; a human approves anything posted, merged, deployed or changed.
+- **Alerts go by email.** The runtime role gets `sns:Publish` on the one alerts topic (and the boundary a matching ceiling), whether or not a model is used.
+- **Bedrock invocation logging** appears unconfigured in this account. If it is enabled so the calls are visible to monitoring, it records prompts and replies, which here are a sanitized pull request title, file paths and a GitHub login; choose its retention and access deliberately.
+- Still not decided: reading or summarizing a contributor's reply, and conversational drafts. Both widen the untrusted input and need their own decision.
+
 ## Not decided
 
-Whether Kepler uses a model at all for its first build (it does not today); the founder's approval to include Claude later; changes to the governance architecture document, which describes LiteLLM-only inference and is founder-owned (`docs/governance/` is not edited here).
+~~Whether Kepler uses a model at all for its first build~~ (decided 2026-11-06: drafting only, see the update above); the founder's approval to include Claude later; changes to the governance architecture document, which describes LiteLLM-only inference and is founder-owned (`docs/governance/` is not edited here).

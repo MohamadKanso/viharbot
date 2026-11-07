@@ -43,6 +43,12 @@
       "Resource": "arn:aws:dynamodb:*:ACCOUNT_ID:table/viharbot-kepler-*"
     },
     {
+      "Sid": "PublishKeplerAlertsOnly",
+      "Effect": "Allow",
+      "Action": "sns:Publish",
+      "Resource": "arn:aws:sns:*:ACCOUNT_ID:viharbot-kepler-*"
+    },
+    {
       "Sid": "InvokeKeplerFunctionsOnly",
       "Effect": "Allow",
       "Action": "lambda:InvokeFunction",

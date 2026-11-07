@@ -57,6 +57,8 @@ check "write logs in a Kepler group"    allowed      "$(capped logs:PutLogEvents
 check "write logs in another group"     implicitDeny "$(capped logs:PutLogEvents "arn:aws:logs:us-west-2:$ACCT:log-group:/aws/lambda/payments:*")"
 LLAMA="arn:aws:bedrock:us-west-2::foundation-model/meta.llama3-1-8b-instruct-v1:0"
 check "invoke the allowlisted Llama model" allowed "$(capped bedrock:InvokeModel "$LLAMA")"
+check "publish to a Kepler alerts topic" allowed "$(capped sns:Publish "arn:aws:sns:us-west-2:$ACCT:viharbot-kepler-alerts")"
+check "publish to an unrelated topic" implicitDeny "$(capped sns:Publish "arn:aws:sns:us-west-2:$ACCT:someone-elses-topic")"
 check "invoke another Llama model"      explicitDeny "$(capped bedrock:InvokeModel "arn:aws:bedrock:us-west-2::foundation-model/meta.llama3-70b-instruct-v1:0")"
 check "invoke an Anthropic model"       explicitDeny "$(capped bedrock:InvokeModel "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0")"
 check "invoke an Anthropic profile"     explicitDeny "$(capped bedrock:InvokeModel "arn:aws:bedrock:us-west-2:$ACCT:inference-profile/us.anthropic.claude-3-haiku-20240307-v1:0")"
@@ -88,6 +90,8 @@ check "pull its image"                  allowed      "$(principal "$RUNTIME" ecr
 check "write runtime logs"              allowed      "$(principal "$RUNTIME" logs:PutLogEvents "arn:aws:logs:us-west-2:$ACCT:log-group:/aws/bedrock-agentcore/runtimes/x:*")"
 check "invoke the alert writer"         allowed      "$(principal "$RUNTIME" lambda:InvokeFunction "arn:aws:lambda:us-west-2:$ACCT:function:viharbot-kepler-alert-writer")"
 check "runtime: invoke the allowlisted Llama" allowed "$(principal "$RUNTIME" bedrock:InvokeModel "$LLAMA")"
+check "runtime: publish to the alerts topic" allowed "$(principal "$RUNTIME" sns:Publish "arn:aws:sns:us-west-2:$ACCT:viharbot-kepler-alerts")"
+check "runtime: publish to an unrelated topic" implicitDeny "$(principal "$RUNTIME" sns:Publish "arn:aws:sns:us-west-2:$ACCT:someone-elses-topic")"
 check "runtime: invoke an Anthropic model" explicitDeny "$(principal "$RUNTIME" bedrock:InvokeModel "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0")"
 check "runtime: invoke a non-allowlisted model" explicitDeny "$(principal "$RUNTIME" bedrock:InvokeModel "arn:aws:bedrock:us-west-2::foundation-model/amazon.nova-lite-v1:0")"
 
