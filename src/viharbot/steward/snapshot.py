@@ -133,12 +133,21 @@ def fetch_snapshot(gh, repo: str, number: int) -> PullSnapshot:
         )
     except gate.GitHubError:
         ci_error = True
+    mergeable_state = str(meta.get("mergeable_state") or "unknown")
+    if mergeable_state == "unknown":
+        # GitHub computes this lazily on the first read of a pull request. By now (after the other
+        # reads) it has usually finished, so look once more rather than report "not computed".
+        try:
+            again = gh.get(f"/repos/{repo}/pulls/{number}")[0]
+            mergeable_state = str(again.get("mergeable_state") or "unknown")
+        except gate.GitHubError:
+            pass
     return PullSnapshot(
         repo=repo, number=number, author=author,
         author_association=str(meta.get("author_association", "NONE")),
         state=str(meta.get("state", "")), draft=bool(meta.get("draft")), head_sha=head_sha,
         is_fork=bool(head_repo and head_repo.lower() != repo.lower()),
-        mergeable_state=str(meta.get("mergeable_state") or "unknown"),
+        mergeable_state=mergeable_state,
         created_at=str(meta.get("created_at", "")), updated_at=str(meta.get("updated_at", "")),
         pr=pr, comments=comments, reviews=reviews, ci_runs=runs, ci_error=ci_error,
     )
