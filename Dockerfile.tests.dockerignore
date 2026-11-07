@@ -1,0 +1,47 @@
+# Build context for Dockerfile.tests only (BuildKit uses <Dockerfile>.dockerignore in preference to
+# the shared .dockerignore, which the production images keep using unchanged).
+#
+# An allowlist: everything is excluded, then only what the offline suite reads is let back in.
+# Local secrets and state (.env, .env.*, .aws/, data/, .venv/, .git/, logs, caches) are never listed,
+# so they cannot enter the image or its layers even if new ones appear. Later rules win.
+*
+
+# Application and tests (the suite also runs scripts/ and reads the static page under src/).
+!pyproject.toml
+!README.md
+!src
+!tests
+!scripts
+
+# Repository files that tests assert on: container and deployment definitions, workflows, docs,
+# the governance and contributor records, and the portraits the team page checks.
+!compose.yaml
+!Dockerfile.*
+!.dockerignore
+!.gitignore
+!requirements.txt
+!certs
+!deploy
+!images
+!docs
+!.github
+!AGENTS.md
+!CONTRIBUTING.md
+!CONTRIBUTORS.md
+!CLA-ACCEPTANCES.md
+!CLA-EXCEPTIONS.md
+
+# Re-exclude generated files and any secret-looking file inside the allowed directories.
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/.aws
+
+# Last, so the rules above cannot hide it: the documented placeholder template only. It holds
+# names with empty values and no secrets, and the shipped-configuration tests read it. A
+# developer's real .env (or .env.local and so on) is never copied.
+!.env.example

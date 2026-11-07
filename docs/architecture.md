@@ -1,8 +1,8 @@
 # ViharBot architecture
 
-**Audited revision:** `main` at `f6fa545` (2026-10-28). Evidence and line references are in the [Phase 6.5 audit](audits/phase-6.5-architecture-audit.md). Statements below describe what the code does today; planned work is labelled **planned**. Earlier phase documents are kept as history and linked from the [README](../README.md).
+**Reconciled revision:** `main` at `9e149d2` (2026-11-06). This update corrected the agent roster, services, execution modes, authentication and deployment statements against the code. Line references in the [Phase 6.5 audit](audits/phase-6.5-architecture-audit.md) date from `f6fa545` (2026-10-28) and are historical. Statements below describe what the code does today; planned work is labelled **planned**. Earlier phase documents are kept as history and linked from the [README](../README.md).
 
-ViharBot is a browser chat that coordinates six independently deployed FastAPI agents over plain private JSON REST. One coordinator identity, Charlie, can plan the work step by step. The application enforces every rule: a model recommends, the application authorizes, the agents execute, the application validates the result, and the application decides completion. All inference goes through Strands to the external LiteLLM proxy. No broker, A2A protocol, service mesh or provider-native inference is used.
+ViharBot is a browser chat that coordinates eight independently deployed FastAPI agent services (six core services plus Pixel and Sage) over plain private JSON REST. One coordinator identity, Charlie, can plan the work step by step. The application enforces every rule: a model recommends, the application authorizes, the agents execute, the application validates the result, and the application decides completion. All inference goes through Strands to the external LiteLLM proxy (the one scoped exception, Kepler on allowlisted Bedrock models, is [ADR-011](adr/ADR-011-kepler-inference-exception.md) and has no code that calls a model yet). No broker, A2A protocol, service mesh or provider-native inference is used.
 
 ## Logical architecture: identities and capabilities
 
@@ -16,8 +16,10 @@ flowchart TB
     SC[Scout]
     CI[Cipher]
     PX[Pixel]
-    PL["Atlas, Sage, Orbit<br/>(not connected)"]
+    SG[Sage]
+    PL["Atlas, Orbit, Archie, Ada, Kepler<br/>(not connected)"]
   end
+  SG -->|philosophical analysis, dev stack| SGS[sage service]
   CH -->|synthesis| SY[synthesis service]
   PX -->|slide generation, on request| PXS[pixel service]
   CH -. planning .-> PW[planner in web container]
@@ -42,11 +44,13 @@ flowchart LR
     S[security :8000]
     P[privacy-review :8000]
     Y[synthesis :8000]
+    X[pixel :8000]
+    G[sage :8000]
   end
   U[Browser] -->|127.0.0.1:8080 only| W
-  W --> R & F & Q & S & P & Y
+  W --> R & F & Q & S & P & Y & X & G
   W -. "CHARLIE_PLANNER_MODEL" .-> L[(External LiteLLM)]
-  R & F & Q & S & P & Y --> L
+  R & F & Q & S & P & Y & X & G --> L
 ```
 
 | Service | Entry point | Framework | Model alias source | Memory | Auth |
@@ -54,13 +58,15 @@ flowchart LR
 | web | `viharbot.web_app` | FastAPI, uvicorn | `CHARLIE_PLANNER_MODEL` (planner only) | none server-side; browser tab history | Basic Auth when enabled |
 | research | `research_agent` | FastAPI, Strands | `RESEARCH_MODEL` | JSONL under `MEMORY_DIR` | none |
 | security | `security_agent` | FastAPI, Strands | `SECURITY_MODEL` | JSONL | none |
-| fact-check, source-quality, privacy-review, synthesis | `specialist_agent` (`AGENT_KIND`) | FastAPI, Strands | `FACT_CHECK_MODEL`, `SOURCE_QUALITY_MODEL`, `PRIVACY_MODEL`, `SYNTHESIS_MODEL` | JSONL, one volume each | none |
+| fact-check, source-quality, privacy-review, synthesis | `specialist_agent` (`AGENT_KIND`) | FastAPI, Strands | `FACT_CHECK_MODEL`, `SOURCE_QUALITY_MODEL`, `PRIVACY_MODEL`, `SYNTHESIS_MODEL` | JSONL, one volume each | signed assertions, opt-in (`VIHARBOT_SERVICE_AUTH`); off by default |
+| pixel | `pixel_agent` | FastAPI, Strands | `PIXEL_MODEL` | deck files under `MEMORY_DIR/pixel` | none |
+| sage | `sage_agent` | FastAPI, Strands | `SAGE_MODEL` | JSONL | none |
 
 Each agent exposes `GET /health` and one `POST` route, and the AgentCore adapter adds `/ping` and `/invocations`. Agents run on port 8000 and are never published to the host. The four specialists share `Dockerfile.specialist` but are separate containers with their own `AGENT_KIND`, alias and memory volume.
 
 ## Execution modes and orchestration
 
-`POST /api/chat` chooses the first mode whose flags allow it: iterative orchestration, controlled delegation, identity-attributed execution, or the fixed pipeline (the default). Flags and details are in the [README](../README.md#execution-modes) and [iterative orchestration](iterative-orchestration.md). The response contract of `/api/chat` is the same in all modes; iterative mode adds one optional `orchestration` object.
+`POST /api/chat` runs one of two modes: iterative orchestration when the web container has both `CHARLIE_PLANNER_MODEL` and `LITELLM_API_KEY` (`live_team.py`; there is no flag), otherwise the fixed pipeline. The older controlled-delegation and identity-attributed modes are not reachable from `web_app.py` (tracked in [#222](https://github.com/vchokshi/viharbot/issues/222)); their phase documents are history. Slide generation is an optional step after either mode. Details are in the [README](../README.md#execution-modes) and [iterative orchestration](iterative-orchestration.md). The response contract of `/api/chat` is the same in all modes; iterative mode adds one optional `orchestration` object.
 
 ### Dependency graph (enforced by `orchestration_policy.py`)
 
@@ -109,7 +115,7 @@ Budgets (defaults, with hard ceilings): 8 decisions, 6 executions, 2 repeats per
 
 ## Model inference path
 
-Every model call is `build_agent()` in `model_agent.py`: a Strands `Agent` over `LiteLLMModel` with `use_litellm_proxy=True`, `api_base` and key from `LITELLM_BASE_URL` / `LITELLM_API_KEY`. The planner and the six agents all use it. The rest of the code makes only non-inference HTTP calls (web to agents, and `GET /v1/models` in `litellm_client.check_connection`). The web container holds a LiteLLM key only when `WEB_LITELLM_API_KEY` is provided; by default it holds none and the planner is unavailable.
+Every model call is `build_agent()` in `model_agent.py`: a Strands `Agent` over `LiteLLMModel` with `use_litellm_proxy=True`, `api_base` and key from `LITELLM_BASE_URL` / `LITELLM_API_KEY`. The planner and all eight agent services use it. The rest of the code makes only non-inference HTTP calls (web to agents, and `GET /v1/models` in `litellm_client.check_connection`). The web container holds a LiteLLM key only when `WEB_LITELLM_API_KEY` is provided; by default it holds none and the planner is unavailable.
 
 | Service | Default alias (Compose and Stage template) |
 |---|---|
@@ -143,20 +149,20 @@ Each agent appends its own structured result to a JSONL file under its `MEMORY_D
 
 ## Authentication boundaries
 
-The web app uses one shared HTTP Basic credential when `WEB_AUTH_ENABLED` is on, applied to `/`, `/images/*`, `/api/chat` and `/api/chat/stream`; `/health` is open. The agents have no authentication, and agent-to-agent traffic relies on the private network. Request IDs correlate logs and are not credentials. Separate containers do not yet have separate cloud permissions.
+The web app uses one shared HTTP Basic credential when `WEB_AUTH_ENABLED` is on, applied to `/`, `/images/*`, `/api/chat` and `/api/chat/stream`; `/health` is open. Agent-to-agent traffic relies on the private network. The four specialist services can verify Ed25519-signed assertions (`service_auth.py`, ADR-006 step A2) when `VIHARBOT_SERVICE_AUTH` is set, and the web process can sign outbound calls to them when `VIHARBOT_OUTBOUND_AUTH` is set; both are off by default. Research, Security, Pixel and Sage verify nothing. Extending authentication is deferred for Stage ([#235](https://github.com/vchokshi/viharbot/issues/235)). Request IDs correlate logs and are not credentials. Separate containers do not yet have separate cloud permissions.
 
 ## Deployment topology
 
 ```mermaid
 flowchart TB
   subgraph Local["Local Dev (verified in use)"]
-    LC[Docker Compose: web + 6 agents]
+    LC[Docker Compose: web + 8 agents]
   end
   subgraph Stage["DigitalOcean Stage (template only; no app currently running)"]
     DW[web: public, Basic Auth]
-    DA[6 agents: private, port 8000, /tmp memory]
+    DA[6 agents (no Pixel or Sage): private, port 8000, /tmp memory]
   end
-  subgraph AWS["AWS / AgentCore (compatibility code only; not deployed)"]
+  subgraph AWS["AWS / AgentCore (compatibility code; no runtime deployed; Kepler lab foundation provisioned)"]
     AG[7 runtimes + browser bridge: planned]
   end
   GH[GitHub main] -. manual, separately approved .-> Stage
@@ -170,9 +176,13 @@ A push to `main` deploys nothing. See [deployment strategy](deployment-strategy.
 | Area | Implemented | Planned or missing |
 |---|---|---|
 | Independent agents | Separate containers, aliases, memory paths, structured logs | Per-agent cloud identities and permissions |
-| Orchestration | Four modes, stateless planner, policy, freshness, budgets, deadline | Persistent planner state; parallel execution |
-| Observability | Request ID, structured logs, live SSE events, model labels | Traces and a hosted log destination; token and cost metrics |
-| Memory | Write-only JSONL per agent | Durable, isolated, retrievable memory |
-| Communication | Plain JSON REST, validated contracts | Authenticated and observable inter-agent calls |
-| Runtimes | Docker Compose; DigitalOcean template | AWS EC2 and AgentCore deployment, distributed coordination |
-| Identities | Five live (Pixel only on request, behind a flag), three defined only | Atlas, Sage, Orbit behavior |
+| Orchestration | Live team or fixed pipeline, stateless planner, policy, freshness, budgets, deadline | Persistent planner state; parallel execution ([#234](https://github.com/vchokshi/viharbot/issues/234)) |
+| Observability | Request ID, structured logs, live SSE events, model labels | Persisted run traces ([#228](https://github.com/vchokshi/viharbot/issues/228)); token and cost metrics ([#231](https://github.com/vchokshi/viharbot/issues/231)); a hosted log destination |
+| Memory | Write-only JSONL per agent | Retention guardrail and engagement id ([#229](https://github.com/vchokshi/viharbot/issues/229)); durable, isolated, retrievable memory (ADR-009, proposed) |
+| Communication | Plain JSON REST, validated contracts; opt-in signed assertions on four services | Authentication on all services ([#235](https://github.com/vchokshi/viharbot/issues/235)) |
+| Runtimes | Docker Compose; DigitalOcean template (six agents) | One placement file ([#226](https://github.com/vchokshi/viharbot/issues/226)); Kepler on AgentCore ([#198](https://github.com/vchokshi/viharbot/issues/198)); other AWS deployment |
+| Identities | Eleven defined; six connected to services (Pixel and Sage in the dev stack) | Behavior for Atlas, Orbit, Archie and Ada; Kepler agent runtime ([#198](https://github.com/vchokshi/viharbot/issues/198)) |
+
+## Adding an operational agent today
+
+An identity needs only a TOML file and a prompt. An operational agent also needs, as of this revision: a `Capability` value and its entries in `CAPABILITY_STATUS` (`identity.py`), `OPERATIONAL_SERVICES` (`execution_bindings.py`), a binding in `execution_config/bindings.toml`, entries in `CANONICAL_ORDER` and `LEGACY_KEYS` (`orchestration_state.py`), `HARD_DEPENDENCIES`, `SOFT_INPUTS` and the planner's `CapabilityName` (`orchestration_policy.py`), a response field in `chat_models.py`, a URL in `web_app.agent_urls()`, `team_models.py`, `outbound_auth.DESTINATION_CAPABILITIES`, and the compose and Stage definitions. Planned improvements: a single placement file ([#226](https://github.com/vchokshi/viharbot/issues/226)) now, and a capability manifest ([#227](https://github.com/vchokshi/viharbot/issues/227)) when a ninth operational agent exists.

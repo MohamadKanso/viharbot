@@ -123,7 +123,7 @@ Eleven further events are declared in `EDUCATION_EVENT_TYPES` for the education 
 
 ### Error and reason codes
 
-`planner_failed.error_code`: `planner_unavailable`, `planner_inference_failed`, `planner_output_invalid`, `deadline_exceeded`. `agent_failed.error_code`: `agent_execution_failed`, `agent_response_invalid`, `deadline_exceeded`. `orchestration_failed.error_code`: `planner_unavailable`, `planner_inference_failed`, `planner_output_invalid`, `agent_execution_failed`, `agent_response_invalid`, `deadline_exceeded`, `orchestration_incomplete`, `internal_error` (the code `cancelled` is defined and has a message, but is never emitted; see the audit). `delegation_rejected.rejection_code` is one of 16 fixed codes defined as `RejectionCode` in `live_events.py` (for example `dependency_unmet`, `repeat_limit`, `execution_budget`, `deadline_exceeded`).
+`planner_failed.error_code`: `planner_unavailable`, `planner_inference_failed`, `planner_output_invalid`, `deadline_exceeded`. `agent_failed.error_code`: `agent_execution_failed`, `agent_response_invalid`, `deadline_exceeded`. `orchestration_failed.error_code`: `planner_unavailable`, `planner_inference_failed`, `planner_output_invalid`, `agent_execution_failed`, `agent_response_invalid`, `deadline_exceeded`, `orchestration_incomplete`, `internal_error` (the code `cancelled` is declared and has a message, but is **reserved and never sent**: a run is cancelled only when the client has disconnected or stopped reading, so there is nobody to deliver it to, and `EventEmitter.failed("cancelled")` raises `EventContractError`). `delegation_rejected.rejection_code` is one of 16 fixed codes defined as `RejectionCode` in `live_events.py` (for example `dependency_unmet`, `repeat_limit`, `execution_budget`, `deadline_exceeded`).
 
 ## JSON examples
 
@@ -518,6 +518,7 @@ Sage (`philosophical_analysis`) is a normal loop capability. Its events use the 
       "fact_check": null,
       "source_quality": null,
       "privacy_review": null,
+      "sage": null,
       "synthesis": null,
       "agent_activity": [
         {
@@ -649,14 +650,15 @@ Sequences are derived from the loop (`src/viharbot/iterative_execution.py`) and 
 ## Ordering and terminal guarantees
 
 * **Server ordering.** Sequence numbers and `parent_event_id` are assigned by a per-request `EventEmitter`, with no global counters. The emitter refuses to emit `final_response` twice, `orchestration_completed` before `final_response`, or `orchestration_failed` after `final_response` (`EventContractError`). `check_stream` verifies a recorded stream against these invariants and is used in the tests.
-* **Exactly one terminal event for a connected client**, under normal conditions: `drive()` (`live_stream.py:265`) turns every outcome into either `final_response` + `orchestration_completed` or a single `orchestration_failed`.
-* **Client ordering.** The page (`static/index.html`, `checkEvent`) rejects an event that has an unknown schema version, an unknown type, a mismatched `id`/`event` pair, a different request ID, a sequence that is not exactly the previous plus one, an event after a terminal event, a completion without a final response, a failure after a final response, or two final responses. Any of these stops the stream and shows "Connection interrupted. Completion could not be verified." Events therefore cannot be silently reordered on screen.
+* **At most one terminal event, and nothing after it**, for a connected, writable stream: the emitter raises `EventContractError` for any event after a terminal one, for a second `final_response`, for `orchestration_completed` before `final_response`, and for `orchestration_failed` after `final_response`. `drive()` turns every outcome into either `final_response` + `orchestration_completed` or a single `orchestration_failed`; the one outcome it cannot turn into a terminal event is described under "What is not guaranteed".
+* **Client ordering.** The page (`static/index.html`, `checkEvent`) rejects an event that has an unknown schema version, an unknown type, a mismatched `id`/`event` pair, a different request ID, a sequence that is not exactly the previous plus one, a completion without a final response, a failure after a final response, or two final responses. Any of these stops the stream and shows "Connection interrupted. Completion could not be verified." Events therefore cannot be silently reordered on screen. The page treats the **first valid terminal event as final**: it stops reading there, and anything after it (even in the same network read) is ignored, so a late frame cannot change a verified outcome. The server cannot send one.
+* **Success is shown only for a complete, verified sequence.** The answer is displayed only after `final_response` **and** `orchestration_completed` for the same request. A stream that ends after `final_response` without a terminal event, or with a contradicting `orchestration_failed`, is shown as interrupted.
 
 ### What is not guaranteed
 
 * **No terminal event after the connection is lost.** A disconnect, proxy cut-off, process crash or restart ends the stream without one. The page treats a stream that ends without a terminal event as unverified, never as success.
-* **A cancelled run emits no terminal event** by design.
-* **A contract bug ends the stream cleanly but without a terminal event.** If emitting a terminal event itself raised `EventContractError`, the worker records `contract_error`, signals the end of the queue, and the stream closes (`event_stream`, `live_stream.py:309`). No test exercises this path; it is a reliability risk, not an observed failure.
+* **A cancelled run emits no terminal event** by design, and does not imply that remote inference stopped or that anything is replayed. The `cancelled` code is reserved (see the codes above).
+* **A contract bug after the answer ends the stream without a terminal event, deliberately.** If `final_response` has been sent and `orchestration_completed` then cannot be (an application bug, `EventContractError`), `orchestration_failed` would contradict the answer already on the wire and a second terminal is forbidden, so **nothing more is sent**. `drive()` raises `EventContractError`, the worker records it, the queue is closed and the stream ends; the page shows "Connection interrupted. Completion could not be verified." The server logs `live stream ended` at **ERROR** with `action_status=no_terminal_event` and `error=terminal_event_not_sent` (fixed codes only, never the exception text). Failures *before* the answer still produce exactly one sanitized `orchestration_failed`. Covered by `tests/test_live_terminal_faults.py` and `tests/test_ui_live.py`.
 * **Cancellation is cooperative.** The loop checks the token before each decision and after planning. A planner or agent call already in flight is not interrupted; it runs to its own timeout, and its result is discarded. A browser disconnect therefore does not stop remote inference.
 
 ## Client guidance
@@ -680,6 +682,19 @@ The page shows the model next to each speaker only when the event carries a `mod
 ## Developer diagnostics
 
 `VIHARBOT_DEV_DIAGNOSTICS_ENABLED` (default `false`) adds `rationale` and `model_alias` as described above. Token usage and cost are not reported by the services, and the Developer Metrics tab says so rather than estimating.
+
+## Contract fixtures and conformance
+
+`tests/fixtures/live_events/` holds seven executable scenarios, each a complete, schema-valid stream ending in exactly one terminal event: `A_successful_request`, `A_successful_request_with_diagnostics`, `B_policy_rejection`, `C_evidence_supersession`, `D_planner_failure`, `E_agent_failure` and `F_full_team`. Together they contain all 14 event types. `final_response` always carries a complete `ChatResponse` (validated by the schema, never a placeholder). Scenario F delegates to all seven specialists, so its `ChatResponse` has every optional section set: `fact_check`, `source_quality`, `privacy_review`, `sage` and `synthesis`.
+
+**They are checked against the code, not only against the schema.** `tests/test_live_stream_conformance.py` regenerates every scenario from the real orchestration loop (mocked inference, the production emitter) and compares it with the fixture: timestamps and durations are ignored for A to E, and F must match byte for byte. A fixture that drifts from what the application emits fails the build. `python tests/live_conformance_helpers.py F_full_team --write` rewrites F from the code; the other fixtures are not rewritten automatically. Every success fixture must also contain every `ChatResponse` field except `deck`, so adding a response field makes the stale fixtures fail until they are updated. `deck` is sent only when a deck was requested; the optional sections the response builder sets are sent as `null` when their agent did not run.
+
+**Discrepancies found while establishing this, recorded rather than absorbed:**
+
+* **Stale fixtures.** The four success fixtures predated `ChatResponse.sage` and lacked `"sage": null`, which the real stream carries. They were updated; each change is that one line.
+* **One request cannot populate every section under default settings.** The default execution budget is six (`VIHARBOT_ORCH_MAX_EXECUTIONS`, ceiling twelve) and there are seven specialists, so a run that delegates to all of them ends with `orchestration_completed` under `policy_budget` and the last agent missing. Scenario F therefore uses a budget of seven.
+* **No `403`.** Authentication is HTTP Basic: a bad or missing credential is `401`, and `503` means web authentication is not configured. The endpoint never returns `403`.
+* **After the first valid terminal event the page ignores everything** (see "Ordering and terminal guarantees").
 
 ## Local validation
 

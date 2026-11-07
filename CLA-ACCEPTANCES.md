@@ -20,6 +20,7 @@ This is the **public record the `CLA acceptance` check reads**: the agreement's 
 | GitHub numeric ID | GitHub username at acceptance | Legal-terms version | Effective from (UTC) | Status | Withdrawn from (UTC) | Eligibility | Evidence ID | Evidence SHA-256 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 8943966 | [@vchokshi](https://github.com/vchokshi) | 1.0 | 2026-11-04T22:21:40Z | active | - | adult-individual | EV-8943966-6643628800 | 67f6230c8c25391dee3908deb9bdb4fe4d84f9a80d73193d008dec6d97647129 |
+| 91088196 | [@MohamadKanso](https://github.com/MohamadKanso) | 1.0 | 2026-11-05T08:39:26Z | active | - | adult-individual | EV-91088196-6653561487 | c2eeef541ae5068c343c75cbe5497b91f66a8b18190f3253e351c998886e3c88 |
 
 ## Rules
 

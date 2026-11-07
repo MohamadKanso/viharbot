@@ -44,7 +44,7 @@ All workflows use `contents: read` by default. Elevated permissions are granted 
 | Frontend tests (Node 24) | the frontend modules only, and fails if any of them was skipped (a skip means Node did not run the page) | yes |
 | Lint (Ruff) | blocking rules from `pyproject.toml`; plus a non-blocking advisory report | blocking rules only |
 | Detect container changes | on a pull request, lists the files it changes and decides whether a container definition or `src/` is among them (see below). Always says yes for pushes to `main` and manual runs, and says yes if it cannot tell | yes: a failed or cancelled detection fails `CI result` |
-| Docker build and smoke test | runs when a container definition or `src/` changed, and always on pushes to `main` and manual runs. Builds every image (web, research, security, specialists, orchestrator, tests), starts the stack with no key and no optional modes, and checks `/health`, the page, and the stream route's `409` and `422` | yes, when it runs |
+| Docker build and smoke test | runs when a container definition or `src/` changed, and always on pushes to `main` and manual runs. Builds every image (web, research, security, specialists, orchestrator, tests), **runs the offline suite inside the test image** (no network, no secrets, JUnit report uploaded; fails on any skip except the opt-in live checks), starts the stack with no key and no optional modes, and checks `/health`, the page, and the stream route's `409` and `422` | yes, when it runs |
 | CI result | one required check that fails if any job above did not succeed, and writes the consolidated summary | yes |
 
 ### When the Docker job runs
@@ -59,12 +59,13 @@ The page has no npm dependencies and no `package.json`. Its tests are pytest mod
 
 ```bash
 python -m pip install -e ".[test]" ruff==0.17.3
-python -m pytest --cov            # needs Node for the UI tests; move any local .env aside
+python -m pytest --cov            # needs Node for the UI tests; a local .env is ignored
 ruff check src tests scripts .github/scripts
 docker compose config --quiet && docker compose --profile demo --profile tests build
+docker compose --profile tests run --build --rm tests   # the same offline suite, in the test image
 ```
 
-A local `.env` is loaded by python-dotenv and can turn the orchestration flags on, which makes about 15 tests fail. CI has no `.env`, so it never sees this.
+LiteLLM loads a `.env` it finds above its install location on import, which used to turn the orchestration flags on and fail tests on a developer's machine (CI has no `.env`, so it never saw this). `tests/conftest.py` now sets `LITELLM_MODE=PRODUCTION` before that import, so the offline suite gives the same result with or without a local `.env`; `tests/test_env_isolation.py` checks it against the installed LiteLLM. The live opt-ins (`RUN_LITELLM_INTEGRATION=1`, `RUN_LITELLM_INFERENCE=1`) skip the isolation, since they may need a key kept in `.env`.
 
 ## Coverage
 
@@ -161,7 +162,8 @@ These are repository settings, not code, and were not changed by the pull reques
 * **Dependency Review runs on pull requests only**, so its badge on `main` reflects the last run on that branch, if any.
 * **Gitleaks, Bandit and CodeQL are static analysis.** They find patterns, not every flaw.
 * **`images/` and `README.md` do not trigger the Docker job**, although the images copy them. A pull request that changes only those cannot change how an image builds or starts, but a broken or missing file there would be found after merge, by the push-to-`main` run. Add them to the pattern in the `changes` job to check them on pull requests too.
-* **The Docker test profile (`docker compose --profile tests ...`) is not used by CI** and still does not run the whole suite: its image lacks Node, `compose.yaml`, `.env.example` and `images/` (see the [development status](development-status.md)). CI runs the suite on the host runner instead.
+* **The Docker test profile runs in CI, but only when the Docker job runs.** On a pull request that job is skipped unless a container definition or `src/` changes (see above), so a change limited to `tests/` is covered by the host jobs, and the Docker run happens on the next push to `main`. The image adds Node 24 and `git` to the test image only (about +314 MB over the previous test image, measured in the pull request that introduced it); no production image changes.
+* **The Docker suite is hermetic by construction.** Its build context is the allowlist in `Dockerfile.tests.dockerignore`, the `tests` service interpolates nothing from the environment, and the container has no network, so it cannot reach LiteLLM. `tests/test_docker_test_profile.py` checks these properties statically. Dependencies are installed while the image is built, which does need the network; running the tests does not.
 * **Advisory Ruff findings** (50 in the baseline: 34 unused imports, 10 ambiguous variable names, 5 lambda assignments, 1 unused variable) are reported but not blocking. The blocking set is intentionally small until they are cleaned up.
 * **Action versions are pinned to SHAs** and need updating; Dependabot proposes those updates.
 * **Third-party services.** Shields.io receives only public repository metadata when a badge is loaded. Scorecard publishes its results to the public OpenSSF API. Trivy downloads its vulnerability database from a public registry. No application data, prompts or secrets are sent anywhere.

@@ -1,0 +1,215 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AgentCoreCreateOnlyTaggedKepler",
+      "Effect": "Allow",
+      "Action": "bedrock-agentcore:CreateAgentRuntime",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": { "aws:RequestTag/project": "viharbot", "aws:RequestTag/agent": "kepler" }
+      }
+    },
+    {
+      "Sid": "AgentCoreManageTaggedKepler",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:UpdateAgentRuntime",
+        "bedrock-agentcore:DeleteAgentRuntime",
+        "bedrock-agentcore:GetAgentRuntime",
+        "bedrock-agentcore:CreateAgentRuntimeEndpoint",
+        "bedrock-agentcore:UpdateAgentRuntimeEndpoint",
+        "bedrock-agentcore:DeleteAgentRuntimeEndpoint",
+        "bedrock-agentcore:GetAgentRuntimeEndpoint",
+        "bedrock-agentcore:InvokeAgentRuntime",
+        "bedrock-agentcore:TagResource"
+      ],
+      "Resource": "*",
+      "Condition": { "StringEquals": { "aws:ResourceTag/project": "viharbot", "aws:ResourceTag/agent": "kepler" } }
+    },
+    {
+      "Sid": "AgentCoreListAndRead",
+      "Effect": "Allow",
+      "Action": ["bedrock-agentcore:ListAgentRuntimes", "bedrock-agentcore:ListAgentRuntimeEndpoints", "bedrock-agentcore:ListTagsForResource"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EcrKeplerRepositoryOnly",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:CreateRepository", "ecr:DeleteRepository", "ecr:DescribeRepositories", "ecr:TagResource",
+        "ecr:PutImage", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload",
+        "ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer",
+        "ecr:DescribeImages", "ecr:PutImageScanningConfiguration", "ecr:PutLifecyclePolicy"
+      ],
+      "Resource": "arn:aws:ecr:us-west-2:ACCOUNT_ID:repository/viharbot/kepler"
+    },
+    {
+      "Sid": "EcrAuthToken",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "StateTableKeplerOnly",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:CreateTable", "dynamodb:DescribeTable", "dynamodb:UpdateTable", "dynamodb:DeleteTable",
+        "dynamodb:UpdateTimeToLive", "dynamodb:DescribeTimeToLive", "dynamodb:UpdateContinuousBackups",
+        "dynamodb:DescribeContinuousBackups", "dynamodb:TagResource", "dynamodb:ListTagsOfResource"
+      ],
+      "Resource": "arn:aws:dynamodb:us-west-2:ACCOUNT_ID:table/viharbot-kepler-*"
+    },
+    {
+      "Sid": "SecretsKeplerNamespaceOnly",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:CreateSecret", "secretsmanager:DescribeSecret", "secretsmanager:PutSecretValue",
+        "secretsmanager:UpdateSecret", "secretsmanager:DeleteSecret", "secretsmanager:TagResource"
+      ],
+      "Resource": "arn:aws:secretsmanager:us-west-2:ACCOUNT_ID:secret:viharbot/kepler/*"
+    },
+    {
+      "Sid": "LogsKeplerOnly",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogGroup", "logs:PutRetentionPolicy", "logs:TagResource", "logs:DeleteLogGroup", "logs:PutMetricFilter", "logs:GetLogEvents", "logs:FilterLogEvents"],
+      "Resource": [
+        "arn:aws:logs:us-west-2:ACCOUNT_ID:log-group:/viharbot/kepler*",
+        "arn:aws:logs:us-west-2:ACCOUNT_ID:log-group:/aws/lambda/viharbot-kepler-*"
+      ]
+    },
+    {
+      "Sid": "LogsDescribe",
+      "Effect": "Allow",
+      "Action": "logs:DescribeLogGroups",
+      "Resource": "*"
+    },
+    {
+      "Sid": "SchedulerKeplerOnly",
+      "Effect": "Allow",
+      "Action": ["scheduler:CreateSchedule", "scheduler:UpdateSchedule", "scheduler:DeleteSchedule", "scheduler:GetSchedule", "scheduler:TagResource"],
+      "Resource": "arn:aws:scheduler:us-west-2:ACCOUNT_ID:schedule/default/viharbot-kepler-*"
+    },
+    {
+      "Sid": "AlertWriterFunctionOnly",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction", "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration",
+        "lambda:DeleteFunction", "lambda:GetFunction", "lambda:TagResource", "lambda:PutFunctionConcurrency",
+        "lambda:InvokeFunction"
+      ],
+      "Resource": "arn:aws:lambda:us-west-2:ACCOUNT_ID:function:viharbot-kepler-*"
+    },
+    {
+      "Sid": "AlarmsTopicsAndBudgetKeplerOnly",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:PutMetricAlarm", "cloudwatch:DeleteAlarms", "cloudwatch:DescribeAlarms", "cloudwatch:TagResource",
+        "sns:CreateTopic", "sns:DeleteTopic", "sns:Subscribe", "sns:SetTopicAttributes", "sns:GetTopicAttributes", "sns:TagResource",
+        "budgets:ViewBudget", "budgets:ModifyBudget"
+      ],
+      "Resource": [
+        "arn:aws:cloudwatch:us-west-2:ACCOUNT_ID:alarm:viharbot-kepler-*",
+        "arn:aws:sns:us-west-2:ACCOUNT_ID:viharbot-kepler-*",
+        "arn:aws:budgets::ACCOUNT_ID:budget/viharbot-kepler-*"
+      ]
+    },
+    {
+      "Sid": "CreateKeplerRolesOnlyWithTheBoundary",
+      "Effect": "Allow",
+      "Action": ["iam:CreateRole", "iam:PutRolePolicy", "iam:AttachRolePolicy"],
+      "Resource": [
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-runtime",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-scheduler",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-alert-writer",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-test-*"
+      ],
+      "Condition": {
+        "StringEquals": { "iam:PermissionsBoundary": "arn:aws:iam::ACCOUNT_ID:policy/viharbot-kepler-boundary" }
+      }
+    },
+    {
+      "Sid": "ManageKeplerRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
+        "iam:TagRole", "iam:DeleteRolePolicy", "iam:DetachRolePolicy", "iam:DeleteRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-runtime",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-scheduler",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-alert-writer",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-test-*"
+      ]
+    },
+    {
+      "Sid": "ReadTheDeployerRoleItself",
+      "Effect": "Allow",
+      "Action": ["iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies"],
+      "Resource": "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-deployer"
+    },
+    {
+      "Sid": "KeplerBoundaryPolicyReadOnly",
+      "Effect": "Allow",
+      "Action": ["iam:GetPolicy", "iam:GetPolicyVersion"],
+      "Resource": "arn:aws:iam::ACCOUNT_ID:policy/viharbot-kepler-boundary"
+    },
+    {
+      "Sid": "PassOnlyKeplerRolesToTheirServices",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-runtime",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-scheduler",
+        "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-alert-writer"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": ["bedrock-agentcore.amazonaws.com", "scheduler.amazonaws.com", "lambda.amazonaws.com"]
+        }
+      }
+    },
+    {
+      "Sid": "ReadCostsAndTags",
+      "Effect": "Allow",
+      "Action": ["ce:GetCostAndUsage", "tag:GetResources", "sts:GetCallerIdentity"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NeverChangeOrUseTheDeployerRoleItself",
+      "Effect": "Deny",
+      "Action": [
+        "iam:UpdateAssumeRolePolicy", "iam:UpdateRole", "iam:UpdateRoleDescription", "iam:TagRole",
+        "iam:UntagRole", "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy", "iam:DeleteRole", "iam:PutRolePermissionsBoundary",
+        "iam:DeleteRolePermissionsBoundary", "iam:PassRole"
+      ],
+      "Resource": "arn:aws:iam::ACCOUNT_ID:role/viharbot-kepler-deployer"
+    },
+    {
+      "Sid": "OnlyTheAdministratorMayAlterOrDeleteTheAuditTable",
+      "Effect": "Deny",
+      "Action": [
+        "dynamodb:UpdateTable", "dynamodb:UpdateContinuousBackups", "dynamodb:UpdateTimeToLive",
+        "dynamodb:DeleteTable", "dynamodb:RestoreTableToPointInTime"
+      ],
+      "Resource": "arn:aws:dynamodb:us-west-2:ACCOUNT_ID:table/viharbot-kepler-audit"
+    },
+    {
+      "Sid": "NeverRemoveTheBoundaryOrUseIdentityAdmin",
+      "Effect": "Deny",
+      "Action": [
+        "iam:DeleteRolePermissionsBoundary", "iam:PutRolePermissionsBoundary", "iam:CreateUser",
+        "iam:CreateAccessKey", "iam:CreateLoginProfile", "iam:CreatePolicyVersion",
+        "iam:DeletePolicy", "iam:DeletePolicyVersion", "iam:SetDefaultPolicyVersion"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NeverInvokeFoundationModelsDirectly",
+      "Effect": "Deny",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      "Resource": "*"
+    }
+  ]
+}

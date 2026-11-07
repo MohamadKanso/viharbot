@@ -1,5 +1,7 @@
 # Development status
 
+> **Reconciliation note (2026-11-06, `main` at `9e149d2`).** The tables below were last measured on 2026-10-28 and were not re-measured; no tests were run for this update. Known changes since then: service authentication is implemented and opt-in on the four specialist services (not on Research, Security, Pixel or Sage); Pixel and Sage run in the dev stack; the identity-routing and delegation flags no longer exist and their modules are unreachable from the web app; eleven identities are defined; the Kepler steward core and AWS lab foundation exist (not deployed); a fourth flag, `VIHARBOT_PERSONA_PROMPT_ENABLED`, was added (set nowhere); the Stage template has six agents and no Pixel or Sage. Open follow-ups are on the [issue tracker](https://github.com/vchokshi/viharbot/issues), starting with [#225](https://github.com/vchokshi/viharbot/issues/225) (dev-stack flags) and [#239](https://github.com/vchokshi/viharbot/issues/239) (documentation).
+
 An evidence-based snapshot. Maturity levels are kept separate, because each says something different:
 
 **Implemented** (code exists) → **Tested** (automated tests cover it) → **Integrated** (wired into the running application) → **Deployed** (ran in a deployed environment) → **Operationally validated** (observed working against real inference).
@@ -53,6 +55,7 @@ All default to `false`. None is set in the committed `compose.yaml` defaults or 
 | *(no flag)* the live team conversation | iterative loop, the live stream and Pixel in the conversation | a planner alias (`gpt-6-luna` by default) and `WEB_LITELLM_API_KEY` for the web container |
 | `VIHARBOT_PPT_GENERATION_ENABLED` | slide-deck generation by the pixel service (true in local Compose while testing) | `PIXEL_MODEL`, `LITELLM_API_KEY` on the pixel service |
 | `VIHARBOT_PERSONALITY_INFERENCE_ENABLED` | identity prompts on services | identity routing |
+| `VIHARBOT_PERSONA_PROMPT_ENABLED` | adds the persona section (Epic #157 Phase B) on top of identity prompts; ignored unless the personality flag is also on in the same service | `VIHARBOT_PERSONALITY_INFERENCE_ENABLED` |
 | `VIHARBOT_DEV_DIAGNOSTICS_ENABLED` | planner rationale and model aliases in the stream | iterative mode |
 
 A developer's `.env` can turn these on and changes test outcomes (see below).
@@ -70,7 +73,7 @@ Run on 2026-10-28 against the audited revision plus the documentation changes of
 
 By area on the host (clean environment): streaming events, emitter and SSE transport 289 passed; frontend and team status 72 passed; Fact Check guard and eval scoring 27 passed; orchestration policy, state, freshness, deadline 315 passed; identity, delegation, personality, configuration and API contract 220 passed with 3 skipped. The frontend tests run the page's own script against a fake DOM in Node 24; they do not use a real browser.
 
-Why the Docker profile differs: `Dockerfile.tests` copies only `pyproject.toml`, `README.md`, `src`, `tests` and `scripts`, and has no Node. The host suite is the authoritative one.
+Why the Docker profile differed on 2026-10-28: `Dockerfile.tests` copied only `pyproject.toml`, `README.md`, `src`, `tests` and `scripts`, and had no Node. Issues #19 and #20 change this: the image now carries Node 24, `git` and the repository files the suite reads, and the Docker profile runs the whole offline suite with no network. The table above is the dated record and is not rewritten; the fresh Docker and host results for the fix are in its pull request, and the fix is not in a release until that pull request is merged. The host suite remains the reference.
 
 ## Verified and unverified
 
@@ -90,9 +93,9 @@ Assets: `scripts/fact_check_eval/cases.json` (31 cases, 37 claims) and `run.py` 
 * Agent memory is written and never read, and is ephemeral on App Platform.
 * Execution is sequential; cancellation is cooperative and does not stop in-flight model or agent calls.
 * The live stream cannot send a terminal event after a lost connection, and would also end without one if the emitter hit an internal contract error (untested path).
-* The failure code `cancelled` is defined and never emitted.
+* The failure code `cancelled` is declared, reserved and never emitted; the emitter refuses it (issue #22, pull request pending merge).
 * Aliases in `agent_activity` of the final response are present even when diagnostics are off.
-* **D1** the Docker test profile does not run the suite. **D2** `test_the_fact_check_section_shows_the_cited_quote_and_whether_it_was_found` lacks `@needs_node`. **D3** a local `.env` changes test results. Details in the audit.
+* **D1** the Docker test profile does not run the suite (fixed in #192, merged). **D2** `test_the_fact_check_section_shows_the_cited_quote_and_whether_it_was_found` lacks `@needs_node` (fixed in #192, merged). **D3** a local `.env` changes test results (fixed by the pull request for #21, pending merge). Details in the audit.
 * Model availability is account-specific: on this account Gemini 2.5 aliases return 404, 3.7 and 3.8 flash returned 503, and the Pro models returned 429 on 2026-10-27.
 * Streaming is not bridged through AgentCore.
 

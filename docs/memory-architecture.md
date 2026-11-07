@@ -1,6 +1,6 @@
 # Memory
 
-Each of the six agents writes an append-only JSONL file in its own memory directory:
+Each agent service (research, security, fact-check, source-quality, privacy-review, synthesis and sage) writes an append-only JSONL file in its own memory directory:
 
 - Research: `data/research/memory.jsonl`
 - Security: `data/security/memory.jsonl`
@@ -8,6 +8,7 @@ Each of the six agents writes an append-only JSONL file in its own memory direct
 - Source Quality: its private container memory directory
 - Privacy Review: its private container memory directory
 - Synthesis: its private container memory directory
+- Sage: its private container memory directory
 
 Each record contains a timestamp, request ID, and that agent's structured result. **Nothing reads these files back.** `remember()` only appends (`src/viharbot/memory.py`), so memory is an audit trail, not context an agent can retrieve. Durable, retrievable, isolated memory is planned, not built. The memory helper does not intentionally save the incoming question, browser transcript, another agent's private history, or credentials. Generated results may still include sensitive information, so protect memory storage appropriately.
 

@@ -8,11 +8,13 @@ ViharBot implements a browser-based chat app and six independently deployed Fast
 
 - All foundation model inference goes through the external LiteLLM project using its OpenAI-compatible API.
 - Configure each model-using agent with `LITELLM_BASE_URL`, `LITELLM_API_KEY`, and its own model alias. Never deploy or modify LiteLLM, add provider-native inference, or put credentials in source.
+- **Exception, Kepler only (accepted in ADR-011; effective):** Kepler may use Amazon Bedrock with its IAM role instead of LiteLLM, restricted to an explicit allowlist of non-Anthropic models that fails closed. No Claude/Anthropic model, direct or indirect, until the founder records licensing and organizational approval. Every other agent stays LiteLLM-only. Live IAM (change record row 12, 2026-11-06) allows `bedrock:InvokeModel*` only on `meta.llama3-1-8b-instruct-v1:0` and denies every other model and all Anthropic models. The code-side allowlist is not built yet, so no Kepler code may call a model until it is; Bedrock model access and price are unverified.
 - Do not send real keys or sensitive prompts over public HTTP. Permit credentials over HTTPS or HTTP to a literal loopback/private IP only (for secure local tunnels/private networking).
 - Use plain JSON REST for agent communication. Do not add A2A, brokers, service meshes, or orchestration frameworks unless the user changes this direction.
 - Keep each agent independently deployable with independent configuration and memory. Start with simple isolated storage; do not add databases without a concrete need.
 - Begin with structured JSON logs, including agent, request ID, destination agent, model alias, duration, and errors. Avoid full prompts, secrets, and private memory in logs.
 - Do not provision AWS resources unless explicitly requested. AgentCore capabilities must be verified before depending on them.
+- **No agent acts autonomously (founder decision, 2026-11-06).** Agents observe, draft and recommend. A human approves anything that is posted to GitHub, merged, deployed or changed, including every contributor-facing message, and an agent says plainly that it is an AI agent and who posts what it drafted. Kepler's GitHub access is read-only; any later write capability needs the founder's written authorization and approval of each message. This is stricter than the Constitution (Section 2.4), which allows a narrowly defined policy to authorize autonomous execution; no such policy exists for any agent.
 
 ## Deployment choices
 
