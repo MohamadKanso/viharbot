@@ -36,7 +36,8 @@ def world(extra_pr: bool = False, slow_clock: Clock | None = None, slow_seconds:
     routes[f"/repos/{REPO}/commits/main"] = {"sha": "9" * 40}
     for path in ("CLA-ACCEPTANCES.md", "CLA-EXCEPTIONS.md", "CONTRIBUTORS.md",
                  "docs/governance/contributor-license-agreement.md"):
-        routes[f"/repos/{REPO}/contents/{path}"] = core.b64(core.read(path))
+        text = core.record_without_author() if path == "CLA-ACCEPTANCES.md" else core.read(path)
+        routes[f"/repos/{REPO}/contents/{path}"] = core.b64(text)
     routes[f"/users/{core.AUTHOR['login']}"] = {"id": core.AUTHOR["id"]}
     pulls = [{"number": 179, "user": core.AUTHOR, "author_association": "FIRST_TIME_CONTRIBUTOR"}]
     if extra_pr:
