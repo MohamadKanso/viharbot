@@ -53,9 +53,19 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
+def record_without_author() -> str:
+    """The live record with any row for the PR #179 author removed.
+
+    These tests model PR #179 before its author is recorded. Reading the live file as-is made them
+    fail once the real acceptance row was merged, so the author's row is dropped here. The header,
+    prerequisites and every other row stay real.
+    """
+    return re.sub(rf"(?m)^\| {AUTHOR['id']} \|.*\n?", "", read("CLA-ACCEPTANCES.md"))
+
+
 def files(record: str | None = None):
     return GATE.Files(
-        base_record=read("CLA-ACCEPTANCES.md") if record is None else record,
+        base_record=record_without_author() if record is None else record,
         base_exceptions=read("CLA-EXCEPTIONS.md"),
         base_registry=read("CONTRIBUTORS.md"),
         base_agreement=read("docs/governance/contributor-license-agreement.md"),
@@ -118,7 +128,7 @@ def status_of(assessment, key):
 
 
 def record_with(row_status="active", version="1.0", withdrawn="-", eligibility="adult-individual"):
-    text = read("CLA-ACCEPTANCES.md")
+    text = record_without_author()
     founder_row = re.search(r"(?m)^\| 8943966 \|.*$", text).group(0)
     row = (f"| {AUTHOR['id']} | [@{AUTHOR['login']}](https://github.com/{AUTHOR['login']}) | "
            f"{version} | 2026-11-05T01:00:00Z | {row_status} | {withdrawn} | {eligibility} | "
