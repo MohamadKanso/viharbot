@@ -1,5 +1,7 @@
 # Phase 6.5 architecture audit
 
+> **Historical (audited 2026-10-28 at `f6fa545`).** Several findings have since changed, notably agent authentication (now implemented and opt-in on four services) and the orchestration flags (removed). See the reconciliation note in [development status](../development-status.md) and the current [architecture](../architecture.md).
+
 An evidence-based review of ViharBot as it exists on `main`. Code is treated as evidence of implementation, tests as evidence of tested behavior, and deployment records as evidence of deployed behavior. These are different things and are kept separate throughout. References use `path:line` against the audited revision.
 
 ## 1. Baseline

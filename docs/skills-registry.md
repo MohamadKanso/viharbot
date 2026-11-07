@@ -1,6 +1,6 @@
 # Skills registry
 
-The skills registry is a declarative, versioned catalogue of the professional work each of the eight agents could do. It implements [Agent Architecture v1.1](governance/agent-architecture-v1.1.md) section 4 and [Skills Registry v1.0](governance/agent-skills-registry-v1.md). **It is metadata only.** Nothing in the application reads it, no skill is executable, and it adds no service, model call or REST/SSE contract.
+The skills registry is a declarative, versioned catalogue of the professional work each of the agent identities could do. It implements [Agent Architecture v1.1](governance/agent-architecture-v1.1.md) section 4 and [Skills Registry v1.0](governance/agent-skills-registry-v1.md). **It is metadata only.** Nothing in the application reads it, no skill is executable, and it adds no service, model call or REST/SSE contract.
 
 ## Identity, skill, capability, binding
 

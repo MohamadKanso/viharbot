@@ -1,5 +1,7 @@
 # Development status
 
+> **Reconciliation note (2026-11-06, `main` at `9e149d2`).** The tables below were last measured on 2026-10-28 and were not re-measured; no tests were run for this update. Known changes since then: service authentication is implemented and opt-in on the four specialist services (not on Research, Security, Pixel or Sage); Pixel and Sage run in the dev stack; the identity-routing and delegation flags no longer exist and their modules are unreachable from the web app; eleven identities are defined; the Kepler steward core and AWS lab foundation exist (not deployed); a fourth flag, `VIHARBOT_PERSONA_PROMPT_ENABLED`, was added (set nowhere); the Stage template has six agents and no Pixel or Sage. Open follow-ups are on the [issue tracker](https://github.com/vchokshi/viharbot/issues), starting with [#225](https://github.com/vchokshi/viharbot/issues/225) (dev-stack flags) and [#239](https://github.com/vchokshi/viharbot/issues/239) (documentation).
+
 An evidence-based snapshot. Maturity levels are kept separate, because each says something different:
 
 **Implemented** (code exists) → **Tested** (automated tests cover it) → **Integrated** (wired into the running application) → **Deployed** (ran in a deployed environment) → **Operationally validated** (observed working against real inference).
